@@ -43,3 +43,5 @@ docs/.vitepress/cache
 
 kite
 !charts/kite
+
+dev.db
