@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 
 import { useResources } from '@/lib/api'
+import { useCluster } from '@/hooks/use-cluster'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -15,7 +16,11 @@ import {
 
 export function RecentEvents() {
   const { t } = useTranslation()
-  const { data, isLoading } = useResources('events', undefined, {
+  const { currentClusterInfo } = useCluster()
+  const scopedNamespace = currentClusterInfo?.namespaceScoped
+    ? currentClusterInfo.namespace
+    : undefined
+  const { data, isLoading } = useResources('events', scopedNamespace, {
     limit: 20,
   })
 

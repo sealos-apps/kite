@@ -39,6 +39,7 @@ export function ClusterDialog({
 }: ClusterDialogProps) {
   const { t } = useTranslation()
   const isEditMode = !!cluster
+  const asciiClusterNameRegExp = /^[\x21-\x7E]+$/
 
   const [formData, setFormData] = useState({
     name: '',
@@ -64,8 +65,14 @@ export function ClusterDialog({
     }
   }, [cluster, open])
 
+  const isClusterNameValid =
+    formData.name === '' || asciiClusterNameRegExp.test(formData.name)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isClusterNameValid) {
+      return
+    }
     onSubmit(formData)
   }
 
@@ -127,7 +134,20 @@ export function ClusterDialog({
                   'e.g., production, staging'
                 )}
                 required
+                aria-invalid={!isClusterNameValid}
               />
+              <p
+                className={`text-xs ${
+                  isClusterNameValid
+                    ? 'text-muted-foreground'
+                    : 'text-destructive'
+                }`}
+              >
+                {t(
+                  'clusterManagement.form.name.asciiOnly',
+                  'Cluster name must use English/ASCII characters only. Do not use Chinese names.'
+                )}
+              </p>
             </div>
 
             {!isEditMode && (
@@ -284,6 +304,7 @@ export function ClusterDialog({
               type="submit"
               disabled={
                 !formData.name ||
+                !isClusterNameValid ||
                 (!isEditMode && !formData.inCluster && !formData.config)
               }
             >

@@ -22,6 +22,7 @@ import {
   ResourceUsageHistory,
   Role,
   UserItem,
+  clusterScopeResources,
 } from '@/types/api'
 
 import { API_BASE_URL, apiClient } from './api-client'
@@ -50,6 +51,29 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
   }
 }
 
+const getCurrentScopedNamespace = (): string | undefined => {
+  const currentCluster = localStorage.getItem('current-cluster')
+  if (!currentCluster) return undefined
+  return (
+    localStorage.getItem(`${currentCluster}-scoped-namespace`) || undefined
+  )
+}
+
+const isClusterScopedResource = (resource: string): boolean => {
+  return clusterScopeResources.includes(resource as ResourceType)
+}
+
+const resolveNamespaceForResource = (
+  resource: string,
+  namespace?: string
+): string | undefined => {
+  const scopedNamespace = getCurrentScopedNamespace()
+  if (!scopedNamespace || isClusterScopedResource(resource)) {
+    return namespace
+  }
+  return scopedNamespace
+}
+
 export const fetchResources = <T>(
   resource: string,
   namespace?: string,
@@ -61,7 +85,10 @@ export const fetchResources = <T>(
     reduce?: boolean
   }
 ): Promise<T> => {
-  let endpoint = namespace ? `/${resource}/${namespace}` : `/${resource}`
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
+  let endpoint = resolvedNamespace
+    ? `/${resource}/${resolvedNamespace}`
+    : `/${resource}`
   const params = new URLSearchParams()
 
   if (opts?.limit) {
@@ -228,7 +255,8 @@ export const updateResource = async <T extends ResourceType>(
   namespace: string | undefined,
   body: ResourceTypeMap[T]
 ): Promise<void> => {
-  const endpoint = `/${resource}/${namespace || '_all'}/${name}`
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
+  const endpoint = `/${resource}/${resolvedNamespace || '_all'}/${name}`
   await apiClient.put(`${endpoint}`, body)
 }
 
@@ -237,7 +265,8 @@ export const resizePod = async (
   name: string,
   body: Partial<Pod>
 ): Promise<void> => {
-  const endpoint = `/pods/${namespace || '_all'}/${name}/resize`
+  const resolvedNamespace = resolveNamespaceForResource('pods', namespace)
+  const endpoint = `/pods/${resolvedNamespace || '_all'}/${name}/resize`
   await apiClient.patch(`${endpoint}`, body)
 }
 
@@ -252,7 +281,8 @@ export const patchResource = async <T extends ResourceType>(
   namespace: string | undefined,
   body: DeepPartial<ResourceTypeMap[T]>
 ): Promise<void> => {
-  const endpoint = `/${resource}/${namespace || '_all'}/${name}`
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
+  const endpoint = `/${resource}/${resolvedNamespace || '_all'}/${name}`
   await apiClient.patch(`${endpoint}`, body)
 }
 
@@ -261,7 +291,8 @@ export const createResource = async <T extends ResourceType>(
   namespace: string | undefined,
   body: ResourceTypeMap[T]
 ): Promise<ResourceTypeMap[T]> => {
-  const endpoint = `/${resource}/${namespace || '_all'}`
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
+  const endpoint = `/${resource}/${resolvedNamespace || '_all'}`
   return await apiClient.post<ResourceTypeMap[T]>(`${endpoint}`, body)
 }
 
@@ -274,6 +305,7 @@ export const deleteResource = async <T extends ResourceType>(
     wait?: boolean
   }
 ): Promise<void> => {
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
   const params = new URLSearchParams()
   if (opts?.force) {
     params.append('force', 'true')
@@ -281,7 +313,7 @@ export const deleteResource = async <T extends ResourceType>(
   if (opts?.wait === false) {
     params.append('wait', 'false')
   }
-  const endpoint = `/${resource}/${namespace || '_all'}/${name}?${params.toString()}`
+  const endpoint = `/${resource}/${resolvedNamespace || '_all'}/${name}?${params.toString()}`
   await apiClient.delete(endpoint)
 }
 
@@ -384,7 +416,8 @@ export function useResourcesWatch<T extends ResourceType>(
   const eventSourceRef = useRef<EventSource | null>(null)
 
   const buildUrl = useCallback(() => {
-    const ns = namespace || '_all'
+    const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
+    const ns = resolvedNamespace || '_all'
     const params = new URLSearchParams()
     if (options?.reduce !== false) params.append('reduce', 'true')
     if (options?.labelSelector)
@@ -514,8 +547,9 @@ export const fetchResource = <T>(
   name: string,
   namespace?: string
 ): Promise<T> => {
-  const endpoint = namespace
-    ? `/${resource}/${namespace}/${name}`
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
+  const endpoint = resolvedNamespace
+    ? `/${resource}/${resolvedNamespace}/${name}`
     : `/${resource}/${name}`
   return fetchAPI<T>(endpoint)
 }
@@ -525,7 +559,7 @@ export const useResource = <T extends keyof ResourceTypeMap>(
   namespace?: string,
   options?: { staleTime?: number; refreshInterval?: number }
 ) => {
-  const ns = namespace || '_all'
+  const ns = resolveNamespaceForResource(resource, namespace) || '_all'
   return useQuery({
     queryKey: [resource.slice(0, -1), ns, name], // Remove 's' from resource name for singular
     queryFn: () => {
@@ -641,7 +675,8 @@ export const fetchDescribe = async (
   name: string,
   namespace?: string
 ): Promise<{ result: string }> => {
-  const endpoint = `/${resourceType}/${namespace ?? '_all'}/${name}/describe`
+  const resolvedNamespace = resolveNamespaceForResource(resourceType, namespace)
+  const endpoint = `/${resourceType}/${resolvedNamespace ?? '_all'}/${name}/describe`
   return fetchAPI<{ result: string }>(endpoint)
 }
 
@@ -1131,8 +1166,9 @@ export async function getRelatedResources(
   name: string,
   namespace?: string
 ) {
+  const resolvedNamespace = resolveNamespaceForResource(resource, namespace)
   const resp = await apiClient.get<RelatedResources[]>(
-    `/${resource}/${namespace ? namespace : '_all'}/${name}/related`
+    `/${resource}/${resolvedNamespace ? resolvedNamespace : '_all'}/${name}/related`
   )
   return resp
 }
@@ -1697,7 +1733,9 @@ export const fetchResourceHistory = (
   page: number = 1,
   pageSize: number = 10
 ): Promise<ResourceHistoryResponse> => {
-  const endpoint = `/${resourceType}/${namespace}/${name}/history?page=${page}&pageSize=${pageSize}`
+  const resolvedNamespace =
+    resolveNamespaceForResource(resourceType, namespace) || namespace
+  const endpoint = `/${resourceType}/${resolvedNamespace}/${name}/history?page=${page}&pageSize=${pageSize}`
   return fetchAPI<ResourceHistoryResponse>(endpoint)
 }
 

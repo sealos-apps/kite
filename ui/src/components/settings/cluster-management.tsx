@@ -37,6 +37,16 @@ export function ClusterManagement() {
   const [editingCluster, setEditingCluster] = useState<Cluster | null>(null)
   const [deletingCluster, setDeletingCluster] = useState<Cluster | null>(null)
 
+  const refreshClusterQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+    queryClient.invalidateQueries({ queryKey: ['clusters'] })
+    // ClusterManager sync is async on backend; refetch again shortly after to update selector options immediately.
+    setTimeout(() => {
+      queryClient.refetchQueries({ queryKey: ['cluster-list'], type: 'active' })
+      queryClient.refetchQueries({ queryKey: ['clusters'], type: 'active' })
+    }, 1200)
+  }
+
   const getClusterTypeBadge = useCallback(
     (cluster: Cluster) => {
       if (cluster.inCluster) {
@@ -177,7 +187,7 @@ export function ClusterManagement() {
   const createMutation = useMutation({
     mutationFn: createCluster,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+      refreshClusterQueries()
       toast.success(
         t('clusterManagement.messages.created', 'Cluster created successfully')
       )
@@ -199,7 +209,7 @@ export function ClusterManagement() {
     mutationFn: ({ id, data }: { id: number; data: ClusterUpdateRequest }) =>
       updateCluster(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+      refreshClusterQueries()
       toast.success(
         t('clusterManagement.messages.updated', 'Cluster updated successfully')
       )
@@ -221,7 +231,7 @@ export function ClusterManagement() {
   const deleteMutation = useMutation({
     mutationFn: deleteCluster,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+      refreshClusterQueries()
       toast.success(
         t('clusterManagement.messages.deleted', 'Cluster deleted successfully')
       )

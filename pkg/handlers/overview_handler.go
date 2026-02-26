@@ -8,7 +8,9 @@ import (
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/model"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -35,8 +37,13 @@ func GetOverview(c *gin.Context) {
 	// Get nodes
 	nodes := &v1.NodeList{}
 	if err := cs.K8sClient.List(ctx, nodes, &client.ListOptions{}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			klog.Warningf("overview: skip nodes for cluster %s due to permission: %v", cs.Name, err)
+			nodes = &v1.NodeList{}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	readyNodes := 0
@@ -56,7 +63,11 @@ func GetOverview(c *gin.Context) {
 
 	// Get pods
 	pods := &v1.PodList{}
-	if err := cs.K8sClient.List(ctx, pods, &client.ListOptions{}); err != nil {
+	podListOptions := &client.ListOptions{}
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		podListOptions.Namespace = cs.Namespace
+	}
+	if err := cs.K8sClient.List(ctx, pods, podListOptions); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -83,14 +94,24 @@ func GetOverview(c *gin.Context) {
 
 	// Get namespaces
 	namespaces := &v1.NamespaceList{}
-	if err := cs.K8sClient.List(ctx, namespaces, &client.ListOptions{}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		namespaces.Items = append(namespaces.Items, v1.Namespace{})
+	} else if err := cs.K8sClient.List(ctx, namespaces, &client.ListOptions{}); err != nil {
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			klog.Warningf("overview: skip namespaces for cluster %s due to permission: %v", cs.Name, err)
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	// Get services
 	services := &v1.ServiceList{}
-	if err := cs.K8sClient.List(ctx, services, &client.ListOptions{}); err != nil {
+	serviceListOptions := &client.ListOptions{}
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		serviceListOptions.Namespace = cs.Namespace
+	}
+	if err := cs.K8sClient.List(ctx, services, serviceListOptions); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

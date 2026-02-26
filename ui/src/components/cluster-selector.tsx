@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+const isAsciiClusterName = (value: string) => /^[\x21-\x7E]+$/.test(value)
+
 export function ClusterSelector() {
   const {
     clusters,
@@ -58,7 +60,7 @@ export function ClusterSelector() {
           <DropdownMenuItem
             key={cluster.name}
             onClick={() => setCurrentCluster(cluster.name)}
-            disabled={!!cluster.error}
+            disabled={!!cluster.error || !isAsciiClusterName(cluster.name)}
             className="flex items-center justify-between"
           >
             <div className="flex flex-col overflow-hidden">
@@ -72,15 +74,26 @@ export function ClusterSelector() {
                     Sync Error
                   </Badge>
                 )}
+                {!isAsciiClusterName(cluster.name) && (
+                  <Badge variant="secondary" className="text-xs">
+                    ASCII only
+                  </Badge>
+                )}
               </div>
               <span
                 className={cn(
                   'text-xs truncate',
-                  cluster.error ? 'text-red-500' : 'text-muted-foreground'
+                  cluster.error ||
+                    !isAsciiClusterName(cluster.name)
+                    ? 'text-red-500'
+                    : 'text-muted-foreground'
                 )}
                 title={cluster.error}
               >
-                {cluster.error || cluster.version}
+                {cluster.error ||
+                  (!isAsciiClusterName(cluster.name)
+                    ? 'Please rename this cluster to English/ASCII'
+                    : cluster.version)}
               </span>
             </div>
             {currentCluster === cluster.name && (

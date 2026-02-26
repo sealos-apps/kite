@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import yaml from 'js-yaml'
 import { Deployment } from 'kubernetes-types/apps/v1'
 import { Container, Volume } from 'kubernetes-types/core/v1'
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { createResource } from '@/lib/api'
+import { useCluster } from '@/hooks/use-cluster'
 import { translateError } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -129,15 +130,28 @@ export function DeploymentCreateDialog({
   onSuccess,
   defaultNamespace,
 }: DeploymentCreateDialogProps) {
+  const { currentClusterInfo } = useCluster()
+  const fixedNamespace = currentClusterInfo?.namespaceScoped
+    ? currentClusterInfo.namespace
+    : undefined
+
   const [formData, setFormData] = useState<DeploymentFormData>({
     ...initialFormData,
-    namespace: defaultNamespace || 'default',
+    namespace: fixedNamespace || defaultNamespace || 'default',
   })
   const [isCreating, setIsCreating] = useState(false)
   const [step, setStep] = useState(1)
   const [editedYaml, setEditedYaml] = useState<string>('')
   const { t } = useTranslation()
   const totalSteps = 4
+
+  useEffect(() => {
+    if (!fixedNamespace) return
+    setFormData((prev) => ({
+      ...prev,
+      namespace: fixedNamespace,
+    }))
+  }, [fixedNamespace])
 
   const updateFormData = (updates: Partial<DeploymentFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }))
@@ -500,7 +514,7 @@ export function DeploymentCreateDialog({
       // Reset form and close dialog
       setFormData({
         ...initialFormData,
-        namespace: defaultNamespace || 'default',
+        namespace: fixedNamespace || defaultNamespace || 'default',
       })
       setStep(1)
       setEditedYaml('')
@@ -521,7 +535,7 @@ export function DeploymentCreateDialog({
       // Reset form when dialog closes
       setFormData({
         ...initialFormData,
-        namespace: defaultNamespace || 'default',
+        namespace: fixedNamespace || defaultNamespace || 'default',
       })
       setStep(1)
       setEditedYaml('')
@@ -563,6 +577,7 @@ export function DeploymentCreateDialog({
                 handleNamespaceChange={(namespace) =>
                   updateFormData({ namespace })
                 }
+                disabled={Boolean(fixedNamespace)}
               />
             </div>
             <div className="space-y-2">

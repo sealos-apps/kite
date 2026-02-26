@@ -42,10 +42,12 @@ type ImportClustersRequest struct {
 }
 
 type ClusterInfo struct {
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	IsDefault bool   `json:"isDefault"`
-	Error     string `json:"error,omitempty"`
+	Name            string `json:"name"`
+	Version         string `json:"version"`
+	IsDefault       bool   `json:"isDefault"`
+	NamespaceScoped bool   `json:"namespaceScoped,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 type MetricsCell struct {

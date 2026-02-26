@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import Icon from '@/assets/icon.svg'
 import { useSidebarConfig } from '@/contexts/sidebar-config-context'
 import { CollapsibleContent } from '@radix-ui/react-collapsible'
@@ -8,7 +8,9 @@ import { ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 
+import { ResourceType, clusterScopeResources } from '@/types/api'
 import { useVersionInfo } from '@/lib/api'
+import { useCluster } from '@/hooks/use-cluster'
 import {
   Sidebar,
   SidebarContent,
@@ -33,14 +35,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isMobile, setOpenMobile } = useSidebar()
   const { config, isLoading, getIconComponent } = useSidebarConfig()
   const { data: versionInfo } = useVersionInfo()
+  const { currentClusterInfo } = useCluster()
+
+  const getResourceByUrl = useCallback((url: string): ResourceType | null => {
+    const path = url.replace(/^\/+/, '').split('/')[0]
+    if (!path) return null
+    return path as ResourceType
+  }, [])
+
+  const shouldShowItemInCurrentCluster = useCallback(
+    (url: string) => {
+      if (!currentClusterInfo?.namespaceScoped) return true
+      const resource = getResourceByUrl(url)
+      if (!resource) return true
+      return !clusterScopeResources.includes(resource)
+    },
+    [currentClusterInfo, getResourceByUrl]
+  )
 
   const pinnedItems = useMemo(() => {
     if (!config) return []
     return config.groups
       .flatMap((group) => group.items)
+      .filter((item) => shouldShowItemInCurrentCluster(item.url))
       .filter((item) => config.pinnedItems.includes(item.id))
       .filter((item) => !config.hiddenItems.includes(item.id))
-  }, [config])
+  }, [config, shouldShowItemInCurrentCluster])
 
   const visibleGroups = useMemo(() => {
     if (!config) return []
@@ -50,12 +70,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       .map((group) => ({
         ...group,
         items: group.items
+          .filter((item) => shouldShowItemInCurrentCluster(item.url))
           .filter((item) => !config.hiddenItems.includes(item.id))
           .filter((item) => !config.pinnedItems.includes(item.id))
           .sort((a, b) => a.order - b.order),
       }))
       .filter((group) => group.items.length > 0)
-  }, [config])
+  }, [config, shouldShowItemInCurrentCluster])
 
   const isActive = (url: string) => {
     if (url === '/') {

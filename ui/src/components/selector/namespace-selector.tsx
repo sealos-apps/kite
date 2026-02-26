@@ -13,36 +13,48 @@ export function NamespaceSelector({
   selectedNamespace,
   handleNamespaceChange,
   showAll = false,
+  disabled = false,
 }: {
   selectedNamespace?: string
   handleNamespaceChange: (namespace: string) => void
   showAll?: boolean
+  disabled?: boolean
 }) {
-  const { data, isLoading } = useResources('namespaces')
+  const { data, isLoading } = useResources('namespaces', undefined, {
+    disable: disabled,
+  })
 
-  const sortedNamespaces = data?.sort((a, b) => {
+  const sortedNamespaces = (data ? [...data] : []).sort((a, b) => {
     const nameA = a.metadata?.name?.toLowerCase() || ''
     const nameB = b.metadata?.name?.toLowerCase() || ''
     return nameA.localeCompare(nameB)
-  }) || [{ metadata: { name: 'default' } }]
+  })
+
+  const namespaces = sortedNamespaces.length
+    ? sortedNamespaces
+    : [{ metadata: { name: selectedNamespace || 'default' } }]
 
   return (
-    <Select value={selectedNamespace} onValueChange={handleNamespaceChange}>
+    <Select
+      value={selectedNamespace}
+      onValueChange={handleNamespaceChange}
+      disabled={disabled}
+    >
       <SelectTrigger className="max-w-48">
         <SelectValue placeholder="Select a namespace" />
       </SelectTrigger>
       <SelectContent>
-        {isLoading && (
+        {!disabled && isLoading && (
           <SelectItem disabled value="_loading">
             Loading namespaces...
           </SelectItem>
         )}
-        {showAll && (
+        {showAll && !disabled && (
           <SelectItem key="all" value="_all">
             All Namespaces
           </SelectItem>
         )}
-        {sortedNamespaces?.map((ns: Namespace) => (
+        {namespaces.map((ns: Namespace) => (
           <SelectItem key={ns.metadata!.name} value={ns.metadata!.name!}>
             {ns.metadata!.name}
           </SelectItem>

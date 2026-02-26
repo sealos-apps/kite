@@ -338,6 +338,8 @@ export interface Cluster {
   createdAt: string
   updatedAt: string
   prometheusURL?: string
+  namespaceScoped?: boolean
+  namespace?: string
   error?: string
 }
 

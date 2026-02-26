@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/prometheus"
 	"gorm.io/gorm"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -25,6 +28,8 @@ type ClientSet struct {
 	PromClient *prometheus.Client
 
 	DiscoveredPrometheusURL string
+	NamespaceScoped         bool
+	Namespace               string
 	config                  string
 	prometheusURL           string
 }
@@ -50,13 +55,51 @@ func createClientSetFromConfig(name, content, prometheusURL string) (*ClientSet,
 		klog.Warningf("Failed to create REST config for cluster %s: %v", name, err)
 		return nil, err
 	}
+	contextNamespace := parseCurrentContextNamespace(content)
 	cs, err := newClientSet(name, restConfig, prometheusURL)
 	if err != nil {
 		return nil, err
 	}
+	cs.applyNamespaceScope(contextNamespace)
 	cs.config = content
 
 	return cs, nil
+}
+
+func parseCurrentContextNamespace(content string) string {
+	cfg, err := clientcmd.Load([]byte(content))
+	if err != nil {
+		klog.Warningf("Failed to parse kubeconfig while detecting namespace scope: %v", err)
+		return ""
+	}
+	if cfg.CurrentContext == "" {
+		return ""
+	}
+	ctx, ok := cfg.Contexts[cfg.CurrentContext]
+	if !ok || ctx == nil {
+		return ""
+	}
+	return strings.TrimSpace(ctx.Namespace)
+}
+
+func (cs *ClientSet) applyNamespaceScope(contextNamespace string) {
+	if contextNamespace == "" || cs.K8sClient == nil || cs.K8sClient.ClientSet == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, err := cs.K8sClient.ClientSet.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1})
+	if err == nil {
+		return
+	}
+	if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+		cs.NamespaceScoped = true
+		cs.Namespace = contextNamespace
+		klog.Infof("Cluster %s detected as namespace-scoped, locked namespace: %s", cs.Name, cs.Namespace)
+		return
+	}
+	klog.Warningf("Namespace scope probe failed for cluster %s: %v", cs.Name, err)
 }
 
 func newClientSet(name string, k8sConfig *rest.Config, prometheusURL string) (*ClientSet, error) {

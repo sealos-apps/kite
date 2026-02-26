@@ -1,6 +1,8 @@
 // API client with authentication support
 import { withSubPath } from './subpath'
 
+const isAsciiClusterName = (value: string) => /^[\x21-\x7E]+$/.test(value)
+
 class ApiClient {
   private baseUrl: string = ''
   private isRefreshing = false
@@ -55,7 +57,7 @@ class ApiClient {
 
     // Add cluster header if available
     const currentCluster = this.getCurrentCluster?.()
-    if (currentCluster) {
+    if (currentCluster && isAsciiClusterName(currentCluster)) {
       headers['x-cluster-name'] = currentCluster
     }
 

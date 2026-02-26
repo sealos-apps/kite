@@ -61,11 +61,15 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var c client.Client
-	if os.Getenv("DISABLE_CACHE") == "true" {
-		c, err = client.New(config, client.Options{
+	newDirectClient := func() (client.Client, error) {
+		return client.New(config, client.Options{
 			Scheme: runtimeScheme,
 		})
+	}
+
+	var c client.Client
+	if os.Getenv("DISABLE_CACHE") == "true" {
+		c, err = newDirectClient()
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to create client: %w", err)
@@ -83,8 +87,19 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 			},
 		})
 		if err != nil {
-			cancel()
-			return nil, err
+			klog.Warningf("failed to create cached manager, falling back to direct client: %v", err)
+			c, err = newDirectClient()
+			if err != nil {
+				cancel()
+				return nil, fmt.Errorf("failed to create fallback direct client: %w", err)
+			}
+			return &K8sClient{
+				Client:        c,
+				ClientSet:     clientset,
+				Configuration: config,
+				MetricsClient: metricsClient,
+				cancel:        cancel,
+			}, nil
 		}
 
 		// Add field indexer for Pod spec.nodeName to enable efficient querying by node
@@ -95,17 +110,45 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 			}
 			return []string{pod.Spec.NodeName}
 		}); err != nil {
+			klog.Warningf("failed to create field indexer, falling back to direct client: %v", err)
 			cancel()
-			return nil, fmt.Errorf("failed to create field indexer for spec.nodeName: %w", err)
+			ctx, cancel = context.WithCancel(context.Background())
+			c, err = newDirectClient()
+			if err != nil {
+				cancel()
+				return nil, fmt.Errorf("failed to create fallback direct client: %w", err)
+			}
+			return &K8sClient{
+				Client:        c,
+				ClientSet:     clientset,
+				Configuration: config,
+				MetricsClient: metricsClient,
+				cancel:        cancel,
+			}, nil
 		}
 		go func() {
 			if err := mgr.Start(ctx); err != nil {
 				fmt.Printf("Error starting manager: %v\n", err)
 			}
 		}()
-		if !mgr.GetCache().WaitForCacheSync(ctx) {
+		cacheSyncCtx, cacheSyncCancel := context.WithTimeout(ctx, 8*time.Second)
+		defer cacheSyncCancel()
+		if !mgr.GetCache().WaitForCacheSync(cacheSyncCtx) {
+			klog.Warningf("failed to sync cached client within timeout, falling back to direct client")
 			cancel()
-			return nil, fmt.Errorf("failed to wait for cache sync")
+			ctx, cancel = context.WithCancel(context.Background())
+			c, err = newDirectClient()
+			if err != nil {
+				cancel()
+				return nil, fmt.Errorf("failed to create fallback direct client: %w", err)
+			}
+			return &K8sClient{
+				Client:        c,
+				ClientSet:     clientset,
+				Configuration: config,
+				MetricsClient: metricsClient,
+				cancel:        cancel,
+			}, nil
 		}
 		c = mgr.GetClient()
 	}

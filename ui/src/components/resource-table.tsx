@@ -28,6 +28,7 @@ import { toast } from 'sonner'
 
 import { ResourceType } from '@/types/api'
 import { deleteResource, useResources, useResourcesWatch } from '@/lib/api'
+import { useCluster } from '@/hooks/use-cluster'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -88,6 +89,11 @@ export function ResourceTable<T>({
   defaultHiddenColumns = [],
 }: ResourceTableProps<T>) {
   const { t } = useTranslation()
+  const { currentCluster, currentClusterInfo } = useCluster()
+  const fixedNamespace =
+    !clusterScope && currentClusterInfo?.namespaceScoped
+      ? currentClusterInfo.namespace
+      : undefined
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
     const currentCluster = localStorage.getItem('current-cluster')
@@ -136,13 +142,17 @@ export function ResourceTable<T>({
     string | undefined
   >(() => {
     // Try to get the stored namespace from localStorage
-    const storedNamespace = localStorage.getItem(
-      localStorage.getItem('current-cluster') + 'selectedNamespace'
-    )
+    const currentClusterName = localStorage.getItem('current-cluster')
+    const storedNamespace = currentClusterName
+      ? localStorage.getItem(`${currentClusterName}selectedNamespace`)
+      : null
     return clusterScope
       ? undefined // No namespace for cluster scope
       : storedNamespace || 'default' // Default to 'default' if not set
   })
+  const requestNamespace = clusterScope
+    ? undefined
+    : fixedNamespace || selectedNamespace
   const [useSSE, setUseSSE] = useState(false)
   const {
     isLoading: queryLoading,
@@ -152,7 +162,7 @@ export function ResourceTable<T>({
     refetch: queryRefetch,
   } = useResources(
     resourceType ?? (resourceName.toLowerCase() as ResourceType),
-    selectedNamespace,
+    requestNamespace,
     {
       refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
       reduce: true, // Fetch reduced data for performance
@@ -171,7 +181,7 @@ export function ResourceTable<T>({
   } = useResourcesWatch(
     (resourceType ??
       (resourceName.toLowerCase() as ResourceType)) as ResourceType,
-    selectedNamespace,
+    requestNamespace,
     { reduce: true, enabled: useSSE }
   )
 
@@ -218,9 +228,29 @@ export function ResourceTable<T>({
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
   }, [columnFilters, searchQuery])
 
+  useEffect(() => {
+    if (clusterScope || !currentCluster) return
+
+    const selectedNamespaceStorageKey = `${currentCluster}selectedNamespace`
+    if (fixedNamespace) {
+      localStorage.setItem(selectedNamespaceStorageKey, fixedNamespace)
+      if (selectedNamespace !== fixedNamespace) {
+        setSelectedNamespace(fixedNamespace)
+      }
+      return
+    }
+
+    const storedNamespace = localStorage.getItem(selectedNamespaceStorageKey)
+    const targetNamespace = storedNamespace || 'default'
+    if (selectedNamespace !== targetNamespace) {
+      setSelectedNamespace(targetNamespace)
+    }
+  }, [clusterScope, currentCluster, fixedNamespace, selectedNamespace])
+
   // Handle namespace change
   const handleNamespaceChange = useCallback(
     (value: string) => {
+      if (fixedNamespace) return
       if (setSelectedNamespace) {
         localStorage.setItem(
           localStorage.getItem('current-cluster') + 'selectedNamespace',
@@ -232,7 +262,7 @@ export function ResourceTable<T>({
         setSearchQuery('')
       }
     },
-    [setSelectedNamespace, pagination.pageSize]
+    [fixedNamespace, setSelectedNamespace, pagination.pageSize]
   )
 
   // Add namespace column when showing all namespaces
@@ -586,7 +616,7 @@ export function ResourceTable<T>({
                 <SelectItem value="30000">30s</SelectItem>
               </SelectContent>
             </Select>
-            {!clusterScope && (
+            {!clusterScope && !fixedNamespace && (
               <NamespaceSelector
                 selectedNamespace={selectedNamespace}
                 handleNamespaceChange={handleNamespaceChange}

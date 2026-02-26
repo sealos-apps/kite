@@ -6,9 +6,12 @@ import { toast } from 'sonner'
 import { Cluster } from '@/types/api'
 import { withSubPath } from '@/lib/subpath'
 
+const isAsciiClusterName = (value: string) => /^[\x21-\x7E]+$/.test(value)
+
 interface ClusterContextType {
   clusters: Cluster[]
   currentCluster: string | null
+  currentClusterInfo: Cluster | null
   setCurrentCluster: (clusterName: string) => void
   isLoading: boolean
   isSwitching?: boolean
@@ -22,6 +25,11 @@ export const ClusterContext = createContext<ClusterContextType | undefined>(
 export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const getScopedNamespaceKey = (clusterName: string) =>
+    `${clusterName}-scoped-namespace`
+  const getSelectedNamespaceKey = (clusterName: string) =>
+    `${clusterName}selectedNamespace`
+
   const [currentCluster, setCurrentClusterState] = useState<string | null>(
     localStorage.getItem('current-cluster')
   )
@@ -37,6 +45,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     queryKey: ['clusters'],
     queryFn: async () => {
       const response = await fetch(withSubPath('/api/v1/clusters'), {
+        cache: 'no-store',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -62,25 +71,45 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
+  const currentClusterInfo =
+    clusters.find((cluster) => cluster.name === currentCluster) ?? null
+
+  useEffect(() => {
+    if (!currentClusterInfo || !currentClusterInfo.name) return
+
+    const scopedNamespaceKey = getScopedNamespaceKey(currentClusterInfo.name)
+    const selectedNamespaceKey = getSelectedNamespaceKey(currentClusterInfo.name)
+    if (currentClusterInfo.namespaceScoped && currentClusterInfo.namespace) {
+      localStorage.setItem(scopedNamespaceKey, currentClusterInfo.namespace)
+      localStorage.setItem(selectedNamespaceKey, currentClusterInfo.namespace)
+      return
+    }
+    localStorage.removeItem(scopedNamespaceKey)
+  }, [currentClusterInfo])
+
   // Set default cluster if none is selected
   useEffect(() => {
     if (clusters.length > 0 && !currentCluster) {
-      const defaultCluster = clusters.find((c) => c.isDefault)
+      const defaultCluster = clusters.find(
+        (c) => c.isDefault && isAsciiClusterName(c.name)
+      )
+      const fallbackCluster = clusters.find((c) => isAsciiClusterName(c.name))
       if (defaultCluster) {
         setCurrentClusterState(defaultCluster.name)
         document.cookie = `x-cluster-name=${defaultCluster.name}; path=/`
         localStorage.setItem('current-cluster', defaultCluster.name)
-      } else {
+      } else if (fallbackCluster) {
         // If no default cluster, use the first one
-        setCurrentClusterState(clusters[0].name)
-        localStorage.setItem('current-cluster', clusters[0].name)
-        document.cookie = `x-cluster-name=${clusters[0].name}; path=/`
+        setCurrentClusterState(fallbackCluster.name)
+        localStorage.setItem('current-cluster', fallbackCluster.name)
+        document.cookie = `x-cluster-name=${fallbackCluster.name}; path=/`
       }
     }
     if (
       currentCluster &&
       clusters.length > 0 &&
-      !clusters.some((c) => c.name === currentCluster)
+      (!clusters.some((c) => c.name === currentCluster) ||
+        !isAsciiClusterName(currentCluster))
     ) {
       // If current cluster is not in the list, reset it
       setCurrentClusterState(null)
@@ -92,11 +121,30 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const setCurrentCluster = (clusterName: string) => {
     if (clusterName !== currentCluster && !isSwitching) {
+      if (!isAsciiClusterName(clusterName)) {
+        toast.error('Cluster name must use English/ASCII characters only')
+        return
+      }
       try {
         setIsSwitching(true)
         setCurrentClusterState(clusterName)
         localStorage.setItem('current-cluster', clusterName)
         document.cookie = `x-cluster-name=${clusterName}; path=/`
+
+        const selectedCluster = clusters.find(
+          (cluster) => cluster.name === clusterName
+        )
+        if (selectedCluster?.namespaceScoped && selectedCluster.namespace) {
+          localStorage.setItem(
+            getScopedNamespaceKey(clusterName),
+            selectedCluster.namespace
+          )
+          localStorage.setItem(
+            getSelectedNamespaceKey(clusterName),
+            selectedCluster.namespace
+          )
+        }
+
         setTimeout(async () => {
           await queryClient.invalidateQueries({
             predicate: (query) => {
@@ -122,6 +170,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
   const value: ClusterContextType = {
     clusters,
     currentCluster,
+    currentClusterInfo,
     setCurrentCluster,
     isLoading,
     isSwitching,

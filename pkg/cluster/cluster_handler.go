@@ -24,9 +24,11 @@ func (cm *ClusterManager) GetClusters(c *gin.Context) {
 			continue
 		}
 		result = append(result, common.ClusterInfo{
-			Name:      name,
-			Version:   cluster.Version,
-			IsDefault: name == cm.defaultContext,
+			Name:            name,
+			Version:         cluster.Version,
+			IsDefault:       name == cm.defaultContext,
+			NamespaceScoped: cluster.NamespaceScoped,
+			Namespace:       cluster.Namespace,
 		})
 	}
 	for name, errMsg := range cm.errors {
