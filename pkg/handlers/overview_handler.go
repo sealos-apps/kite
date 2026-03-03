@@ -50,6 +50,8 @@ func GetOverview(c *gin.Context) {
 	var cpuAllocatable, memAllocatable resource.Quantity
 	var cpuRequested, memRequested resource.Quantity
 	var cpuLimited, memLimited resource.Quantity
+	cpuBasis := common.ResourceBasisClusterAllocatable
+	memoryBasis := common.ResourceBasisClusterAllocatable
 	for _, node := range nodes.Items {
 		cpuAllocatable.Add(*node.Status.Allocatable.Cpu())
 		memAllocatable.Add(*node.Status.Allocatable.Memory())
@@ -92,6 +94,35 @@ func GetOverview(c *gin.Context) {
 		}
 	}
 
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		var quotaList v1.ResourceQuotaList
+		if err := cs.K8sClient.List(ctx, &quotaList, client.InNamespace(cs.Namespace)); err != nil {
+			if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+				klog.Warningf("overview: skip resourcequotas for namespace %s due to permission: %v", cs.Namespace, err)
+			} else {
+				klog.Warningf("overview: failed to list resourcequotas for namespace %s: %v", cs.Namespace, err)
+			}
+		} else {
+			cpuQuotaMilli, memoryQuotaBytes, hasCPUQuota, hasMemoryQuota, err := extractNamespaceQuotaHard(quotaList.Items)
+			if err != nil {
+				klog.Warningf("overview: failed to parse resourcequotas for namespace %s: %v", cs.Namespace, err)
+			} else {
+				if hasCPUQuota {
+					cpuAllocatable = *resource.NewMilliQuantity(cpuQuotaMilli, resource.DecimalSI)
+					cpuBasis = common.ResourceBasisNamespaceQuota
+				} else {
+					cpuBasis = common.ResourceBasisNamespaceNoQuota
+				}
+				if hasMemoryQuota {
+					memAllocatable = *resource.NewQuantity(memoryQuotaBytes, resource.BinarySI)
+					memoryBasis = common.ResourceBasisNamespaceQuota
+				} else {
+					memoryBasis = common.ResourceBasisNamespaceNoQuota
+				}
+			}
+		}
+	}
+
 	// Get namespaces
 	namespaces := &v1.NamespaceList{}
 	if cs.NamespaceScoped && cs.Namespace != "" {
@@ -128,11 +159,13 @@ func GetOverview(c *gin.Context) {
 				Allocatable: cpuAllocatable.MilliValue(),
 				Requested:   cpuRequested.MilliValue(),
 				Limited:     cpuLimited.MilliValue(),
+				Basis:       cpuBasis,
 			},
 			Mem: common.Resource{
 				Allocatable: memAllocatable.MilliValue(),
 				Requested:   memRequested.MilliValue(),
 				Limited:     memLimited.MilliValue(),
+				Basis:       memoryBasis,
 			},
 		},
 	}

@@ -22,8 +22,8 @@ export function ResourceCharts(props: ResourceChartsProps) {
   const { isLoading, error, isError } = props
   const chartData = useMemo(() => {
     const { cpu, memory } = props.data || {
-      cpu: { requested: 0, allocatable: 0, limited: 0 },
-      memory: { requested: 0, allocatable: 0, limited: 0 },
+      cpu: { requested: 0, allocatable: 0, limited: 0, basis: undefined },
+      memory: { requested: 0, allocatable: 0, limited: 0, basis: undefined },
     }
     return [
       {
@@ -31,8 +31,11 @@ export function ResourceCharts(props: ResourceChartsProps) {
         request: cpu.requested / 1000,
         limit: cpu.limited / 1000,
         total: cpu.allocatable / 1000,
-        requestPercentage: (cpu.requested / cpu.allocatable) * 100,
-        limitPercentage: (cpu.limited / cpu.allocatable) * 100,
+        showCapacity: cpu.basis !== 'namespace_no_quota' && cpu.allocatable > 0,
+        requestPercentage:
+          cpu.allocatable > 0 ? (cpu.requested / cpu.allocatable) * 100 : 0,
+        limitPercentage:
+          cpu.allocatable > 0 ? (cpu.limited / cpu.allocatable) * 100 : 0,
         unit: 'cores',
       },
       {
@@ -40,8 +43,14 @@ export function ResourceCharts(props: ResourceChartsProps) {
         request: memory.requested / 1024 / 1024 / 1024 / 1024,
         limit: memory.limited / 1024 / 1024 / 1024 / 1024,
         total: memory.allocatable / 1024 / 1024 / 1024 / 1024,
-        requestPercentage: (memory.requested / memory.allocatable) * 100,
-        limitPercentage: (memory.limited / memory.allocatable) * 100,
+        showCapacity:
+          memory.basis !== 'namespace_no_quota' && memory.allocatable > 0,
+        requestPercentage:
+          memory.allocatable > 0
+            ? (memory.requested / memory.allocatable) * 100
+            : 0,
+        limitPercentage:
+          memory.allocatable > 0 ? (memory.limited / memory.allocatable) * 100 : 0,
         unit: 'GiB',
       },
     ]
@@ -89,6 +98,9 @@ export function ResourceCharts(props: ResourceChartsProps) {
         const requestIsMedium = resource.requestPercentage > 60
         const limitIsHigh = resource.limitPercentage > 90
         const limitIsMedium = resource.limitPercentage > 60
+        const relativeBase = Math.max(resource.request, resource.limit, 1)
+        const requestRelativePercentage = (resource.request / relativeBase) * 100
+        const limitRelativePercentage = (resource.limit / relativeBase) * 100
 
         return (
           <Card key={resource.name}>
@@ -97,9 +109,9 @@ export function ResourceCharts(props: ResourceChartsProps) {
                 <span>{resource.name}</span>
               </CardTitle>
               <CardDescription>
-                Requests: {resource.request.toFixed(1)} / Limits:{' '}
-                {resource.limit.toFixed(1)} / Total: {resource.total.toFixed(2)}{' '}
-                {resource.unit}
+                {resource.showCapacity
+                  ? `Requests: ${resource.request.toFixed(1)} / Limits: ${resource.limit.toFixed(1)} / Total: ${resource.total.toFixed(2)} ${resource.unit}`
+                  : `Requests: ${resource.request.toFixed(1)} / Limits: ${resource.limit.toFixed(1)} ${resource.unit}`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -124,12 +136,19 @@ export function ResourceCharts(props: ResourceChartsProps) {
                               : 'bg-blue-500'
                         }`}
                         style={{
-                          width: `${Math.min(resource.requestPercentage, 100)}%`,
+                          width: `${Math.min(
+                            resource.showCapacity
+                              ? resource.requestPercentage
+                              : requestRelativePercentage,
+                            100
+                          )}%`,
                         }}
                       />
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {resource.requestPercentage.toFixed(1)}% of capacity
+                      {resource.showCapacity
+                        ? `${resource.requestPercentage.toFixed(1)}% of capacity`
+                        : '-'}
                     </div>
                   </div>
 
@@ -152,20 +171,33 @@ export function ResourceCharts(props: ResourceChartsProps) {
                               : 'bg-orange-500'
                         }`}
                         style={{
-                          width: `${Math.min(resource.limitPercentage, 100)}%`,
+                          width: `${Math.min(
+                            resource.showCapacity
+                              ? resource.limitPercentage
+                              : limitRelativePercentage,
+                            100
+                          )}%`,
                         }}
                       />
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {resource.limitPercentage.toFixed(1)}% of capacity
+                      {resource.showCapacity
+                        ? `${resource.limitPercentage.toFixed(1)}% of capacity`
+                        : '-'}
                     </div>
                   </div>
                 </div>
 
-                <div className="text-xs text-muted-foreground ">
-                  Available: {(resource.total - resource.request).toFixed(1)}{' '}
-                  {resource.unit}
-                </div>
+                {resource.showCapacity ? (
+                  <div className="text-xs text-muted-foreground ">
+                    Available: {(resource.total - resource.request).toFixed(1)}{' '}
+                    {resource.unit}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    Namespace quota not configured; capacity percentages are unavailable.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

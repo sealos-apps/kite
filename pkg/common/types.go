@@ -21,10 +21,17 @@ type RelatedResource struct {
 }
 
 type Resource struct {
-	Allocatable int64 `json:"allocatable"`
-	Requested   int64 `json:"requested"`
-	Limited     int64 `json:"limited"`
+	Allocatable int64  `json:"allocatable"`
+	Requested   int64  `json:"requested"`
+	Limited     int64  `json:"limited"`
+	Basis       string `json:"basis,omitempty"`
 }
+
+const (
+	ResourceBasisClusterAllocatable = "cluster_allocatable"
+	ResourceBasisNamespaceQuota     = "namespace_quota"
+	ResourceBasisNamespaceNoQuota   = "namespace_no_quota"
+)
 
 type ResourceMetric struct {
 	CPU Resource `json:"cpu,omitempty"`

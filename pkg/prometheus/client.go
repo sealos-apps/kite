@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,11 @@ import (
 type Client struct {
 	client v1.API
 }
+
+const (
+	UtilizationModeClusterCapacity = "cluster_capacity"
+	UtilizationModeNamespaceQuota  = "namespace_quota"
+)
 
 type ResourceMetrics struct {
 	CPURequest    float64
@@ -32,12 +38,15 @@ type UsageDataPoint struct {
 
 // ResourceUsageHistory contains historical usage data for a resource
 type ResourceUsageHistory struct {
-	CPU        []UsageDataPoint `json:"cpu"`
-	Memory     []UsageDataPoint `json:"memory"`
-	NetworkIn  []UsageDataPoint `json:"networkIn"`
-	NetworkOut []UsageDataPoint `json:"networkOut"`
-	DiskRead   []UsageDataPoint `json:"diskRead"`
-	DiskWrite  []UsageDataPoint `json:"diskWrite"`
+	CPU                   []UsageDataPoint `json:"cpu"`
+	Memory                []UsageDataPoint `json:"memory"`
+	NetworkIn             []UsageDataPoint `json:"networkIn"`
+	NetworkOut            []UsageDataPoint `json:"networkOut"`
+	DiskRead              []UsageDataPoint `json:"diskRead"`
+	DiskWrite             []UsageDataPoint `json:"diskWrite"`
+	Namespace             string           `json:"namespace,omitempty"`
+	CPUUtilizationMode    string           `json:"cpuUtilizationMode,omitempty"`
+	MemoryUtilizationMode string           `json:"memoryUtilizationMode,omitempty"`
 }
 
 // PodMetrics contains metrics for a specific pod
@@ -56,6 +65,12 @@ type PodCurrentMetrics struct {
 	Namespace string  `json:"namespace"`
 	CPU       float64 `json:"cpu"`    // CPU cores
 	Memory    float64 `json:"memory"` // Memory in MB
+}
+
+type ResourceUsageOptions struct {
+	Namespace          string
+	CPUCapacityCores   float64
+	MemoryCapacityByte float64
 }
 
 func NewClientWithRoundTripper(prometheusURL string, rt http.RoundTripper) (*Client, error) {
@@ -77,7 +92,7 @@ func NewClientWithRoundTripper(prometheusURL string, rt http.RoundTripper) (*Cli
 }
 
 // GetResourceUsageHistory fetches historical usage data for CPU and Memory
-func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, duration string, nodeLabel string, namespace string) (*ResourceUsageHistory, error) {
+func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, duration string, nodeLabel string, options ResourceUsageOptions) (*ResourceUsageHistory, error) {
 	var step time.Duration
 	var timeRange time.Duration
 
@@ -98,7 +113,7 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	now := time.Now()
 	start := now.Add(-timeRange)
 
-	cpuQuery, memoryQuery, networkInQuery, networkOutQuery := buildResourceUsageQueries(instance, nodeLabel, namespace)
+	cpuQuery, memoryQuery, networkInQuery, networkOutQuery := buildResourceUsageQueries(instance, nodeLabel, options)
 
 	// Query CPU usage percentage - using container CPU usage
 	cpuData, err := c.queryRange(ctx, cpuQuery, start, now, step)
@@ -136,42 +151,59 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	}, nil
 }
 
-func buildResourceUsageQueries(instance, nodeLabel, namespace string) (string, string, string, string) {
+func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsageOptions) (string, string, string, string) {
 	containerConditions := []string{
 		`container!="POD"`, // Exclude the "POD" container
 		`container!=""`,    // Exclude empty containers
 	}
-	if namespace != "" {
-		containerConditions = append(containerConditions, fmt.Sprintf(`namespace="%s"`, namespace))
+	if options.Namespace != "" {
+		containerConditions = append(containerConditions, fmt.Sprintf(`namespace="%s"`, options.Namespace))
 	}
 	if instance != "" {
 		containerConditions = append(containerConditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
 	}
 
-	cpuConditions := []string{
-		`resource="cpu"`,
-	}
-	memoryConditions := []string{
-		`resource="memory"`,
-	}
-	if instance != "" {
-		cpuConditions = append(cpuConditions, fmt.Sprintf(`node="%s"`, instance))
-		memoryConditions = append(memoryConditions, fmt.Sprintf(`node="%s"`, instance))
-	}
-
 	networkConditions := []string{}
-	if namespace != "" {
-		networkConditions = append(networkConditions, fmt.Sprintf(`namespace="%s"`, namespace))
+	if options.Namespace != "" {
+		networkConditions = append(networkConditions, fmt.Sprintf(`namespace="%s"`, options.Namespace))
 	}
 	if instance != "" {
 		networkConditions = append(networkConditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
 	}
 
-	cpuQuery := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(containerConditions, ","), strings.Join(cpuConditions, ","))
-	memoryQuery := fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(containerConditions, ","), strings.Join(memoryConditions, ","))
+	cpuQuery := ""
+	if options.CPUCapacityCores > 0 {
+		cpuQuery = fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / %s * 100`, strings.Join(containerConditions, ","), formatPromQLScalar(options.CPUCapacityCores))
+	} else {
+		cpuConditions := []string{
+			`resource="cpu"`,
+		}
+		if instance != "" {
+			cpuConditions = append(cpuConditions, fmt.Sprintf(`node="%s"`, instance))
+		}
+		cpuQuery = fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(containerConditions, ","), strings.Join(cpuConditions, ","))
+	}
+
+	memoryQuery := ""
+	if options.MemoryCapacityByte > 0 {
+		memoryQuery = fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / %s * 100`, strings.Join(containerConditions, ","), formatPromQLScalar(options.MemoryCapacityByte))
+	} else {
+		memoryConditions := []string{
+			`resource="memory"`,
+		}
+		if instance != "" {
+			memoryConditions = append(memoryConditions, fmt.Sprintf(`node="%s"`, instance))
+		}
+		memoryQuery = fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(containerConditions, ","), strings.Join(memoryConditions, ","))
+	}
+
 	networkInQuery := fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, strings.Join(networkConditions, ","))
 	networkOutQuery := fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, strings.Join(networkConditions, ","))
 	return cpuQuery, memoryQuery, networkInQuery, networkOutQuery
+}
+
+func formatPromQLScalar(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
 func (c *Client) queryRange(ctx context.Context, query string, start, end time.Time, step time.Duration) ([]UsageDataPoint, error) {

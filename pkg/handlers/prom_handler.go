@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -10,8 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/zxh326/kite/pkg/cluster"
 	"github.com/zxh326/kite/pkg/prometheus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type PromHandler struct {
@@ -74,17 +78,38 @@ func (h *PromHandler) GetResourceUsageHistory(c *gin.Context) {
 	}
 
 	instance := c.Query("instance")
-	namespace := ""
+	options := prometheus.ResourceUsageOptions{}
 	if cs.NamespaceScoped && cs.Namespace != "" {
-		namespace = cs.Namespace
+		options.Namespace = cs.Namespace
+		cpuCapacity, memoryCapacity, hasCPUQuota, hasMemoryQuota, err := h.getNamespaceQuotaCapacities(ctx, cs, cs.Namespace)
+		if err != nil {
+			klog.Warningf("failed to resolve resource quota capacities for namespace %s: %v", cs.Namespace, err)
+		}
+		if hasCPUQuota {
+			options.CPUCapacityCores = cpuCapacity
+		}
+		if hasMemoryQuota {
+			options.MemoryCapacityByte = memoryCapacity
+		}
 	}
-	resourceUsageHistory, err := cs.PromClient.GetResourceUsageHistory(ctx, instance, duration, "instance", namespace)
+	resourceUsageHistory, err := cs.PromClient.GetResourceUsageHistory(ctx, instance, duration, "instance", options)
 	if err != nil {
-		resourceUsageHistory, err = cs.PromClient.GetResourceUsageHistory(ctx, instance, duration, "node", namespace)
+		resourceUsageHistory, err = cs.PromClient.GetResourceUsageHistory(ctx, instance, duration, "node", options)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get resource usage history: %v", err)})
 			return
 		}
+	}
+	resourceUsageHistory.Namespace = options.Namespace
+	if options.CPUCapacityCores > 0 {
+		resourceUsageHistory.CPUUtilizationMode = prometheus.UtilizationModeNamespaceQuota
+	} else {
+		resourceUsageHistory.CPUUtilizationMode = prometheus.UtilizationModeClusterCapacity
+	}
+	if options.MemoryCapacityByte > 0 {
+		resourceUsageHistory.MemoryUtilizationMode = prometheus.UtilizationModeNamespaceQuota
+	} else {
+		resourceUsageHistory.MemoryUtilizationMode = prometheus.UtilizationModeClusterCapacity
 	}
 
 	c.JSON(http.StatusOK, resourceUsageHistory)
@@ -227,4 +252,56 @@ func mergeUsageDataPointsSum(points []prometheus.UsageDataPoint) []prometheus.Us
 		return merged[i].Timestamp.Before(merged[j].Timestamp)
 	})
 	return merged
+}
+
+func (h *PromHandler) getNamespaceQuotaCapacities(ctx context.Context, cs *cluster.ClientSet, namespace string) (float64, float64, bool, bool, error) {
+	var quotaList corev1.ResourceQuotaList
+	if err := cs.K8sClient.List(ctx, &quotaList, client.InNamespace(namespace)); err != nil {
+		return 0, 0, false, false, err
+	}
+	return extractNamespaceQuotaCapacities(quotaList.Items)
+}
+
+func extractNamespaceQuotaCapacities(quotas []corev1.ResourceQuota) (float64, float64, bool, bool, error) {
+	cpuMilli, memoryBytes, hasCPU, hasMemory, err := extractNamespaceQuotaHard(quotas)
+	if err != nil {
+		return 0, 0, false, false, err
+	}
+	return float64(cpuMilli) / 1000.0, float64(memoryBytes), hasCPU, hasMemory, nil
+}
+
+func extractNamespaceQuotaHard(quotas []corev1.ResourceQuota) (int64, int64, bool, bool, error) {
+	limitCPUMilli := int64(0)
+	requestCPUMilli := int64(0)
+	limitMemoryBytes := int64(0)
+	requestMemoryBytes := int64(0)
+
+	for _, quota := range quotas {
+		hard := quota.Status.Hard
+		if len(hard) == 0 {
+			hard = quota.Spec.Hard
+		}
+		if q, ok := hard[corev1.ResourceLimitsCPU]; ok {
+			limitCPUMilli += q.MilliValue()
+		}
+		if q, ok := hard[corev1.ResourceRequestsCPU]; ok {
+			requestCPUMilli += q.MilliValue()
+		}
+		if q, ok := hard[corev1.ResourceLimitsMemory]; ok {
+			limitMemoryBytes += q.Value()
+		}
+		if q, ok := hard[corev1.ResourceRequestsMemory]; ok {
+			requestMemoryBytes += q.Value()
+		}
+	}
+
+	cpuMilli := limitCPUMilli
+	if cpuMilli == 0 {
+		cpuMilli = requestCPUMilli
+	}
+	memoryBytes := limitMemoryBytes
+	if memoryBytes == 0 {
+		memoryBytes = requestMemoryBytes
+	}
+	return cpuMilli, memoryBytes, cpuMilli > 0, memoryBytes > 0, nil
 }

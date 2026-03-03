@@ -259,6 +259,9 @@ export interface ResourceUsageHistory {
   networkOut: UsageDataPoint[]
   diskRead: UsageDataPoint[]
   diskWrite: UsageDataPoint[]
+  namespace?: string
+  cpuUtilizationMode?: 'cluster_capacity' | 'namespace_quota'
+  memoryUtilizationMode?: 'cluster_capacity' | 'namespace_quota'
 }
 
 // Pod monitoring types
@@ -285,11 +288,13 @@ export interface OverviewData {
       allocatable: number
       requested: number
       limited: number
+      basis?: 'cluster_allocatable' | 'namespace_quota' | 'namespace_no_quota'
     }
     memory: {
       allocatable: number
       requested: number
       limited: number
+      basis?: 'cluster_allocatable' | 'namespace_quota' | 'namespace_no_quota'
     }
   }
 }
