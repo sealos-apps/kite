@@ -235,6 +235,11 @@ func main() {
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS())
 	model.InitDB()
+	if rows, err := auth.SyncSealosPrometheusDefaults(); err != nil {
+		klog.Warningf("Failed to sync default Prometheus URL for Sealos clusters: %v", err)
+	} else if rows > 0 {
+		klog.Infof("Synced default Prometheus URL for %d existing Sealos clusters", rows)
+	}
 	rbac.InitRBAC()
 	handlers.InitTemplates()
 	internal.LoadConfigFromEnv()

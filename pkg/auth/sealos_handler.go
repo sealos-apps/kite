@@ -178,7 +178,12 @@ func buildSealosRoleName(userID string) string {
 	return "sealos-role-" + part + "-" + hash
 }
 
+func getSealosDefaultPrometheusURL() string {
+	return strings.TrimSpace(common.SealosDefaultPrometheusURL)
+}
+
 func upsertSealosCluster(clusterName, kubeconfig, namespace string) error {
+	defaultPrometheusURL := getSealosDefaultPrometheusURL()
 	description := "Managed by Sealos SSO"
 	if namespace != "" {
 		description = fmt.Sprintf("%s (namespace: %s)", description, namespace)
@@ -187,23 +192,44 @@ func upsertSealosCluster(clusterName, kubeconfig, namespace string) error {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return model.AddCluster(&model.Cluster{
-				Name:        clusterName,
-				Description: description,
-				Config:      model.SecretString(kubeconfig),
-				InCluster:   false,
-				IsDefault:   false,
-				Enable:      true,
+				Name:          clusterName,
+				Description:   description,
+				Config:        model.SecretString(kubeconfig),
+				PrometheusURL: defaultPrometheusURL,
+				InCluster:     false,
+				IsDefault:     false,
+				Enable:        true,
 			})
 		}
 		return err
 	}
 
-	return model.UpdateCluster(cluster, map[string]interface{}{
+	updates := map[string]interface{}{
 		"description": description,
 		"config":      model.SecretString(kubeconfig),
 		"in_cluster":  false,
 		"enable":      true,
-	})
+	}
+	if strings.TrimSpace(cluster.PrometheusURL) == "" && defaultPrometheusURL != "" {
+		updates["prometheus_url"] = defaultPrometheusURL
+	}
+	return model.UpdateCluster(cluster, updates)
+}
+
+// SyncSealosPrometheusDefaults applies default Prometheus URL to existing
+// Sealos-managed clusters that do not have prometheus_url configured.
+func SyncSealosPrometheusDefaults() (int64, error) {
+	if !common.SealosAuthEnabled {
+		return 0, nil
+	}
+	defaultPrometheusURL := getSealosDefaultPrometheusURL()
+	if defaultPrometheusURL == "" {
+		return 0, nil
+	}
+	result := model.DB.Model(&model.Cluster{}).
+		Where("name LIKE ? AND (prometheus_url = '' OR prometheus_url IS NULL)", "sealos-%").
+		Update("prometheus_url", defaultPrometheusURL)
+	return result.RowsAffected, result.Error
 }
 
 func ensureSealosRole(roleName, clusterName, namespace string) (*model.Role, error) {

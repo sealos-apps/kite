@@ -15,6 +15,7 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 
 - **SEALOS_AUTH_ENABLED**：是否启用 Sealos 登录接口（`/api/auth/login/sealos`），默认 `false`。
 - **SEALOS_JWT_SECRET**：用于校验 Sealos JWT 的密钥。Kite 对 Sealos token 固定使用 `HS256` 校验。
+- **SEALOS_DEFAULT_PROMETHEUS_URL**：Sealos 管理集群的默认 Prometheus 地址。配置后，Kite 会在 Sealos 集群同步时为新集群写入该值，并在启动时自动补齐历史 Sealos 集群中为空的 `prometheus_url`。
 
 - **HOST**: 用户 OAuth 2.0 授权回调地址生成，默认会从请求头获取，如果您发现结果不及预期可以手动配置此环境变量。
 

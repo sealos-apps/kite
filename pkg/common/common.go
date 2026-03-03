@@ -48,6 +48,8 @@ var (
 
 	SealosAuthEnabled = false
 	SealosJWTSecret   = ""
+	// SealosDefaultPrometheusURL sets default Prometheus URL for Sealos-managed clusters.
+	SealosDefaultPrometheusURL = ""
 )
 
 func LoadEnvs() {
@@ -130,5 +132,8 @@ func LoadEnvs() {
 	}
 	if v := strings.TrimSpace(os.Getenv("SEALOS_JWT_SECRET")); v != "" {
 		SealosJWTSecret = v
+	}
+	if v := strings.TrimSpace(os.Getenv("SEALOS_DEFAULT_PROMETHEUS_URL")); v != "" {
+		SealosDefaultPrometheusURL = v
 	}
 }
