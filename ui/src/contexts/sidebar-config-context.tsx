@@ -43,6 +43,7 @@ import {
   SidebarItem,
 } from '@/types/sidebar'
 import { withSubPath } from '@/lib/subpath'
+import { isSidebarPathHidden } from '@/lib/resource-visibility'
 
 import { useAuth } from './auth-context'
 
@@ -140,8 +141,6 @@ const defaultMenus: DefaultMenus = {
   'sidebar.groups.traffic': [
     { titleKey: 'nav.ingresses', url: '/ingresses', icon: IconRouter },
     { titleKey: 'nav.services', url: '/services', icon: IconNetwork },
-    { titleKey: 'nav.gateways', url: '/gateways', icon: IconLoadBalancer },
-    { titleKey: 'nav.httproutes', url: '/httproutes', icon: IconRoute },
   ],
   'sidebar.groups.storage': [
     {
@@ -202,6 +201,37 @@ const defaultMenus: DefaultMenus = {
 
 const CURRENT_CONFIG_VERSION = 1
 
+const sanitizeSidebarConfig = (config: SidebarConfig): SidebarConfig => {
+  const removedItemIds = new Set<string>()
+
+  const groups = config.groups.map((group) => {
+    const items = group.items
+      .filter((item) => {
+        const shouldHide = isSidebarPathHidden(item.url)
+        if (shouldHide) {
+          removedItemIds.add(item.id)
+        }
+        return !shouldHide
+      })
+      .map((item, index) => ({
+        ...item,
+        order: index,
+      }))
+
+    return {
+      ...group,
+      items,
+    }
+  })
+
+  return {
+    ...config,
+    groups,
+    pinnedItems: config.pinnedItems.filter((itemId) => !removedItemIds.has(itemId)),
+    hiddenItems: config.hiddenItems.filter((itemId) => !removedItemIds.has(itemId)),
+  }
+}
+
 const defaultConfigs = (): SidebarConfig => {
   const groups: SidebarGroup[] = []
   let groupOrder = 0
@@ -252,7 +282,8 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const loadConfig = useCallback(async () => {
     if (user && user.sidebar_preference && user.sidebar_preference != '') {
       const userConfig = JSON.parse(user.sidebar_preference)
-      setConfig(userConfig)
+      const sanitizedConfig = sanitizeSidebarConfig(userConfig)
+      setConfig(sanitizedConfig)
 
       const currentVersion = userConfig.version || 0
       if (currentVersion < CURRENT_CONFIG_VERSION) {
@@ -265,14 +296,16 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
 
   const saveConfig = useCallback(
     async (newConfig: SidebarConfig) => {
+      const sanitizedConfig = sanitizeSidebarConfig(newConfig)
+
       if (!user) {
-        setConfig(newConfig)
+        setConfig(sanitizedConfig)
         return
       }
 
       try {
         const configToSave = {
-          ...newConfig,
+          ...sanitizedConfig,
           lastUpdated: Date.now(),
           version: CURRENT_CONFIG_VERSION,
         }

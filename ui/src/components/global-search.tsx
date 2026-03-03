@@ -6,7 +6,6 @@ import {
   IconBox,
   IconBoxMultiple,
   IconLayoutDashboard,
-  IconLoadBalancer,
   IconLoader,
   IconLock,
   IconMap,
@@ -14,7 +13,6 @@ import {
   IconNetwork,
   IconPlayerPlay,
   IconRocket,
-  IconRoute,
   IconRouter,
   IconServer,
   IconServer2,
@@ -28,6 +26,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { globalSearch, SearchResult } from '@/lib/api'
+import { isResourceTypeHidden, isSidebarPathHidden } from '@/lib/resource-visibility'
 import { useCluster } from '@/hooks/use-cluster'
 import { useFavorites } from '@/hooks/use-favorites'
 import { Badge } from '@/components/ui/badge'
@@ -68,8 +67,6 @@ const RESOURCE_CONFIG: Record<
   nodes: { label: 'nav.nodes', icon: IconServer2 },
   jobs: { label: 'nav.jobs', icon: IconPlayerPlay },
   ingresses: { label: 'nav.ingresses', icon: IconRouter },
-  gateways: { label: 'nav.gateways', icon: IconLoadBalancer },
-  httproutes: { label: 'nav.httproutes', icon: IconRoute },
   daemonsets: {
     label: 'nav.daemonsets',
     icon: IconTopologyBus,
@@ -212,6 +209,10 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         .slice()
         .sort((a, b) => a.order - b.order)
         .forEach((item) => {
+          if (isSidebarPathHidden(item.url)) {
+            return
+          }
+
           const title = item.titleKey
             ? t(item.titleKey, { defaultValue: item.titleKey })
             : item.id
@@ -323,7 +324,9 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
       const currentQuery = query
       setTimeout(() => {
         if (!currentQuery || currentQuery.length < 2) {
-          setResults(favorites)
+          setResults(
+            favorites.filter((item) => !isResourceTypeHidden(item.resourceType))
+          )
         }
       }, 0)
     },
@@ -335,7 +338,9 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     try {
       setIsLoading(true)
       const response = await globalSearch(searchQuery, { limit: 10 })
-      setResults(response.results)
+      setResults(
+        response.results.filter((result) => !isResourceTypeHidden(result.resourceType))
+      )
     } catch (error) {
       console.error('Search failed:', error)
       setResults([])
@@ -351,7 +356,9 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     }
     if (!query || query.length < 2) {
       if (query.length === 0) {
-        setResults(favorites)
+        setResults(
+          favorites.filter((result) => !isResourceTypeHidden(result.resourceType))
+        )
       }
       return
     }
@@ -384,7 +391,9 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
 
   useEffect(() => {
     if (open && query === '') {
-      setResults(favorites) // Show favorites when dialog opens
+      setResults(
+        favorites.filter((result) => !isResourceTypeHidden(result.resourceType))
+      ) // Show favorites when dialog opens
     }
   }, [open, query, favorites])
 
