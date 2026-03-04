@@ -43,6 +43,8 @@ export function UserMenu() {
     }
   }
 
+  const showLogout = user.provider !== 'Anonymous' && user.provider !== 'sealos'
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -153,7 +155,7 @@ export function UserMenu() {
 
         <SidebarCustomizer onOpenChange={(d) => setOpen(d)} />
 
-        {user.provider !== 'Anonymous' && (
+        {showLogout && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
