@@ -21,9 +21,9 @@ image:
 # pods cannot mount the same RWO volume simultaneously.
 deploymentStrategy:
   type: RollingUpdate
-  # rollingUpdate:
-  #   maxSurge: 25%
-  #   maxUnavailable: 25%
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
@@ -273,6 +273,13 @@ resources:
   #   memory: 128Mi
 
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 5
+  failureThreshold: 24
+  timeoutSeconds: 3
 livenessProbe:
   httpGet:
     path: /healthz
