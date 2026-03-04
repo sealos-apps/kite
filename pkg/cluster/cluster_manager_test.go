@@ -5,12 +5,42 @@ import (
 
 	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/assert"
+	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 )
+
+func Test_applyNamespaceScope(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+
+	t.Run("context namespace locks cluster to namespace scope", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+		cs := &ClientSet{Name: "test-cluster"}
+
+		cs.applyNamespaceScope(" default ")
+
+		assert.True(t, cs.NamespaceScoped)
+		assert.Equal(t, "default", cs.Namespace)
+	})
+
+	t.Run("exempt namespace does not lock namespace scope", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{
+			"ns-admin": {},
+		}
+		cs := &ClientSet{Name: "test-cluster"}
+
+		cs.applyNamespaceScope("ns-admin")
+
+		assert.False(t, cs.NamespaceScoped)
+		assert.Equal(t, "", cs.Namespace)
+	})
+}
 
 func Test_shouldUpdateCluster(t *testing.T) {
 	type args struct {

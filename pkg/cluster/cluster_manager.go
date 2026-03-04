@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/prometheus"
@@ -85,6 +86,10 @@ func parseCurrentContextNamespace(content string) string {
 func (cs *ClientSet) applyNamespaceScope(contextNamespace string) {
 	contextNamespace = strings.TrimSpace(contextNamespace)
 	if contextNamespace == "" {
+		return
+	}
+	if common.IsNamespaceScopeExempt(contextNamespace) {
+		klog.Infof("Cluster %s context namespace %s is exempt from namespace scope lock", cs.Name, contextNamespace)
 		return
 	}
 

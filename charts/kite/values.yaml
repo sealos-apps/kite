@@ -131,6 +131,8 @@ db:
 extraEnvs:
   # - name: "EXAMPLE_ENV"
   #   value: "example_value"
+  # - name: "KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES"
+  #   value: "ns-admin"
 
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:

@@ -232,11 +232,16 @@ func SyncSealosPrometheusDefaults() (int64, error) {
 	return result.RowsAffected, result.Error
 }
 
-func ensureSealosRole(roleName, clusterName, namespace string) (*model.Role, error) {
-	namespaces := []string{"*"}
-	if namespace != "" {
-		namespaces = []string{namespace}
+func buildSealosRoleNamespaces(namespace string) []string {
+	ns := strings.TrimSpace(namespace)
+	if ns == "" || common.IsNamespaceScopeExempt(ns) {
+		return []string{"*"}
 	}
+	return []string{ns}
+}
+
+func ensureSealosRole(roleName, clusterName, namespace string) (*model.Role, error) {
+	namespaces := buildSealosRoleNamespaces(namespace)
 	role := &model.Role{
 		Name:        roleName,
 		Description: "Auto generated role for Sealos SSO user",

@@ -16,6 +16,7 @@ Kite supports several environment variables by default to change the default val
 - **SEALOS_AUTH_ENABLED**: Enable Sealos login API (`/api/auth/login/sealos`), default is `false`.
 - **SEALOS_JWT_SECRET**: Secret used to verify Sealos JWT. Kite uses `HS256` for Sealos token verification.
 - **SEALOS_DEFAULT_PROMETHEUS_URL**: Default Prometheus URL for Sealos-managed clusters. If set, Kite writes this value for newly synced Sealos clusters and backfills existing Sealos clusters with empty `prometheus_url` during startup.
+- **KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES**: Comma-separated namespace allowlist (for example `ns-admin,platform-admin`). For these namespaces, Kite bypasses kubeconfig `current-context.namespace` namespace-scope lock, and Sealos SSO auto-roles are granted `*` namespaces on their managed cluster. Use this only for namespaces whose credentials are truly cluster-admin/global.
 
 - **HOST**: Used for generating OAuth 2.0 authorization callback addresses, default will be obtained from request headers. If you find the result not as expected, you can manually configure this environment variable.
 

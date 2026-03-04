@@ -50,6 +50,10 @@ var (
 	SealosJWTSecret   = ""
 	// SealosDefaultPrometheusURL sets default Prometheus URL for Sealos-managed clusters.
 	SealosDefaultPrometheusURL = ""
+
+	// NamespaceScopeExemptNamespaces lists namespaces that should not force
+	// namespace-scoped mode even when kubeconfig current-context.namespace is set.
+	NamespaceScopeExemptNamespaces = map[string]struct{}{}
 )
 
 func LoadEnvs() {
@@ -136,4 +140,27 @@ func LoadEnvs() {
 	if v := strings.TrimSpace(os.Getenv("SEALOS_DEFAULT_PROMETHEUS_URL")); v != "" {
 		SealosDefaultPrometheusURL = v
 	}
+	if v := strings.TrimSpace(os.Getenv("KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES")); v != "" {
+		namespaces := make(map[string]struct{})
+		for _, ns := range strings.Split(v, ",") {
+			ns = strings.ToLower(strings.TrimSpace(ns))
+			if ns == "" {
+				continue
+			}
+			namespaces[ns] = struct{}{}
+		}
+		NamespaceScopeExemptNamespaces = namespaces
+		if len(namespaces) > 0 {
+			klog.Infof("Configured %d namespace-scope exemptions from KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES", len(namespaces))
+		}
+	}
+}
+
+func IsNamespaceScopeExempt(namespace string) bool {
+	ns := strings.ToLower(strings.TrimSpace(namespace))
+	if ns == "" {
+		return false
+	}
+	_, ok := NamespaceScopeExemptNamespaces[ns]
+	return ok
 }
