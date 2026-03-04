@@ -30,7 +30,7 @@ export function CRListPage() {
   const isClusterScopeBlocked = !!currentClusterInfo?.namespaceScoped
   const { data: crdData, isLoading: isLoadingCRD } = useQuery({
     queryKey: ['crds', crd],
-    queryFn: () => fetchResource<CustomResourceDefinition>('crds', crd!),
+    queryFn: () => fetchResource<CustomResourceDefinition>('crds', crd!, '_all'),
     enabled: !!crd && !isClusterScopeBlocked,
   })
 
