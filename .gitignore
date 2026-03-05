@@ -42,6 +42,6 @@ docs/node_modules
 docs/.vitepress/cache
 
 kite
-!charts/kite
+!deploy/charts/kite
 
 dev.db

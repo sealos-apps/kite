@@ -80,7 +80,7 @@ secret:
   #  JWT_SECRET
   #  KITE_ENCRYPT_KEY
   #  DB_TYPE supported values: sqlite, postgres, mysql (defaults to sqlite if not set)
-  #  DB_DSN (not required for sqlite)
+  #  DB_DSN (not required for sqlite, and not required for postgres native mode)
   # 
   #  see superUser section for more details
   #  KITE_USERNAME (optional for superuser)
@@ -92,16 +92,56 @@ secret:
 # type: sqlite | postgres | mysql
 # - sqlite: embedded DB (default). If you choose sqlite and want data to survive pod restarts,
 #   enable persistence below so a PVC will be used to store the sqlite file.
-# - postgres/mysql: connection fields for external DBs.
+# - mysql: external DB with `db.dsn`.
+# - postgres:
+#   - native mode (default): create/manage a KubeBlocks PostgreSQL cluster via sub chart.
+#   - external mode: set `db.postgres.native.enabled=false` and provide `db.dsn`.
 db:
   # supported values: sqlite, postgres, mysql
   type: sqlite
-  # full DSN string for MySQL/Postgres.
-  # when type is mysql/postgres, is required
-  # leave empty for use existingSecret to provide it when type is not sqlite
-  # Example: "mysql://user:password@tcp(host:port)/dbname"
+  # full DSN string for MySQL/Postgres external mode.
+  # required when type is mysql, or when type is postgres with db.postgres.native.enabled=false.
+  # Example (MySQL): "mysql://user:password@tcp(host:3306)/dbname"
+  # Example (Postgres): "host=postgres.default.svc user=postgres password=secret dbname=postgres port=5432 sslmode=disable"
   dsn: ""
-  
+
+  # postgres-specific options
+  postgres:
+    # Application database name in postgres DSN
+    database: postgres
+    # ssl mode passed to postgres DSN
+    sslMode: disable
+    # additional raw DSN options appended at the end in native mode
+    # Example: "TimeZone=Asia/Shanghai"
+    extraOptions: ""
+
+    # Native Postgres management via KubeBlocks (Sealos)
+    native:
+      # enabled=true: create a Postgres cluster by kb (sub-chart `database-pg`) and auto-build DB_DSN.
+      # enabled=false: use db.dsn/existing secret as external postgres.
+      enabled: true
+      # KubeBlocks Cluster name. Empty means "<release-name>-pg".
+      clusterName: ""
+      # Optional existing credential secret name. Empty means "<clusterName>-conn-credential".
+      credentialSecretName: ""
+      # KubeBlocks PostgreSQL cluster version
+      version: postgresql-14.8.0
+      replicas: 2
+      storage: 3Gi
+      backup:
+        enabled: true
+        cron: "0 7 * * *"
+        retentionPeriod: 7d
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1024Mi
+        requests:
+          cpu: 10m
+          memory: 50Mi
+      # Delete | Halt | WipeOut | DoNotTerminate
+      terminationPolicy: Delete
+
   # sqlite-specific options
   sqlite:
     # If true, the chart will create a PVC and mount it into the pod for the sqlite DB file.

@@ -61,6 +61,39 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{- define "kite.postgresNativeEnabled" -}}
+{{- $dbType := default "sqlite" .Values.db.type -}}
+{{- $postgres := default (dict) .Values.db.postgres -}}
+{{- $native := default (dict) $postgres.native -}}
+{{- $enabled := true -}}
+{{- if hasKey $native "enabled" -}}
+{{- $enabled = $native.enabled -}}
+{{- end -}}
+{{- if and (eq $dbType "postgres") $enabled -}}true{{- else -}}false{{- end -}}
+{{- end }}
+
+{{- define "kite.postgresClusterName" -}}
+{{- $postgres := default (dict) .Values.db.postgres -}}
+{{- $native := default (dict) $postgres.native -}}
+{{- $clusterName := (default "" $native.clusterName) | trim -}}
+{{- if $clusterName -}}
+{{- $clusterName -}}
+{{- else -}}
+{{- printf "%s-pg" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end }}
+
+{{- define "kite.postgresCredentialSecretName" -}}
+{{- $postgres := default (dict) .Values.db.postgres -}}
+{{- $native := default (dict) $postgres.native -}}
+{{- $secretName := (default "" $native.credentialSecretName) | trim -}}
+{{- if $secretName -}}
+{{- $secretName -}}
+{{- else -}}
+{{- printf "%s-conn-credential" (include "kite.postgresClusterName" .) -}}
+{{- end -}}
+{{- end }}
+
 
 {{- define "kite.secret" -}}
 {{- if .Values.secret.existingSecret }}
