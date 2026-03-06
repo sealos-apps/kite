@@ -31,7 +31,7 @@
   Font families
   - --font-sans holds the system UI font stack
   - --font-mono enforces Maple Mono for all monospace usages
-  - --app-font-sans controls the app's primary font; default to Maple to keep current look
+  - --app-font-sans controls the app's primary font; defaults to system stack
 */
 :root {
   --font-sans:
