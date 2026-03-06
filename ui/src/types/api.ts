@@ -281,6 +281,8 @@ export interface OverviewData {
   totalPods: number
   runningPods: number
   totalNamespaces: number
+  totalIngresses: number
+  totalPVCs: number
   totalServices: number
   prometheusEnabled: boolean
   resource: {

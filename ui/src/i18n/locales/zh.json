@@ -60,8 +60,8 @@
     "statefulsets": "有状态副本集",
     "daemonsets": "守护进程集",
     "jobs": "任务",
-    "services": "服务",
-    "ingresses": "入口",
+    "services": "Services",
+    "ingresses": "Ingresses",
     "gateways": "网关",
     "httproutes": "HTTP 路由",
     "configMaps": "配置映射",
@@ -143,7 +143,7 @@
     "age": "运行时间"
   },
   "services": {
-    "title": "服务",
+    "title": "Services",
     "type": "类型",
     "clusterIP": "集群IP",
     "externalIP": "外部IP",

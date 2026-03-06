@@ -8,6 +8,7 @@ import (
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/model"
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
@@ -20,6 +21,8 @@ type OverviewData struct {
 	TotalPods       int                   `json:"totalPods"`
 	RunningPods     int                   `json:"runningPods"`
 	TotalNamespaces int                   `json:"totalNamespaces"`
+	TotalIngresses  int                   `json:"totalIngresses"`
+	TotalPVCs       int                   `json:"totalPVCs"`
 	TotalServices   int                   `json:"totalServices"`
 	PromEnabled     bool                  `json:"prometheusEnabled"`
 	Resource        common.ResourceMetric `json:"resource"`
@@ -146,12 +149,47 @@ func GetOverview(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Get ingresses
+	ingresses := &networkingv1.IngressList{}
+	ingressListOptions := &client.ListOptions{}
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		ingressListOptions.Namespace = cs.Namespace
+	}
+	if err := cs.K8sClient.List(ctx, ingresses, ingressListOptions); err != nil {
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			klog.Warningf("overview: skip ingresses for cluster %s due to permission: %v", cs.Name, err)
+			ingresses = &networkingv1.IngressList{}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// Get persistentvolumeclaims
+	pvcs := &v1.PersistentVolumeClaimList{}
+	pvcListOptions := &client.ListOptions{}
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		pvcListOptions.Namespace = cs.Namespace
+	}
+	if err := cs.K8sClient.List(ctx, pvcs, pvcListOptions); err != nil {
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			klog.Warningf("overview: skip persistentvolumeclaims for cluster %s due to permission: %v", cs.Name, err)
+			pvcs = &v1.PersistentVolumeClaimList{}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	overview := OverviewData{
 		TotalNodes:      len(nodes.Items),
 		ReadyNodes:      readyNodes,
 		TotalPods:       len(pods.Items),
 		RunningPods:     runningPods,
 		TotalNamespaces: len(namespaces.Items),
+		TotalIngresses:  len(ingresses.Items),
+		TotalPVCs:       len(pvcs.Items),
 		TotalServices:   len(services.Items),
 		PromEnabled:     cs.PromClient != nil,
 		Resource: common.ResourceMetric{
