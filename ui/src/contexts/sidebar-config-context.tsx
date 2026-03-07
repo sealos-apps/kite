@@ -85,6 +85,7 @@ interface SidebarConfigContextType {
   config: SidebarConfig | null
   isLoading: boolean
   hasUpdate: boolean
+  canCreateCustomCRDGroup: boolean
   updateConfig: (updates: Partial<SidebarConfig>) => void
   toggleItemVisibility: (itemId: string) => void
   toggleGroupVisibility: (groupId: string) => void
@@ -278,6 +279,8 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [hasUpdate, setHasUpdate] = useState(false)
   const { user } = useAuth()
+  const canCreateCustomCRDGroupPermission =
+    user?.capabilities?.canCreateCustomCRDGroup ?? user?.isAdmin() ?? false
 
   const loadConfig = useCallback(async () => {
     if (user && user.sidebar_preference && user.sidebar_preference != '') {
@@ -438,6 +441,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const createCustomGroup = useCallback(
     (groupName: string) => {
       if (!config) return
+      if (!canCreateCustomCRDGroupPermission) return
 
       const groupId = `custom-${groupName.toLowerCase().replace(/\s+/g, '-')}`
 
@@ -459,7 +463,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       const groups = [...config.groups, newGroup]
       updateConfig({ groups, groupOrder: [...config.groupOrder, groupId] })
     },
-    [config, updateConfig]
+    [canCreateCustomCRDGroupPermission, config, updateConfig]
   )
 
   const addCRDToGroup = useCallback(
@@ -568,6 +572,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     config,
     isLoading,
     hasUpdate,
+    canCreateCustomCRDGroup: canCreateCustomCRDGroupPermission,
     updateConfig,
     toggleItemVisibility,
     toggleGroupVisibility,
