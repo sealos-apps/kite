@@ -12,8 +12,15 @@ import { useQueryClient } from '@tanstack/react-query'
 import * as sealosDesktopSDK from 'sealos-desktop-sdk/app'
 
 import i18n from '@/i18n'
-import { writeCurrentCluster } from '@/lib/current-cluster'
+import {
+  CURRENT_CLUSTER_CHANGE_EVENT,
+  writeCurrentCluster,
+} from '@/lib/current-cluster'
 import { withSubPath } from '@/lib/subpath'
+
+interface UserCapabilities {
+  canCreateCustomCRDGroup?: boolean
+}
 
 interface User {
   id: string
@@ -21,8 +28,15 @@ interface User {
   name: string
   avatar_url: string
   provider: string
-  roles?: { name: string }[]
+  roles?: {
+    name: string
+    clusters?: string[]
+    resources?: string[]
+    namespaces?: string[]
+    verbs?: string[]
+  }[]
   sidebar_preference?: string
+  capabilities?: UserCapabilities
 
   isAdmin(): boolean
 }
@@ -187,7 +201,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const checkAuthInternal = async (): Promise<User | null> => {
+  const checkAuthInternal = useCallback(async (): Promise<User | null> => {
     try {
       const response = await fetch(withSubPath('/api/auth/user'), {
         credentials: 'include',
@@ -196,6 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.ok) {
         const data = await response.json()
         const user = data.user as User
+        user.capabilities = data.capabilities as UserCapabilities | undefined
         user.isAdmin = function () {
           return (
             this.roles?.some(
@@ -214,11 +229,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null)
       return null
     }
-  }
+  }, [])
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     await checkAuthInternal()
-  }
+  }, [checkAuthInternal])
 
   const syncSealosSession = useCallback(
     async (currentUser: User | null): Promise<boolean> => {
@@ -276,7 +291,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         sealosSyncingRef.current = false
       }
     },
-    [queryClient]
+    [checkAuthInternal, queryClient]
   )
 
   const syncSealosLanguage = useCallback(async (currentUser: User | null) => {
@@ -467,6 +482,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
       document.removeEventListener('visibilitychange', syncOnFocus)
     }
   }, [syncSealosLanguage, syncSealosSession, user])
+
+  useEffect(() => {
+    const syncPermissionsByCluster = () => {
+      if (!user) return
+      void checkAuthInternal()
+    }
+    window.addEventListener(
+      CURRENT_CLUSTER_CHANGE_EVENT,
+      syncPermissionsByCluster as EventListener
+    )
+    return () => {
+      window.removeEventListener(
+        CURRENT_CLUSTER_CHANGE_EVENT,
+        syncPermissionsByCluster as EventListener
+      )
+    }
+  }, [checkAuthInternal, user])
 
   // Set up automatic token refresh
   useEffect(() => {

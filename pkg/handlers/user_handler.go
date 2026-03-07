@@ -1,15 +1,69 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zxh326/kite/pkg/model"
+	"github.com/zxh326/kite/pkg/permissions"
 	"github.com/zxh326/kite/pkg/rbac"
 	"k8s.io/klog/v2"
 )
+
+type sidebarPreferenceGroup struct {
+	ID       string `json:"id"`
+	IsCustom bool   `json:"isCustom"`
+}
+
+type sidebarPreferencePayload struct {
+	Groups []sidebarPreferenceGroup `json:"groups"`
+}
+
+func extractCustomGroupIDs(preference string) (map[string]struct{}, error) {
+	customGroups := map[string]struct{}{}
+	preference = strings.TrimSpace(preference)
+	if preference == "" {
+		return customGroups, nil
+	}
+
+	var payload sidebarPreferencePayload
+	if err := json.Unmarshal([]byte(preference), &payload); err != nil {
+		return nil, err
+	}
+
+	for _, group := range payload.Groups {
+		if group.ID == "" {
+			continue
+		}
+		if group.IsCustom || strings.HasPrefix(group.ID, "custom-") {
+			customGroups[group.ID] = struct{}{}
+		}
+	}
+
+	return customGroups, nil
+}
+
+func hasNewCustomGroup(currentPreference, nextPreference string) (bool, error) {
+	currentCustomGroups, err := extractCustomGroupIDs(currentPreference)
+	if err != nil {
+		return false, err
+	}
+	nextCustomGroups, err := extractCustomGroupIDs(nextPreference)
+	if err != nil {
+		return false, err
+	}
+
+	for groupID := range nextCustomGroups {
+		if _, exists := currentCustomGroups[groupID]; !exists {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
 
 type createPasswordUser struct {
 	Username string `json:"username" binding:"required"`
@@ -216,6 +270,20 @@ func UpdateSidebarPreference(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+
+	clusterName := permissions.ClusterNameFromRequest(c)
+	if !permissions.CanCreateCustomCRDGroup(user, clusterName) {
+		hasNewGroup, err := hasNewCustomGroup(user.SidebarPreference, req.SidebarPreference)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "invalid sidebar preference"})
+			return
+		}
+		if hasNewGroup {
+			c.JSON(http.StatusForbidden, gin.H{"error": "only admin can create custom CRD groups"})
+			return
+		}
+	}
+
 	user.SidebarPreference = req.SidebarPreference
 	if err := model.UpdateUser(&user); err != nil {
 		klog.Errorf("failed to update sidebar preference for user %s: %v", user.Username, err)

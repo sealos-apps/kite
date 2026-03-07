@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react'
 import * as React from 'react'
@@ -85,6 +86,7 @@ interface SidebarConfigContextType {
   config: SidebarConfig | null
   isLoading: boolean
   hasUpdate: boolean
+  canCreateCustomCRDGroup: boolean
   updateConfig: (updates: Partial<SidebarConfig>) => void
   toggleItemVisibility: (itemId: string) => void
   toggleGroupVisibility: (groupId: string) => void
@@ -277,22 +279,36 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const [config, setConfig] = useState<SidebarConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasUpdate, setHasUpdate] = useState(false)
+  const hasLoadedConfigRef = useRef(false)
+  const lastLoadedPreferenceRef = useRef<string | null>(null)
   const { user } = useAuth()
+  const sidebarPreference = user?.sidebar_preference || ''
+  const canCreateCustomCRDGroupPermission =
+    user?.capabilities?.canCreateCustomCRDGroup ?? user?.isAdmin() ?? false
 
-  const loadConfig = useCallback(async () => {
-    if (user && user.sidebar_preference && user.sidebar_preference != '') {
-      const userConfig = JSON.parse(user.sidebar_preference)
-      const sanitizedConfig = sanitizeSidebarConfig(userConfig)
-      setConfig(sanitizedConfig)
-
-      const currentVersion = userConfig.version || 0
-      if (currentVersion < CURRENT_CONFIG_VERSION) {
-        setHasUpdate(true)
-      }
+  const loadConfig = useCallback(() => {
+    const normalizedPreference = sidebarPreference.trim()
+    if (lastLoadedPreferenceRef.current === normalizedPreference) {
       return
     }
+    lastLoadedPreferenceRef.current = normalizedPreference
+
+    if (normalizedPreference) {
+      try {
+        const userConfig = JSON.parse(normalizedPreference)
+        const sanitizedConfig = sanitizeSidebarConfig(userConfig)
+        setConfig(sanitizedConfig)
+
+        const currentVersion = userConfig.version || 0
+        setHasUpdate(currentVersion < CURRENT_CONFIG_VERSION)
+        return
+      } catch (error) {
+        console.error('Failed to parse sidebar preference:', error)
+      }
+    }
+    setHasUpdate(false)
     setConfig(defaultConfigs())
-  }, [user])
+  }, [sidebarPreference])
 
   const saveConfig = useCallback(
     async (newConfig: SidebarConfig) => {
@@ -438,6 +454,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const createCustomGroup = useCallback(
     (groupName: string) => {
       if (!config) return
+      if (!canCreateCustomCRDGroupPermission) return
 
       const groupId = `custom-${groupName.toLowerCase().replace(/\s+/g, '-')}`
 
@@ -459,7 +476,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       const groups = [...config.groups, newGroup]
       updateConfig({ groups, groupOrder: [...config.groupOrder, groupId] })
     },
-    [config, updateConfig]
+    [canCreateCustomCRDGroupPermission, config, updateConfig]
   )
 
   const addCRDToGroup = useCallback(
@@ -556,9 +573,12 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   }, [])
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      await loadConfig()
+    const loadData = () => {
+      if (!hasLoadedConfigRef.current) {
+        setIsLoading(true)
+      }
+      loadConfig()
+      hasLoadedConfigRef.current = true
       setIsLoading(false)
     }
     loadData()
@@ -568,6 +588,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     config,
     isLoading,
     hasUpdate,
+    canCreateCustomCRDGroup: canCreateCustomCRDGroupPermission,
     updateConfig,
     toggleItemVisibility,
     toggleGroupVisibility,

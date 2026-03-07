@@ -2,8 +2,10 @@ import {
   IconAlertCircleFilled,
   IconBox,
   IconCircleCheckFilled,
+  IconDatabase,
   IconFolders,
   IconNetwork,
+  IconRouter,
   IconServer,
 } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
@@ -29,7 +31,7 @@ export function ClusterStatsCards({
 }: ClusterStatsCardsProps) {
   const { t } = useTranslation()
   const { currentClusterInfo } = useCluster()
-  const disableClusterScopeLinks = !!currentClusterInfo?.namespaceScoped
+  const isNamespaceScoped = !!currentClusterInfo?.namespaceScoped
 
   if (isLoading || !stats) {
     return (
@@ -46,15 +48,48 @@ export function ClusterStatsCards({
     )
   }
 
+  const scopedSpecificStats = isNamespaceScoped
+    ? [
+        {
+          label: t('nav.ingresses'),
+          value: stats.totalIngresses,
+          icon: IconRouter,
+          color: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-950/50',
+          routePath: '/ingresses',
+        },
+        {
+          label: t('sidebar.short.pvcs'),
+          value: stats.totalPVCs,
+          icon: IconDatabase,
+          color: 'text-purple-600 dark:text-purple-400',
+          bgColor: 'bg-purple-50 dark:bg-purple-950/50',
+          routePath: '/persistentvolumeclaims',
+        },
+      ]
+    : [
+        {
+          label: t('nav.nodes'),
+          value: stats.totalNodes,
+          subValue: stats.readyNodes,
+          icon: IconServer,
+          color: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-950/50',
+          routePath: '/nodes',
+        },
+        {
+          label: t('nav.namespaces'),
+          value: stats.totalNamespaces,
+          icon: IconFolders,
+          color: 'text-purple-600 dark:text-purple-400',
+          bgColor: 'bg-purple-50 dark:bg-purple-950/50',
+          routePath: '/namespaces',
+        },
+      ]
+
   const statsConfig = [
     {
-      label: t('nav.nodes'),
-      value: stats.totalNodes,
-      subValue: stats.readyNodes,
-      icon: IconServer,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/50',
-      routePath: disableClusterScopeLinks ? undefined : '/nodes',
+      ...scopedSpecificStats[0],
     },
     {
       label: t('nav.pods'),
@@ -66,12 +101,7 @@ export function ClusterStatsCards({
       routePath: '/pods',
     },
     {
-      label: t('nav.namespaces'),
-      value: stats.totalNamespaces,
-      icon: IconFolders,
-      color: 'text-purple-600 dark:text-purple-400',
-      bgColor: 'bg-purple-50 dark:bg-purple-950/50',
-      routePath: disableClusterScopeLinks ? undefined : '/namespaces',
+      ...scopedSpecificStats[1],
     },
     {
       label: t('nav.services'),

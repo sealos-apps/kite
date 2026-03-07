@@ -49,6 +49,7 @@ export function SidebarCustomizer({
     config,
     isLoading,
     hasUpdate,
+    canCreateCustomCRDGroup: canCreateCustomGroup,
     toggleItemVisibility,
     toggleItemPin,
     toggleGroupCollapse,
@@ -63,6 +64,9 @@ export function SidebarCustomizer({
   } = useSidebarConfig()
 
   const handleCreateGroup = () => {
+    if (!canCreateCustomGroup) {
+      return
+    }
     if (newGroupName.trim()) {
       createCustomGroup(newGroupName.trim())
       setNewGroupName('')
@@ -363,33 +367,35 @@ export function SidebarCustomizer({
 
             <Separator />
 
-            <div className="space-y-4">
-              {/* Create new CRD group */}
-              <div className="space-y-3 p-4 border rounded-md bg-muted/10">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <FolderPlus className="h-4 w-4" />
-                  {t('sidebar.createGroup', 'Create New CRD Group')}
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Group name (e.g., CRDs)"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleCreateGroup()
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={handleCreateGroup}
-                    disabled={!newGroupName.trim()}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+            {canCreateCustomGroup && (
+              <div className="space-y-4">
+                {/* Create new CRD group */}
+                <div className="space-y-3 p-4 border rounded-md bg-muted/10">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <FolderPlus className="h-4 w-4" />
+                    {t('sidebar.createGroup', 'Create New CRD Group')}
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Group name (e.g., CRDs)"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCreateGroup()
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handleCreateGroup}
+                      disabled={!newGroupName.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 

@@ -9,6 +9,7 @@ import (
 	"github.com/zxh326/kite/pkg/cluster"
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/model"
+	"github.com/zxh326/kite/pkg/permissions"
 	"github.com/zxh326/kite/pkg/rbac"
 	"k8s.io/klog/v2"
 )
@@ -218,8 +219,13 @@ func (h *AuthHandler) GetUser(c *gin.Context) {
 		return
 	}
 
+	u := user.(model.User)
+	clusterName := permissions.ClusterNameFromRequest(c)
+	capabilities := permissions.BuildUserCapabilities(u, clusterName)
+
 	c.JSON(http.StatusOK, gin.H{
-		"user": user,
+		"user":         u,
+		"capabilities": capabilities,
 	})
 }
 

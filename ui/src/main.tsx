@@ -29,7 +29,7 @@ createRoot(document.getElementById('root')!).render(
       <AppearanceProvider
         defaultTheme="system"
         defaultColorTheme="default"
-        defaultFont="maple"
+        defaultFont="system"
       >
         <AuthProvider>
           <SidebarConfigProvider>
