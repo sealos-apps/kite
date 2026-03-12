@@ -390,6 +390,10 @@ func (h *AuthHandler) SealosLogin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign sealos role"})
 		return
 	}
+	if err := rbac.ForceSyncRolesConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync sealos rbac"})
+		return
+	}
 	select {
 	case rbac.SyncNow <- struct{}{}:
 	default:
