@@ -70,6 +70,11 @@ var (
 	SyncNow = make(chan struct{}, 1)
 )
 
+// ForceSyncRolesConfig reloads RBAC config from DB synchronously.
+func ForceSyncRolesConfig() error {
+	return loadRolesFromDB()
+}
+
 func SyncRolesConfig() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()

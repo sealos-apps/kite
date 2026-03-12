@@ -14,6 +14,7 @@ import * as sealosDesktopSDK from 'sealos-desktop-sdk/app'
 import i18n from '@/i18n'
 import {
   CURRENT_CLUSTER_CHANGE_EVENT,
+  readCurrentCluster,
   writeCurrentCluster,
 } from '@/lib/current-cluster'
 import { withSubPath } from '@/lib/subpath'
@@ -188,6 +189,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [providers, setProviders] = useState<string[]>([])
   const queryClient = useQueryClient()
   const sealosSyncingRef = useRef(false)
+  const pendingSealosSyncRef = useRef(false)
 
   const loadProviders = async () => {
     try {
@@ -247,6 +249,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (sealosSyncingRef.current) {
+        pendingSealosSyncRef.current = true
         return false
       }
 
@@ -275,13 +278,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         const data = await response.json()
-        if (data?.cluster && typeof data.cluster === 'string') {
-          writeCurrentCluster(data.cluster)
-        }
-
         await queryClient.invalidateQueries({ queryKey: ['init-check'] })
         await queryClient.invalidateQueries({ queryKey: ['clusters'] })
         await queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+        await queryClient.refetchQueries({
+          queryKey: ['clusters'],
+          type: 'active',
+        })
+
+        const previousCluster = readCurrentCluster()
+        const nextCluster =
+          data?.cluster && typeof data.cluster === 'string'
+            ? data.cluster
+            : null
+
+        if (nextCluster) {
+          writeCurrentCluster(nextCluster)
+        }
+
+        if (nextCluster && nextCluster !== previousCluster) {
+          await queryClient.invalidateQueries({
+            predicate: (query) => {
+              const key = query.queryKey[0] as string
+              return ![
+                'user',
+                'auth',
+                'clusters',
+                'cluster-list',
+                'init-check',
+              ].includes(key)
+            },
+          })
+        }
+
         await checkAuthInternal()
         return true
       } catch (error) {
@@ -289,6 +318,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false
       } finally {
         sealosSyncingRef.current = false
+        if (pendingSealosSyncRef.current) {
+          pendingSealosSyncRef.current = false
+          setTimeout(() => {
+            void syncSealosSession(currentUser)
+          }, 0)
+        }
       }
     },
     [checkAuthInternal, queryClient]

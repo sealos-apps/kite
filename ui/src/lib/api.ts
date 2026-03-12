@@ -59,6 +59,11 @@ const getCurrentScopedNamespace = (): string | undefined => {
   )
 }
 
+const getCurrentClusterCacheKey = (): string => {
+  if (typeof window === 'undefined') return '_no_cluster'
+  return localStorage.getItem('current-cluster') || '_no_cluster'
+}
+
 const isClusterScopedResource = (resource: string): boolean => {
   return clusterScopeResources.includes(resource as ResourceType)
 }
@@ -342,8 +347,9 @@ export const useResourcesEvents = <T extends ResourceType>(
   name: string,
   namespace?: string
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: ['resource-events', resource, namespace, name],
+    queryKey: ['resource-events', clusterKey, resource, namespace, name],
     queryFn: () => {
       const endpoint =
         '/events/resources?' +
@@ -373,8 +379,10 @@ export const useResources = <T extends ResourceType>(
     reduce?: boolean
   }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
     queryKey: [
+      clusterKey,
       resource,
       namespace,
       options?.limit,
@@ -409,6 +417,7 @@ export function useResourcesWatch<T extends ResourceType>(
     enabled?: boolean
   }
 ) {
+  const currentCluster = getCurrentClusterCacheKey()
   const [data, setData] = useState<ResourcesItems<T> | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -424,12 +433,14 @@ export function useResourcesWatch<T extends ResourceType>(
       params.append('labelSelector', options.labelSelector)
     if (options?.fieldSelector)
       params.append('fieldSelector', options.fieldSelector)
-    const cluster = localStorage.getItem('current-cluster')
-    if (cluster) params.append('x-cluster-name', cluster)
+    if (currentCluster && currentCluster !== '_no_cluster') {
+      params.append('x-cluster-name', currentCluster)
+    }
     return withSubPath(
       `${API_BASE_URL}/${resource}/${ns}/watch?${params.toString()}`
     )
   }, [
+    currentCluster,
     resource,
     namespace,
     options?.reduce,
@@ -559,9 +570,10 @@ export const useResource = <T extends keyof ResourceTypeMap>(
   namespace?: string,
   options?: { staleTime?: number; refreshInterval?: number }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   const ns = resolveNamespaceForResource(resource, namespace) || '_all'
   return useQuery({
-    queryKey: [resource.slice(0, -1), ns, name], // Remove 's' from resource name for singular
+    queryKey: [clusterKey, resource.slice(0, -1), ns, name], // Remove 's' from resource name for singular
     queryFn: () => {
       return fetchResource<ResourceTypeMap[T]>(resource, name, ns)
     },
@@ -578,8 +590,9 @@ const fetchOverview = (): Promise<OverviewData> => {
 }
 
 export const useOverview = (options?: { staleTime?: number }) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: ['overview'],
+    queryKey: ['overview', clusterKey],
     queryFn: fetchOverview,
     staleTime: options?.staleTime || 30000, // 30 seconds cache
     refetchInterval: 30000, // Auto refresh every 30 seconds
@@ -632,8 +645,9 @@ export const useResourceUsageHistory = (
   duration: string,
   options?: { staleTime?: number; instance?: string; enabled?: boolean }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: ['resource-usage-history', duration, options?.instance],
+    queryKey: [clusterKey, 'resource-usage-history', duration, options?.instance],
     queryFn: () => fetchResourceUsageHistory(duration, options?.instance),
     enabled: options?.enabled,
     staleTime: options?.staleTime || 10000, // 10 seconds cache
@@ -683,8 +697,10 @@ export const usePodMetrics = (
     labelSelector?: string
   }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
     queryKey: [
+      clusterKey,
       'pod-metrics',
       namespace,
       podName,
@@ -725,8 +741,9 @@ export const useDescribe = (
   namespace?: string,
   options?: { staleTime?: number; enabled?: boolean }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: [resourceType, name, namespace, 'describe'],
+    queryKey: [clusterKey, resourceType, name, namespace, 'describe'],
     queryFn: () => fetchDescribe(resourceType, name, namespace),
     enabled: (options?.enabled ?? true) && !!name,
     staleTime: options?.staleTime || 0,
@@ -1191,8 +1208,9 @@ export async function getImageTags(image: string): Promise<ImageTagInfo[]> {
 }
 
 export function useImageTags(image: string, options?: { enabled?: boolean }) {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: ['image-tags', image],
+    queryKey: [clusterKey, 'image-tags', image],
     queryFn: () => getImageTags(image),
     enabled: !!image && (options?.enabled ?? true),
     staleTime: 60 * 1000, // 1 min
@@ -1217,8 +1235,9 @@ export function useRelatedResources(
   name: string,
   namespace?: string
 ) {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: ['related-resources', resource, name, namespace],
+    queryKey: [clusterKey, 'related-resources', resource, name, namespace],
     queryFn: () => getRelatedResources(resource, name, namespace),
     staleTime: 60 * 1000, // 1 min
     placeholderData: (prev) => prev,
@@ -1786,8 +1805,10 @@ export const useResourceHistory = (
   pageSize: number = 10,
   options?: { enabled?: boolean; staleTime?: number }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
     queryKey: [
+      clusterKey,
       'resource-history',
       resourceType,
       namespace,
@@ -1840,8 +1861,9 @@ export const usePodFiles = (
   path: string,
   options?: { enabled?: boolean }
 ) => {
+  const clusterKey = getCurrentClusterCacheKey()
   return useQuery({
-    queryKey: ['pod-files', namespace, podName, container, path],
+    queryKey: [clusterKey, 'pod-files', namespace, podName, container, path],
     queryFn: () => podListFiles(namespace, podName, container, path),
     enabled: options?.enabled !== false,
     staleTime: 10000, // 10 seconds cache
