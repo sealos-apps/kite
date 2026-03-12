@@ -97,11 +97,13 @@ export function ClusterSelector() {
             <span className="text-sm font-medium truncate">
               {isSwitching
                 ? 'Switching...'
-                : getClusterDisplayName({
-                    ...currentClusterData,
-                    username: user?.username,
-                    provider: user?.provider,
-                  })}
+                : currentClusterData
+                  ? getClusterDisplayName({
+                      ...currentClusterData,
+                      username: user?.username,
+                      provider: user?.provider,
+                    })
+                  : getClusterDisplayName()}
             </span>
           </span>
           <IconChevronDown className="h-3 w-3 opacity-50" />
