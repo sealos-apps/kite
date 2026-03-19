@@ -101,6 +101,11 @@ const shouldTrySealosAutoLogin = (): boolean => {
   return true
 }
 
+const isSealosOutside = (): boolean => {
+  if (typeof window === 'undefined') return false
+  return window.self === window.top
+}
+
 const normalizeSealosSession = (raw: unknown): SealosSession | null => {
   if (typeof raw !== 'object' || raw === null) return null
   const value = raw as Record<string, unknown>
@@ -187,6 +192,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [providers, setProviders] = useState<string[]>([])
+  const [isSealosExternalBlocked, setIsSealosExternalBlocked] = useState(false)
   const queryClient = useQueryClient()
   const userRef = useRef<User | null>(null)
   const sealosSyncPromiseRef = useRef<Promise<boolean> | null>(null)
@@ -195,16 +201,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     userRef.current = user
   }, [user])
 
-  const loadProviders = async () => {
+  const loadProviders = async (): Promise<boolean> => {
     try {
       const response = await fetch(withSubPath('/api/auth/providers'))
       if (response.ok) {
         const data = await response.json()
         setProviders(data.providers || [])
+        const sealosEnabled = data.sealos_auth_enabled === true
+        const blockedOutside = sealosEnabled && isSealosOutside()
+        setIsSealosExternalBlocked(blockedOutside)
+        return blockedOutside
       }
     } catch (error) {
       console.error('Failed to load OAuth providers:', error)
     }
+    setIsSealosExternalBlocked(false)
+    return false
   }
 
   const checkAuthInternal = useCallback(
@@ -257,6 +269,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const syncSealosSession = useCallback(
     async (currentUser: User | null): Promise<boolean> => {
+      if (isSealosExternalBlocked) {
+        return false
+      }
       if (!shouldTrySealosAutoLogin()) {
         return false
       }
@@ -347,10 +362,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
     },
-    [checkAuthInternal, queryClient]
+    [checkAuthInternal, isSealosExternalBlocked, queryClient]
   )
 
   const syncSealosLanguage = useCallback(async (currentUser: User | null) => {
+    if (isSealosExternalBlocked) {
+      return
+    }
     if (!shouldTrySealosAutoLogin()) {
       return
     }
@@ -377,9 +395,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Sealos language sync failed:', error)
     }
-  }, [])
+  }, [isSealosExternalBlocked])
 
   useEffect(() => {
+    if (isSealosExternalBlocked) {
+      return
+    }
     if (!shouldTrySealosAutoLogin()) {
       return
     }
@@ -417,7 +438,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         cleanup()
       }
     }
-  }, [syncSealosLanguage, user])
+  }, [isSealosExternalBlocked, syncSealosLanguage, user])
 
   const login = async (provider: string = 'github') => {
     try {
@@ -504,7 +525,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const initAuth = async () => {
       setIsLoading(true)
       try {
-        await loadProviders()
+        const blockedOutside = await loadProviders()
+        if (blockedOutside) {
+          setUser(null)
+          return
+        }
         const currentUser = await checkAuthInternal()
         await Promise.all([
           syncSealosSession(currentUser),
@@ -518,6 +543,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [syncSealosLanguage, syncSealosSession])
 
   useEffect(() => {
+    if (isSealosExternalBlocked) {
+      return
+    }
     if (user && user.provider !== SEALOS_PROVIDER) {
       return
     }
@@ -537,7 +565,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener('focus', syncOnFocus)
       document.removeEventListener('visibilitychange', syncOnFocus)
     }
-  }, [syncSealosLanguage, syncSealosSession, user])
+  }, [isSealosExternalBlocked, syncSealosLanguage, syncSealosSession, user])
 
   useEffect(() => {
     const syncPermissionsByCluster = () => {
@@ -591,5 +619,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshToken,
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  if (isSealosExternalBlocked) {
+    return (
+      <AuthContext.Provider value={value}>
+        <div className="min-h-screen flex items-center justify-center px-6">
+          <div className="w-full max-w-md space-y-3 text-center">
+            <h1 className="text-xl font-semibold">
+              {i18n.t('login.sealosOnlyTitle', 'Sealos Access Required')}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {i18n.t(
+                'login.sealosOnlyDescription',
+                'This instance is in Sealos login mode and cannot be used outside Sealos. Please open it from the Sealos app center.'
+              )}
+            </p>
+          </div>
+        </div>
+      </AuthContext.Provider>
+    )
+  }
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
