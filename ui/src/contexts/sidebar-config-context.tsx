@@ -203,28 +203,44 @@ const defaultMenus: DefaultMenus = {
 
 const CURRENT_CONFIG_VERSION = 1
 
-const sanitizeSidebarConfig = (config: SidebarConfig): SidebarConfig => {
+const sanitizeSidebarConfig = (
+  config: SidebarConfig,
+  options?: {
+    canViewCustomCRDGroups?: boolean
+  }
+): SidebarConfig => {
+  const canViewCustomCRDGroups = options?.canViewCustomCRDGroups ?? true
   const removedItemIds = new Set<string>()
+  const removedGroupIds = new Set<string>()
 
-  const groups = config.groups.map((group) => {
-    const items = group.items
-      .filter((item) => {
-        const shouldHide = isSidebarPathHidden(item.url)
-        if (shouldHide) {
-          removedItemIds.add(item.id)
-        }
-        return !shouldHide
-      })
-      .map((item, index) => ({
-        ...item,
-        order: index,
-      }))
+  const groups = config.groups
+    .filter((group) => {
+      const shouldKeep = canViewCustomCRDGroups || !group.isCustom
+      if (!shouldKeep) {
+        removedGroupIds.add(group.id)
+        group.items.forEach((item) => removedItemIds.add(item.id))
+      }
+      return shouldKeep
+    })
+    .map((group) => {
+      const items = group.items
+        .filter((item) => {
+          const shouldHide = isSidebarPathHidden(item.url)
+          if (shouldHide) {
+            removedItemIds.add(item.id)
+          }
+          return !shouldHide
+        })
+        .map((item, index) => ({
+          ...item,
+          order: index,
+        }))
 
-    return {
-      ...group,
-      items,
-    }
-  })
+      return {
+        ...group,
+        items,
+      }
+    })
 
   return {
     ...config,
@@ -234,6 +250,9 @@ const sanitizeSidebarConfig = (config: SidebarConfig): SidebarConfig => {
     ),
     hiddenItems: config.hiddenItems.filter(
       (itemId) => !removedItemIds.has(itemId)
+    ),
+    groupOrder: config.groupOrder.filter(
+      (groupId) => !removedGroupIds.has(groupId)
     ),
   }
 }
@@ -292,15 +311,19 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
 
   const loadConfig = useCallback(() => {
     const normalizedPreference = sidebarPreference.trim()
-    if (lastLoadedPreferenceRef.current === normalizedPreference) {
+    const loadCacheKey = `${canCreateCustomCRDGroupPermission ? '1' : '0'}:${normalizedPreference}`
+
+    if (lastLoadedPreferenceRef.current === loadCacheKey) {
       return
     }
-    lastLoadedPreferenceRef.current = normalizedPreference
+    lastLoadedPreferenceRef.current = loadCacheKey
 
     if (normalizedPreference) {
       try {
         const userConfig = JSON.parse(normalizedPreference)
-        const sanitizedConfig = sanitizeSidebarConfig(userConfig)
+        const sanitizedConfig = sanitizeSidebarConfig(userConfig, {
+          canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
+        })
         setConfig(sanitizedConfig)
 
         const currentVersion = userConfig.version || 0
@@ -312,11 +335,13 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     }
     setHasUpdate(false)
     setConfig(defaultConfigs())
-  }, [sidebarPreference])
+  }, [sidebarPreference, canCreateCustomCRDGroupPermission])
 
   const saveConfig = useCallback(
     async (newConfig: SidebarConfig) => {
-      const sanitizedConfig = sanitizeSidebarConfig(newConfig)
+      const sanitizedConfig = sanitizeSidebarConfig(newConfig, {
+        canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
+      })
 
       if (!user) {
         setConfig(sanitizedConfig)
@@ -353,7 +378,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
         console.error('Failed to save sidebar config to server:', error)
       }
     },
-    [user]
+    [user, canCreateCustomCRDGroupPermission]
   )
 
   const updateConfig = useCallback(

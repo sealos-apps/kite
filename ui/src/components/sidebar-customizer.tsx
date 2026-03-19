@@ -117,7 +117,7 @@ export function SidebarCustomizer({
           shouldShowItemInCurrentCluster(item.url)
         ),
       }))
-      .filter((group) => group.items.length > 0)
+      .filter((group) => group.isCustom || group.items.length > 0)
   }, [config, shouldShowItemInCurrentCluster])
 
   if (isLoading || !config) {
