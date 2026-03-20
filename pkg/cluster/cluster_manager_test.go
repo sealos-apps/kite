@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"testing"
+	"time"
 
 	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
+	"gorm.io/gorm"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -245,5 +247,38 @@ func TestResolveClientSetForUser(t *testing.T) {
 		_, err := cm.ResolveClientSetForUser(noAccessUser, "")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrNoAccessibleCluster)
+	})
+
+	t.Run("wait for explicitly requested cluster to finish syncing", func(t *testing.T) {
+		originalLookup := getClusterByName
+		getClusterByName = func(name string) (*model.Cluster, error) {
+			return &model.Cluster{Name: name, Enable: true}, nil
+		}
+		t.Cleanup(func() {
+			getClusterByName = originalLookup
+		})
+
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			cm.clusters["sealos-tenant-c"] = &ClientSet{Name: "sealos-tenant-c"}
+		}()
+
+		got, err := cm.ResolveClientSetForUser(user, "sealos-tenant-c")
+		require.NoError(t, err)
+		assert.Equal(t, "sealos-tenant-c", got.Name)
+	})
+
+	t.Run("return not found when requested cluster does not exist in db", func(t *testing.T) {
+		originalLookup := getClusterByName
+		getClusterByName = func(string) (*model.Cluster, error) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		t.Cleanup(func() {
+			getClusterByName = originalLookup
+		})
+
+		_, err := cm.ResolveClientSetForUser(user, "sealos-tenant-missing")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrClusterNotFound)
 	})
 }

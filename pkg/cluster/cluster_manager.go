@@ -47,6 +47,7 @@ var (
 	ErrClusterNotFound     = errors.New("cluster not found")
 	ErrClusterAccessDenied = errors.New("cluster access denied")
 	ErrNoAccessibleCluster = errors.New("no accessible cluster")
+	getClusterByName       = model.GetClusterByName
 )
 
 func createClientSetInCluster(name, prometheusURL string) (*ClientSet, error) {
@@ -254,12 +255,8 @@ func (cm *ClusterManager) GetClientSet(clusterName string) (*ClientSet, error) {
 }
 
 func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName string) (*ClientSet, error) {
-	if len(cm.clusters) == 0 {
-		return nil, fmt.Errorf("no clusters available")
-	}
-
 	if clusterName != "" {
-		cluster, ok := cm.clusters[clusterName]
+		cluster, ok := cm.resolveClientSetByName(clusterName)
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrClusterNotFound, clusterName)
 		}
@@ -267,6 +264,10 @@ func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName s
 			return nil, fmt.Errorf("%w: %s", ErrClusterAccessDenied, clusterName)
 		}
 		return cluster, nil
+	}
+
+	if len(cm.clusters) == 0 {
+		return nil, fmt.Errorf("no clusters available")
 	}
 
 	if cm.defaultContext != "" {
@@ -287,6 +288,39 @@ func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName s
 
 	sort.Strings(accessible)
 	return cm.clusters[accessible[0]], nil
+}
+
+func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet, bool) {
+	if clusterName == "" {
+		return nil, false
+	}
+
+	if cluster, ok := cm.clusters[clusterName]; ok {
+		return cluster, true
+	}
+
+	if _, hasBuildError := cm.errors[clusterName]; hasBuildError {
+		return nil, false
+	}
+
+	dbCluster, err := getClusterByName(clusterName)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			klog.Warningf("Failed to query cluster %s while resolving client set: %v", clusterName, err)
+		}
+		return nil, false
+	}
+	if !dbCluster.Enable {
+		return nil, false
+	}
+
+	cm.TriggerSync()
+	if !cm.WaitForCluster(clusterName, 10*time.Second) {
+		return nil, false
+	}
+
+	cluster, ok := cm.clusters[clusterName]
+	return cluster, ok
 }
 
 func ImportClustersFromKubeconfig(kubeconfig *clientcmdapi.Config) int64 {
@@ -349,6 +383,9 @@ func (cm *ClusterManager) WaitForCluster(name string, timeout time.Duration) boo
 	for time.Now().Before(deadline) {
 		if _, ok := cm.clusters[name]; ok {
 			return true
+		}
+		if _, ok := cm.errors[name]; ok {
+			return false
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
