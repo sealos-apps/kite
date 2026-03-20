@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -68,9 +69,10 @@ type PodCurrentMetrics struct {
 }
 
 type ResourceUsageOptions struct {
-	Namespace          string
-	CPUCapacityCores   float64
-	MemoryCapacityByte float64
+	Namespace                       string
+	CPUCapacityCores                float64
+	MemoryCapacityByte              float64
+	DisallowClusterCapacityFallback bool
 }
 
 func NewClientWithRoundTripper(prometheusURL string, rt http.RoundTripper) (*Client, error) {
@@ -114,17 +116,24 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	start := now.Add(-timeRange)
 
 	cpuQuery, memoryQuery, networkInQuery, networkOutQuery := buildResourceUsageQueries(instance, nodeLabel, options)
+	var err error
 
-	// Query CPU usage percentage - using container CPU usage
-	cpuData, err := c.queryRange(ctx, cpuQuery, start, now, step)
-	if err != nil {
-		return nil, fmt.Errorf("error querying CPU usage: %w", err)
+	cpuData := []UsageDataPoint{}
+	if cpuQuery != "" {
+		// Query CPU usage percentage - using container CPU usage
+		cpuData, err = c.queryRange(ctx, cpuQuery, start, now, step)
+		if err != nil {
+			return nil, fmt.Errorf("error querying CPU usage: %w", err)
+		}
 	}
 
-	// Query Memory usage percentage - using container memory usage
-	memoryData, err := c.queryRange(ctx, memoryQuery, start, now, step)
-	if err != nil {
-		return nil, fmt.Errorf("error querying Memory usage: %w", err)
+	memoryData := []UsageDataPoint{}
+	if memoryQuery != "" {
+		// Query Memory usage percentage - using container memory usage
+		memoryData, err = c.queryRange(ctx, memoryQuery, start, now, step)
+		if err != nil {
+			return nil, fmt.Errorf("error querying Memory usage: %w", err)
+		}
 	}
 
 	// Query Network incoming bytes rate (bytes per second)
@@ -174,6 +183,8 @@ func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsage
 	cpuQuery := ""
 	if options.CPUCapacityCores > 0 {
 		cpuQuery = fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / %s * 100`, strings.Join(containerConditions, ","), formatPromQLScalar(options.CPUCapacityCores))
+	} else if options.Namespace != "" && options.DisallowClusterCapacityFallback {
+		cpuQuery = ""
 	} else {
 		cpuConditions := []string{
 			`resource="cpu"`,
@@ -187,6 +198,8 @@ func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsage
 	memoryQuery := ""
 	if options.MemoryCapacityByte > 0 {
 		memoryQuery = fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / %s * 100`, strings.Join(containerConditions, ","), formatPromQLScalar(options.MemoryCapacityByte))
+	} else if options.Namespace != "" && options.DisallowClusterCapacityFallback {
+		memoryQuery = ""
 	} else {
 		memoryConditions := []string{
 			`resource="memory"`,
@@ -240,6 +253,26 @@ func (c *Client) queryRange(ctx context.Context, query string, start, end time.T
 	}
 
 	return dataPoints, nil
+}
+
+func IsClientErrorStatus(err error, statusCode int) bool {
+	if err == nil {
+		return false
+	}
+
+	var promErr *v1.Error
+	if errors.As(err, &promErr) {
+		if promErr.Type != v1.ErrClient {
+			return false
+		}
+		return strings.Contains(promErr.Msg, fmt.Sprintf("client error: %d", statusCode))
+	}
+
+	return false
+}
+
+func IsForbiddenError(err error) bool {
+	return IsClientErrorStatus(err, http.StatusForbidden)
 }
 
 // HealthCheck verifies if Prometheus is accessible

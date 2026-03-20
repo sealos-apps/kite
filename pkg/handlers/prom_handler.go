@@ -10,7 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/zxh326/kite/pkg/cluster"
+	"github.com/zxh326/kite/pkg/common"
+	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/prometheus"
+	"github.com/zxh326/kite/pkg/rbac"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -56,6 +59,7 @@ func (h *PromHandler) GetResourceUsageHistory(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	user := c.MustGet("user").(model.User)
 	// Get query parameter for time range
 	duration := c.DefaultQuery("duration", "1h")
 
@@ -91,16 +95,43 @@ func (h *PromHandler) GetResourceUsageHistory(c *gin.Context) {
 		if hasMemoryQuota {
 			options.MemoryCapacityByte = memoryCapacity
 		}
+		if !common.IsNamespaceScopeExempt(cs.Namespace) && !rbac.UserHasRole(user, model.DefaultAdminRole.Name) {
+			options.DisallowClusterCapacityFallback = true
+		}
 	}
 	resourceUsageHistory, err := cs.PromClient.GetResourceUsageHistory(ctx, instance, duration, "instance", options)
 	if err != nil {
 		resourceUsageHistory, err = cs.PromClient.GetResourceUsageHistory(ctx, instance, duration, "node", options)
 		if err != nil {
+			if prometheus.IsForbiddenError(err) {
+				klog.Warningf("resource usage history forbidden by prometheus, return empty history: cluster=%s duration=%s instance=%s namespace=%s err=%v", cs.Name, duration, instance, options.Namespace, err)
+				resourceUsageHistory = newEmptyResourceUsageHistory()
+				applyResourceUsageHistoryMetadata(resourceUsageHistory, options)
+				c.JSON(http.StatusOK, resourceUsageHistory)
+				return
+			}
 			klog.Warningf("resource usage history query failed: cluster=%s duration=%s instance=%s namespace=%s err=%v", cs.Name, duration, instance, options.Namespace, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get resource usage history: %v", err)})
 			return
 		}
 	}
+	applyResourceUsageHistoryMetadata(resourceUsageHistory, options)
+
+	c.JSON(http.StatusOK, resourceUsageHistory)
+}
+
+func newEmptyResourceUsageHistory() *prometheus.ResourceUsageHistory {
+	return &prometheus.ResourceUsageHistory{
+		CPU:        []prometheus.UsageDataPoint{},
+		Memory:     []prometheus.UsageDataPoint{},
+		NetworkIn:  []prometheus.UsageDataPoint{},
+		NetworkOut: []prometheus.UsageDataPoint{},
+		DiskRead:   []prometheus.UsageDataPoint{},
+		DiskWrite:  []prometheus.UsageDataPoint{},
+	}
+}
+
+func applyResourceUsageHistoryMetadata(resourceUsageHistory *prometheus.ResourceUsageHistory, options prometheus.ResourceUsageOptions) {
 	resourceUsageHistory.Namespace = options.Namespace
 	if options.CPUCapacityCores > 0 {
 		resourceUsageHistory.CPUUtilizationMode = prometheus.UtilizationModeNamespaceQuota
@@ -112,8 +143,6 @@ func (h *PromHandler) GetResourceUsageHistory(c *gin.Context) {
 	} else {
 		resourceUsageHistory.MemoryUtilizationMode = prometheus.UtilizationModeClusterCapacity
 	}
-
-	c.JSON(http.StatusOK, resourceUsageHistory)
 }
 
 // GetPodMetrics handles pod-specific metrics requests
