@@ -17,6 +17,7 @@ import {
   readCurrentCluster,
   writeCurrentCluster,
 } from '@/lib/current-cluster'
+import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
 import { withSubPath } from '@/lib/subpath'
 
 interface UserCapabilities {
@@ -201,6 +202,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     userRef.current = user
   }, [user])
 
+  const buildAuthHeaders = (): HeadersInit => {
+    const token = readAuthToken()
+    if (!token) return {}
+    return {
+      Authorization: `Bearer ${token}`,
+    }
+  }
+
   const loadProviders = async (): Promise<boolean> => {
     try {
       const response = await fetch(withSubPath('/api/auth/providers'))
@@ -229,6 +238,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const response = await fetch(withSubPath('/api/auth/user'), {
           credentials: 'include',
+          headers: buildAuthHeaders(),
         })
 
         if (response.ok) {
@@ -249,6 +259,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (preserveUserOnFailure && previousUser) {
           return previousUser
         }
+        writeAuthToken(null)
         setUser(null)
         return null
       } catch (error) {
@@ -256,6 +267,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (preserveUserOnFailure && previousUser) {
           return previousUser
         }
+        writeAuthToken(null)
         setUser(null)
         return null
       }
@@ -310,6 +322,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
 
           const data = await response.json()
+          const accessToken =
+            typeof data?.access_token === 'string'
+              ? data.access_token.trim()
+              : ''
+          if (accessToken) {
+            writeAuthToken(accessToken)
+          } else if (data?.token_type === 'kite-cookie') {
+            writeAuthToken(null)
+          }
           await queryClient.invalidateQueries({ queryKey: ['init-check'] })
           await queryClient.invalidateQueries({ queryKey: ['clusters'] })
           await queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
@@ -473,6 +494,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
 
       if (response.ok) {
+        writeAuthToken(null)
         await checkAuth()
       } else {
         const errorData = await response.json()
@@ -485,10 +507,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const refreshToken = async () => {
+    if (readAuthToken()) {
+      return
+    }
+
     try {
       const response = await fetch(withSubPath('/api/auth/refresh'), {
         method: 'POST',
         credentials: 'include',
+        headers: buildAuthHeaders(),
       })
 
       if (!response.ok) {
@@ -496,6 +523,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('Token refresh failed:', error)
+      writeAuthToken(null)
       setUser(null)
       window.location.href = withSubPath('/login')
     }
@@ -506,9 +534,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await fetch(withSubPath('/api/auth/logout'), {
         method: 'POST',
         credentials: 'include',
+        headers: buildAuthHeaders(),
       })
 
       if (response.ok) {
+        writeAuthToken(null)
         setUser(null)
         writeCurrentCluster(null)
         window.location.href = withSubPath('/login')

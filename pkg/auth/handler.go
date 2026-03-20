@@ -282,16 +282,24 @@ func (h *AuthHandler) RequireAuth() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		authHeader := c.GetHeader("Authorization")
+		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+		var tokenString string
 		// bot token
 		if authHeader != "" {
 			if after, ok := strings.CutPrefix(authHeader, "kite"); ok {
 				h.RequireAPIKeyAuth(c, after)
 				return
 			}
+			if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+				tokenString = strings.TrimSpace(after)
+			} else if after, ok := strings.CutPrefix(authHeader, "bearer "); ok {
+				tokenString = strings.TrimSpace(after)
+			}
 		}
-		// Try to read auth token cookie (if missing, tokenString will be empty)
-		tokenString, _ := c.Cookie("auth_token")
+		// Fallback to auth token cookie when Authorization bearer is absent.
+		if tokenString == "" {
+			tokenString, _ = c.Cookie("auth_token")
+		}
 		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid or expired token",
@@ -548,6 +556,12 @@ func (h *AuthHandler) GetOAuthProvider(c *gin.Context) {
 }
 
 func resolveCookieSameSite() http.SameSite {
+	// Sealos SSO is commonly hosted in iframe/third-party contexts.
+	// When not explicitly configured, default to SameSite=None to allow cookie roundtrips.
+	if common.SealosAuthEnabled && !common.AuthCookieSameSiteExplicit {
+		return http.SameSiteNoneMode
+	}
+
 	switch strings.ToLower(strings.TrimSpace(common.AuthCookieSameSite)) {
 	case "strict":
 		return http.SameSiteStrictMode
@@ -559,6 +573,12 @@ func resolveCookieSameSite() http.SameSite {
 }
 
 func resolveCookieSecure(c *gin.Context) bool {
+	sameSite := resolveCookieSameSite()
+	if sameSite == http.SameSiteNoneMode {
+		// SameSite=None cookies are rejected by modern browsers without Secure.
+		return true
+	}
+
 	switch strings.ToLower(strings.TrimSpace(common.AuthCookieSecure)) {
 	case "true":
 		return true

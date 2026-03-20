@@ -415,9 +415,11 @@ func (h *AuthHandler) SealosLogin(c *gin.Context) {
 	setCookieClient(c, "x-cluster-name", clusterName, common.CookieExpirationSeconds)
 
 	c.JSON(http.StatusOK, gin.H{
-		"user":       user,
-		"cluster":    clusterName,
-		"namespace":  workspaceID,
-		"token_type": "kite-cookie",
+		"user":         user,
+		"cluster":      clusterName,
+		"namespace":    workspaceID,
+		"token_type":   "Bearer",
+		"access_token": jwtToken,
+		"expires_in":   common.JWTExpirationSeconds,
 	})
 }
