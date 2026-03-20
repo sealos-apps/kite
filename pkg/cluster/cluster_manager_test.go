@@ -5,6 +5,7 @@ import (
 
 	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
@@ -183,5 +184,66 @@ func Test_shouldUpdateCluster(t *testing.T) {
 			got := shouldUpdateCluster(cs, cluster)
 			assert.False(t, got, "expected no update when all the same")
 		})
+	})
+}
+
+func TestResolveClientSetForUser(t *testing.T) {
+	cm := &ClusterManager{
+		clusters: map[string]*ClientSet{
+			"default-cluster":   {Name: "default-cluster"},
+			"sealos-tenant-a":   {Name: "sealos-tenant-a"},
+			"sealos-tenant-b":   {Name: "sealos-tenant-b"},
+			"unrelated-cluster": {Name: "unrelated-cluster"},
+		},
+		defaultContext: "default-cluster",
+	}
+
+	user := model.User{
+		Username: "sealos-user",
+		Roles: []common.Role{
+			{
+				Name:       "sealos-role",
+				Clusters:   []string{"sealos-tenant-.*"},
+				Namespaces: []string{"*"},
+				Resources:  []string{"*"},
+				Verbs:      []string{"*"},
+			},
+		},
+	}
+
+	t.Run("fallback to accessible cluster when default cluster is inaccessible", func(t *testing.T) {
+		got, err := cm.ResolveClientSetForUser(user, "")
+		require.NoError(t, err)
+		assert.Equal(t, "sealos-tenant-a", got.Name)
+	})
+
+	t.Run("deny explicit inaccessible cluster", func(t *testing.T) {
+		_, err := cm.ResolveClientSetForUser(user, "default-cluster")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrClusterAccessDenied)
+	})
+
+	t.Run("allow explicit accessible cluster", func(t *testing.T) {
+		got, err := cm.ResolveClientSetForUser(user, "sealos-tenant-b")
+		require.NoError(t, err)
+		assert.Equal(t, "sealos-tenant-b", got.Name)
+	})
+
+	t.Run("return no accessible cluster when user has no allowed cluster", func(t *testing.T) {
+		noAccessUser := model.User{
+			Username: "guest",
+			Roles: []common.Role{
+				{
+					Name:       "guest",
+					Clusters:   []string{"guest-only-cluster"},
+					Namespaces: []string{"*"},
+					Resources:  []string{"*"},
+					Verbs:      []string{"*"},
+				},
+			},
+		}
+		_, err := cm.ResolveClientSetForUser(noAccessUser, "")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrNoAccessibleCluster)
 	})
 }

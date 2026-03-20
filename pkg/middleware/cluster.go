@@ -1,8 +1,12 @@
 package middleware
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zxh326/kite/pkg/cluster"
+	"github.com/zxh326/kite/pkg/model"
 )
 
 const (
@@ -24,14 +28,32 @@ func ClusterMiddleware(cm *cluster.ClusterManager) gin.HandlerFunc {
 				clusterName, _ = c.Cookie(ClusterNameHeader)
 			}
 		}
-		cluster, err := cm.GetClientSet(clusterName)
-		if err != nil {
-			c.JSON(404, gin.H{"error": err.Error()})
+		userValue, hasUser := c.Get("user")
+		if !hasUser {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user context not found"})
 			c.Abort()
 			return
 		}
-		c.Set("cluster", cluster)
-		c.Set(ClusterNameKey, cluster.Name)
+
+		user, ok := userValue.(model.User)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user context"})
+			c.Abort()
+			return
+		}
+
+		clientSet, err := cm.ResolveClientSetForUser(user, clusterName)
+		if err != nil {
+			statusCode := http.StatusNotFound
+			if errors.Is(err, cluster.ErrClusterAccessDenied) || errors.Is(err, cluster.ErrNoAccessibleCluster) {
+				statusCode = http.StatusForbidden
+			}
+			c.JSON(statusCode, gin.H{"error": err.Error()})
+			c.Abort()
+			return
+		}
+		c.Set("cluster", clientSet)
+		c.Set(ClusterNameKey, clientSet.Name)
 		c.Next()
 	}
 }

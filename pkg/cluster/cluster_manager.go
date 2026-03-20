@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/prometheus"
+	"github.com/zxh326/kite/pkg/rbac"
 	"gorm.io/gorm"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +42,12 @@ type ClusterManager struct {
 	errors         map[string]string
 	defaultContext string
 }
+
+var (
+	ErrClusterNotFound     = errors.New("cluster not found")
+	ErrClusterAccessDenied = errors.New("cluster access denied")
+	ErrNoAccessibleCluster = errors.New("no accessible cluster")
+)
 
 func createClientSetInCluster(name, prometheusURL string) (*ClientSet, error) {
 	config, err := rest.InClusterConfig()
@@ -243,6 +251,42 @@ func (cm *ClusterManager) GetClientSet(clusterName string) (*ClientSet, error) {
 		return cluster, nil
 	}
 	return nil, fmt.Errorf("cluster not found: %s", clusterName)
+}
+
+func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName string) (*ClientSet, error) {
+	if len(cm.clusters) == 0 {
+		return nil, fmt.Errorf("no clusters available")
+	}
+
+	if clusterName != "" {
+		cluster, ok := cm.clusters[clusterName]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrClusterNotFound, clusterName)
+		}
+		if !rbac.CanAccessCluster(user, clusterName) {
+			return nil, fmt.Errorf("%w: %s", ErrClusterAccessDenied, clusterName)
+		}
+		return cluster, nil
+	}
+
+	if cm.defaultContext != "" {
+		if cluster, ok := cm.clusters[cm.defaultContext]; ok && rbac.CanAccessCluster(user, cm.defaultContext) {
+			return cluster, nil
+		}
+	}
+
+	accessible := make([]string, 0, len(cm.clusters))
+	for name := range cm.clusters {
+		if rbac.CanAccessCluster(user, name) {
+			accessible = append(accessible, name)
+		}
+	}
+	if len(accessible) == 0 {
+		return nil, ErrNoAccessibleCluster
+	}
+
+	sort.Strings(accessible)
+	return cm.clusters[accessible[0]], nil
 }
 
 func ImportClustersFromKubeconfig(kubeconfig *clientcmdapi.Config) int64 {
