@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { IconLoader2 } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { applyResource, useTemplates } from '@/lib/api'
 import { translateError } from '@/lib/utils'
+import { useCluster } from '@/hooks/use-cluster'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -34,10 +35,44 @@ export function CreateResourceDialog({
   onOpenChange,
 }: CreateResourceDialogProps) {
   const { t } = useTranslation()
+  const { currentCluster, currentClusterInfo } = useCluster()
   const { data: templates = [] } = useTemplates()
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
   const [yamlContent, setYamlContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  const defaultNamespace = useMemo(() => {
+    if (currentClusterInfo?.namespace) {
+      return currentClusterInfo.namespace
+    }
+
+    if (typeof window === 'undefined') return undefined
+
+    const clusterName =
+      currentCluster || localStorage.getItem('current-cluster')
+    if (!clusterName) return undefined
+
+    const scopedNamespace = localStorage.getItem(
+      `${clusterName}-scoped-namespace`
+    )
+    if (scopedNamespace) return scopedNamespace
+
+    const selectedNamespace = localStorage.getItem(`${clusterName}selectedNamespace`)
+    if (selectedNamespace && selectedNamespace !== '_all') {
+      return selectedNamespace
+    }
+
+    return undefined
+  }, [currentCluster, currentClusterInfo?.namespace])
+
+  const withDefaultNamespace = (templateYaml: string): string => {
+    if (!defaultNamespace) return templateYaml
+
+    return templateYaml.replace(
+      /^(\s*namespace:\s*)(["']?)default\2(\s*(#.*)?)$/gm,
+      `$1${defaultNamespace}$3`
+    )
+  }
 
   useEffect(() => {
     if (open) {
@@ -55,7 +90,7 @@ export function CreateResourceDialog({
 
     const template = templates.find((t) => t.name === templateName)
     if (template) {
-      setYamlContent(template.yaml)
+      setYamlContent(withDefaultNamespace(template.yaml))
       setSelectedTemplateId(template.name)
     }
   }
