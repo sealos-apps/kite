@@ -317,26 +317,26 @@ jobs:
           sudo -v ; curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
 
 
-#      - name: Sync to OSS
-#        run: |
-#          set -euo pipefail
-#          ARCH="${{ matrix.arch }}"
-#          TAR_NAME="sealos-admin-cluster-${ARCH}.tar"
-#          RELEASE_TAG="${{ needs.prepare.outputs.release_tag }}"
-#          OSS_PREFIX="${{ needs.prepare.outputs.oss_prefix }}"
-#          OSS_TAR_NAME="sealos-admin-cluster-${RELEASE_TAG}-${ARCH}.tar"
-#          if [[ -f "${TAR_NAME}" ]]; then
-#            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
-#                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
-#                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
-#                "${TAR_NAME}" \
-#                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}"
-#            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
-#                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
-#                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
-#                "${TAR_NAME}.md5" \
-#                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}.md5"
-#          fi
+      - name: Sync to OSS
+        run: |
+          set -euo pipefail
+          TAR_NAME="release-assets/sealos-kite-cluster-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}.tar.gz"
+          md5sum "${TAR_NAME}" > "${TAR_NAME}.md5"
+          RELEASE_TAG="${{ needs.prepare.outputs.release_tag }}"
+          OSS_PREFIX="${{ needs.prepare.outputs.oss_prefix }}"
+          OSS_TAR_NAME="sealos-kite-cluster-${RELEASE_TAG}-${ARCH}.tar"
+          if [[ -f "${TAR_NAME}" ]]; then
+            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
+                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
+                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
+                "${TAR_NAME}" \
+                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}"
+            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
+                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
+                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
+                "${TAR_NAME}.md5" \
+                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}.md5"
+          fi
   
   release-assets:
     name: Publish Release Assets
