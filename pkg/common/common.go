@@ -45,6 +45,10 @@ var (
 
 	AuthCookieSameSite = "lax"
 	AuthCookieSecure   = "auto"
+	// AuthCookieSameSiteExplicit indicates AUTH_COOKIE_SAMESITE is explicitly configured.
+	AuthCookieSameSiteExplicit = false
+	// AuthCookieSecureExplicit indicates AUTH_COOKIE_SECURE is explicitly configured.
+	AuthCookieSecureExplicit = false
 
 	SealosAuthEnabled = false
 	SealosJWTSecret   = ""
@@ -117,6 +121,7 @@ func LoadEnvs() {
 		switch strings.ToLower(v) {
 		case "lax", "strict", "none":
 			AuthCookieSameSite = strings.ToLower(v)
+			AuthCookieSameSiteExplicit = true
 		default:
 			klog.Warningf("Invalid AUTH_COOKIE_SAMESITE=%q, use lax|strict|none, fallback to lax", v)
 		}
@@ -126,6 +131,7 @@ func LoadEnvs() {
 		switch strings.ToLower(v) {
 		case "auto", "true", "false":
 			AuthCookieSecure = strings.ToLower(v)
+			AuthCookieSecureExplicit = true
 		default:
 			klog.Warningf("Invalid AUTH_COOKIE_SECURE=%q, use auto|true|false, fallback to auto", v)
 		}

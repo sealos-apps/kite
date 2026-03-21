@@ -2,12 +2,15 @@ package cluster
 
 import (
 	"testing"
+	"time"
 
 	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
+	"gorm.io/gorm"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -183,5 +186,99 @@ func Test_shouldUpdateCluster(t *testing.T) {
 			got := shouldUpdateCluster(cs, cluster)
 			assert.False(t, got, "expected no update when all the same")
 		})
+	})
+}
+
+func TestResolveClientSetForUser(t *testing.T) {
+	cm := &ClusterManager{
+		clusters: map[string]*ClientSet{
+			"default-cluster":   {Name: "default-cluster"},
+			"sealos-tenant-a":   {Name: "sealos-tenant-a"},
+			"sealos-tenant-b":   {Name: "sealos-tenant-b"},
+			"unrelated-cluster": {Name: "unrelated-cluster"},
+		},
+		defaultContext: "default-cluster",
+	}
+
+	user := model.User{
+		Username: "sealos-user",
+		Roles: []common.Role{
+			{
+				Name:       "sealos-role",
+				Clusters:   []string{"sealos-tenant-.*"},
+				Namespaces: []string{"*"},
+				Resources:  []string{"*"},
+				Verbs:      []string{"*"},
+			},
+		},
+	}
+
+	t.Run("fallback to accessible cluster when default cluster is inaccessible", func(t *testing.T) {
+		got, err := cm.ResolveClientSetForUser(user, "")
+		require.NoError(t, err)
+		assert.Equal(t, "sealos-tenant-a", got.Name)
+	})
+
+	t.Run("deny explicit inaccessible cluster", func(t *testing.T) {
+		_, err := cm.ResolveClientSetForUser(user, "default-cluster")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrClusterAccessDenied)
+	})
+
+	t.Run("allow explicit accessible cluster", func(t *testing.T) {
+		got, err := cm.ResolveClientSetForUser(user, "sealos-tenant-b")
+		require.NoError(t, err)
+		assert.Equal(t, "sealos-tenant-b", got.Name)
+	})
+
+	t.Run("return no accessible cluster when user has no allowed cluster", func(t *testing.T) {
+		noAccessUser := model.User{
+			Username: "guest",
+			Roles: []common.Role{
+				{
+					Name:       "guest",
+					Clusters:   []string{"guest-only-cluster"},
+					Namespaces: []string{"*"},
+					Resources:  []string{"*"},
+					Verbs:      []string{"*"},
+				},
+			},
+		}
+		_, err := cm.ResolveClientSetForUser(noAccessUser, "")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrNoAccessibleCluster)
+	})
+
+	t.Run("wait for explicitly requested cluster to finish syncing", func(t *testing.T) {
+		originalLookup := getClusterByName
+		getClusterByName = func(name string) (*model.Cluster, error) {
+			return &model.Cluster{Name: name, Enable: true}, nil
+		}
+		t.Cleanup(func() {
+			getClusterByName = originalLookup
+		})
+
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			cm.clusters["sealos-tenant-c"] = &ClientSet{Name: "sealos-tenant-c"}
+		}()
+
+		got, err := cm.ResolveClientSetForUser(user, "sealos-tenant-c")
+		require.NoError(t, err)
+		assert.Equal(t, "sealos-tenant-c", got.Name)
+	})
+
+	t.Run("return not found when requested cluster does not exist in db", func(t *testing.T) {
+		originalLookup := getClusterByName
+		getClusterByName = func(string) (*model.Cluster, error) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		t.Cleanup(func() {
+			getClusterByName = originalLookup
+		})
+
+		_, err := cm.ResolveClientSetForUser(user, "sealos-tenant-missing")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrClusterNotFound)
 	})
 }

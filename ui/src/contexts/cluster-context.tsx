@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { Cluster } from '@/types/api'
+import { readAuthToken } from '@/lib/auth-token'
 import {
   CURRENT_CLUSTER_CHANGE_EVENT,
   CURRENT_CLUSTER_STORAGE_KEY,
@@ -50,11 +51,13 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
   } = useQuery<Cluster[]>({
     queryKey: ['clusters'],
     queryFn: async () => {
+      const token = readAuthToken()
       const response = await fetch(withSubPath('/api/v1/clusters'), {
         cache: 'no-store',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       })
 

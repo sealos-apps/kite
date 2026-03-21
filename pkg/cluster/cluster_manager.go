@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/prometheus"
+	"github.com/zxh326/kite/pkg/rbac"
 	"gorm.io/gorm"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +42,13 @@ type ClusterManager struct {
 	errors         map[string]string
 	defaultContext string
 }
+
+var (
+	ErrClusterNotFound     = errors.New("cluster not found")
+	ErrClusterAccessDenied = errors.New("cluster access denied")
+	ErrNoAccessibleCluster = errors.New("no accessible cluster")
+	getClusterByName       = model.GetClusterByName
+)
 
 func createClientSetInCluster(name, prometheusURL string) (*ClientSet, error) {
 	config, err := rest.InClusterConfig()
@@ -245,6 +254,75 @@ func (cm *ClusterManager) GetClientSet(clusterName string) (*ClientSet, error) {
 	return nil, fmt.Errorf("cluster not found: %s", clusterName)
 }
 
+func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName string) (*ClientSet, error) {
+	if clusterName != "" {
+		cluster, ok := cm.resolveClientSetByName(clusterName)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrClusterNotFound, clusterName)
+		}
+		if !rbac.CanAccessCluster(user, clusterName) {
+			return nil, fmt.Errorf("%w: %s", ErrClusterAccessDenied, clusterName)
+		}
+		return cluster, nil
+	}
+
+	if len(cm.clusters) == 0 {
+		return nil, fmt.Errorf("no clusters available")
+	}
+
+	if cm.defaultContext != "" {
+		if cluster, ok := cm.clusters[cm.defaultContext]; ok && rbac.CanAccessCluster(user, cm.defaultContext) {
+			return cluster, nil
+		}
+	}
+
+	accessible := make([]string, 0, len(cm.clusters))
+	for name := range cm.clusters {
+		if rbac.CanAccessCluster(user, name) {
+			accessible = append(accessible, name)
+		}
+	}
+	if len(accessible) == 0 {
+		return nil, ErrNoAccessibleCluster
+	}
+
+	sort.Strings(accessible)
+	return cm.clusters[accessible[0]], nil
+}
+
+func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet, bool) {
+	if clusterName == "" {
+		return nil, false
+	}
+
+	if cluster, ok := cm.clusters[clusterName]; ok {
+		return cluster, true
+	}
+
+	if _, hasBuildError := cm.errors[clusterName]; hasBuildError {
+		return nil, false
+	}
+
+	dbCluster, err := getClusterByName(clusterName)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			klog.Warningf("Failed to query cluster %s while resolving client set: %v", clusterName, err)
+		}
+		return nil, false
+	}
+	if !dbCluster.Enable {
+		return nil, false
+	}
+
+	cm.TriggerSync()
+	if !cm.WaitForCluster(clusterName, 10*time.Second) {
+		return nil, false
+	}
+
+	cluster, ok := cm.clusters[clusterName]
+	return cluster, ok
+}
+
 func ImportClustersFromKubeconfig(kubeconfig *clientcmdapi.Config) int64 {
 	if len(kubeconfig.Contexts) == 0 {
 		return 0
@@ -305,6 +383,9 @@ func (cm *ClusterManager) WaitForCluster(name string, timeout time.Duration) boo
 	for time.Now().Before(deadline) {
 		if _, ok := cm.clusters[name]; ok {
 			return true
+		}
+		if _, ok := cm.errors[name]; ok {
+			return false
 		}
 		time.Sleep(100 * time.Millisecond)
 	}

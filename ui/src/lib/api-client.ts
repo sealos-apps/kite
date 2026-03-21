@@ -1,4 +1,5 @@
 // API client with authentication support
+import { readAuthToken } from './auth-token'
 import { withSubPath } from './subpath'
 
 const isAsciiClusterName = (value: string) => /^[\x21-\x7E]+$/.test(value)
@@ -59,6 +60,11 @@ class ApiClient {
     const currentCluster = this.getCurrentCluster?.()
     if (currentCluster && isAsciiClusterName(currentCluster)) {
       headers['x-cluster-name'] = currentCluster
+    }
+
+    const accessToken = readAuthToken()
+    if (accessToken && !headers.Authorization) {
+      headers.Authorization = `Bearer ${accessToken}`
     }
 
     const defaultOptions: RequestInit = {

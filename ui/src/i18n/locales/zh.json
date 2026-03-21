@@ -213,6 +213,8 @@
     "signInWithPassword": "使用密码登录",
     "orContinueWith": "或继续使用",
     "signInWith": "使用 {{provider}} 登录",
+    "sealosOnlyTitle": "仅支持在 Sealos 内访问",
+    "sealosOnlyDescription": "当前实例已启用 Sealos 登录模式，不允许在 Sealos 外部使用。请从 Sealos 应用中心打开。",
     "tryAgainDifferentAccount": "尝试使用其他账户",
     "tryAgainHint": "您可以尝试使用具有所需权限的其他账户登录。",
     "noLoginMethods": "未配置登录方式",
