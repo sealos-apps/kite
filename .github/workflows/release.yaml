@@ -214,9 +214,10 @@ jobs:
         run: |
           set -euo pipefail
           TAG_NAME="${{ needs.meta.outputs.tag_name }}"
+          TAG_WITH_SHA="${{ needs.meta.outputs.tag_with_sha }}"
           sudo sealos login -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}" ghcr.io
           sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*repository:[[:space:]]*\).*#\1${GHCR_RUNTIME_IMAGE}#" charts/sealos-kite/values.yaml
-          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*tag:[[:space:]]*\).*#\1${TAG_NAME}#" charts/sealos-kite/values.yaml
+          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*tag:[[:space:]]*\).*#\1${TAG_WITH_SHA}#" charts/sealos-kite/values.yaml
           sudo sealos registry save --registry-dir=registry_${{ matrix.arch }} --arch ${{ matrix.arch }} .
 
       - name: Set up Docker Buildx
@@ -237,16 +238,15 @@ jobs:
           labels: runnumber=${{ github.run_id }}
 
       - name: Save sealos image package
-        if: ${{ needs.meta.outputs.is_release == 'true' }}
         run: |
           set -euo pipefail
           TAG_NAME="${{ needs.meta.outputs.tag_name }}"
-          docker pull "${GHCR_SEALOS_IMAGE}:${TAG_NAME}-${{ matrix.arch }}"
+          TAG_WITH_SHA="${{ needs.meta.outputs.tag_with_sha }}"
+          docker pull "${GHCR_SEALOS_IMAGE}:${TAG_WITH_SHA}-${{ matrix.arch }}"
           mkdir -p release-assets
-          docker save "${GHCR_SEALOS_IMAGE}:${TAG_NAME}-${{ matrix.arch }}" | gzip > "release-assets/sealos-kite-cluster-${TAG_NAME}-${{ matrix.arch }}.tar.gz"
+          docker save "${GHCR_SEALOS_IMAGE}:${TAG_WITH_SHA}-${{ matrix.arch }}" | gzip > "release-assets/sealos-kite-cluster-${TAG_NAME}-${{ matrix.arch }}.tar.gz"
 
       - name: Upload sealos image package
-        if: ${{ needs.meta.outputs.is_release == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: sealos-image-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}
@@ -295,48 +295,48 @@ jobs:
             "${GHCR_SEALOS_IMAGE}:${TAG_NAME}-amd64" \
             "${GHCR_SEALOS_IMAGE}:${TAG_NAME}-arm64"
 
-  sync-pve-image-aliyun:
-    runs-on: ubuntu-latest
-    needs: [prepare, sealos-manifest]
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [amd64, arm64]
-    steps:
-      - name: Download sealos packages
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-          pattern: sealos-image-${{ needs.meta.outputs.tag_name }}-*
-          merge-multiple: true
-      - name: Install oss tools
-        run: |
-          set -euo pipefail
-          sudo -v ; curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
+#  sync-pve-image-aliyun:
+#    runs-on: ubuntu-latest
+#    needs: [prepare, sealos-manifest]
+#    permissions:
+#      contents: write
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        arch: [amd64, arm64]
+#    steps:
+#      - name: Download sealos packages
+#        uses: actions/download-artifact@v4
+#        with:
+#          path: release-assets
+#          pattern: sealos-image-${{ needs.meta.outputs.tag_name }}-*
+#          merge-multiple: true
+#      - name: Install oss tools
+#        run: |
+#          set -euo pipefail
+#          sudo -v ; curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
 
 
-      - name: Sync to OSS
-        run: |
-          set -euo pipefail
-          ARCH="${{ matrix.arch }}"
-          TAR_NAME="sealos-admin-cluster-${ARCH}.tar"
-          RELEASE_TAG="${{ needs.prepare.outputs.release_tag }}"
-          OSS_PREFIX="${{ needs.prepare.outputs.oss_prefix }}"
-          OSS_TAR_NAME="sealos-admin-cluster-${RELEASE_TAG}-${ARCH}.tar"
-          if [[ -f "${TAR_NAME}" ]]; then
-            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
-                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
-                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
-                "${TAR_NAME}" \
-                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}"
-            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
-                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
-                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
-                "${TAR_NAME}.md5" \
-                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}.md5"
-          fi
+#      - name: Sync to OSS
+#        run: |
+#          set -euo pipefail
+#          ARCH="${{ matrix.arch }}"
+#          TAR_NAME="sealos-admin-cluster-${ARCH}.tar"
+#          RELEASE_TAG="${{ needs.prepare.outputs.release_tag }}"
+#          OSS_PREFIX="${{ needs.prepare.outputs.oss_prefix }}"
+#          OSS_TAR_NAME="sealos-admin-cluster-${RELEASE_TAG}-${ARCH}.tar"
+#          if [[ -f "${TAR_NAME}" ]]; then
+#            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
+#                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
+#                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
+#                "${TAR_NAME}" \
+#                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}"
+#            ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
+#                -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
+#                -k ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
+#                "${TAR_NAME}.md5" \
+#                "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}.md5"
+#          fi
   
   release-assets:
     name: Publish Release Assets
