@@ -297,7 +297,7 @@ jobs:
 
   sync-pve-image-aliyun:
     runs-on: ubuntu-latest
-    needs: [prepare, sealos-manifest]
+    needs: [prepare, meta, sealos-manifest]
     permissions:
       contents: write
     strategy:
