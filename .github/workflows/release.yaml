@@ -16,37 +16,34 @@ env:
 
 jobs:
   prepare:
+    name: Prepare Variables
     runs-on: ubuntu-latest
     outputs:
-      release_tag: ${{ steps.vars.outputs.release_tag }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+      cluster_tag: ${{ steps.vars.outputs.cluster_tag }}
       oss_prefix: ${{ steps.vars.outputs.oss_prefix }}
-      oss_region: ${{ steps.vars.outputs.oss_region }}
     steps:
-      - name: Prepare release variables
+      - name: Prepare build variables
         id: vars
-        env:
-          OSS_ENDPOINT: ${{ secrets.OSS_ENDPOINT }}
-          OSS_REGION_INPUT: ${{ vars.OSS_REGION }}
         run: |
-          RELEASE_TAG="${{ github.event.release.tag_name }}"
-          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "oss_prefix=releases/${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+          echo "short_sha=${SHORT_SHA}" >> "${GITHUB_OUTPUT}"
           
-          if [ -n "${OSS_REGION_INPUT}" ]; then
-            OSS_REGION="${OSS_REGION_INPUT}"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            CLUSTER_TAG="latest-${SHORT_SHA}"
+            OSS_PREFIX="ci/main/${SHORT_SHA}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            CLUSTER_TAG="${{ github.ref_name }}"
+            OSS_PREFIX="release/${CLUSTER_TAG}"
           else
-            OSS_HOST="${OSS_ENDPOINT#http://}"
-            OSS_HOST="${OSS_HOST#https://}"
-            OSS_HOST="${OSS_HOST%%/*}"
-            if [[ "$OSS_HOST" =~ ^oss-([a-z0-9-]+)(-internal)?\.aliyuncs\.com$ ]]; then
-              OSS_REGION="${BASH_REMATCH[1]}"
-            else
-              echo "failed to infer OSS region from OSS_ENDPOINT=${OSS_ENDPOINT}" >&2
-              exit 1
-            fi
+            echo "unsupported ref for release workflow: ${{ github.ref }}" >&2
+            exit 1
           fi
           
-          echo "oss_region=${OSS_REGION}" >> "$GITHUB_OUTPUT"
+          echo "cluster_tag=${CLUSTER_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "oss_prefix=${OSS_PREFIX}" >> "${GITHUB_OUTPUT}"
+
 
   meta:
     name: Release Metadata
@@ -322,9 +319,8 @@ jobs:
           set -euo pipefail
           TAR_NAME="release-assets/sealos-kite-cluster-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}.tar.gz"
           md5sum "${TAR_NAME}" > "${TAR_NAME}.md5"
-          RELEASE_TAG="${{ needs.prepare.outputs.release_tag }}"
           OSS_PREFIX="${{ needs.prepare.outputs.oss_prefix }}"
-          OSS_TAR_NAME="sealos-kite-cluster-${RELEASE_TAG}-${{ matrix.arch }}.tar"
+          OSS_TAR_NAME="sealos-kite-cluster-${{ needs.prepare.outputs.cluster_tag }}-${{ matrix.arch }}.tar"
           if [[ -f "${TAR_NAME}" ]]; then
             ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
                 -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
