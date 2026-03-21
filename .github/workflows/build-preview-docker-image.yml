@@ -68,7 +68,7 @@ jobs:
       - name: Generate tags
         id: tags
         run: |
-          echo "tags=ghcr.io/${{ github.repository_owner }}/kite:main" >> $GITHUB_OUTPUT
+          echo "tags=ghcr.io/${{ github.repository_owner }}/sealos-kite:main" >> $GITHUB_OUTPUT
           echo "image_tag=main" >> $GITHUB_OUTPUT
 
       - name: Build
