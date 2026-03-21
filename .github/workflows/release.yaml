@@ -324,7 +324,7 @@ jobs:
           md5sum "${TAR_NAME}" > "${TAR_NAME}.md5"
           RELEASE_TAG="${{ needs.prepare.outputs.release_tag }}"
           OSS_PREFIX="${{ needs.prepare.outputs.oss_prefix }}"
-          OSS_TAR_NAME="sealos-kite-cluster-${RELEASE_TAG}-${ARCH}.tar"
+          OSS_TAR_NAME="sealos-kite-cluster-${RELEASE_TAG}-${{ matrix.arch }}.tar"
           if [[ -f "${TAR_NAME}" ]]; then
             ossutil64 cp -f -e ${{ secrets.OSS_ENDPOINT }} \
                 -i ${{ secrets.OSS_ACCESS_KEY_ID }} \
