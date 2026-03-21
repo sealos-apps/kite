@@ -14,7 +14,7 @@ on:
 env:
   GO_VERSION: '1.25'
   NODE_VERSION: '24'
-  LOCAL_REGISTRY: '127.0.0.1:5000/kite-pr'
+  LOCAL_REGISTRY: '127.0.0.1:5000/sealos-kite-pr'
 
 jobs:
   sealos:
@@ -100,8 +100,8 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME_TAG="${{ steps.meta.outputs.pr_tag }}"
-          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*repository:[[:space:]]*\).*#\1${LOCAL_REGISTRY}/kite-pr-runtime#" charts/kite/values.yaml
-          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*tag:[[:space:]]*\).*#\1${RUNTIME_TAG}#" charts/kite/values.yaml
+          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*repository:[[:space:]]*\).*#\1${LOCAL_REGISTRY}/kite-pr-runtime#" charts/sealos-kite/values.yaml
+          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*tag:[[:space:]]*\).*#\1${RUNTIME_TAG}#" charts/sealos-kite/values.yaml
           sudo sealos registry save --registry-dir=registry_amd64 --arch amd64 .
           cp -R registry_amd64 registry_arm64
 
@@ -122,14 +122,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          TAR_NAME="kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64.tar"
-          docker save "kite-cluster-pr:${{ steps.meta.outputs.pr_tag }}-amd64" -o "artifacts/${TAR_NAME}"
+          TAR_NAME="sealos-kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64.tar"
+          docker save "sealos-kite-cluster-pr:${{ steps.meta.outputs.pr_tag }}-amd64" -o "artifacts/${TAR_NAME}"
           gzip -f "artifacts/${TAR_NAME}"
 
       - name: Upload sealos image tar
         uses: actions/upload-artifact@v4
         with:
-          name: kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64
+          name: sealos-kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64
           path: artifacts/*.tar.gz
           if-no-files-found: error
           retention-days: 14
