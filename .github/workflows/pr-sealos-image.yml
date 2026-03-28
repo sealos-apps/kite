@@ -14,7 +14,7 @@ on:
 env:
   GO_VERSION: '1.25'
   NODE_VERSION: '24'
-  LOCAL_REGISTRY: '127.0.0.1:5000/sealos-kite-pr'
+  LOCAL_REGISTRY: '127.0.0.1:5000/kite-pr'
 
 jobs:
   sealos:
@@ -75,21 +75,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-          tags: sealos-kite-pr-runtime:${{ steps.meta.outputs.pr_tag }}
+          tags: kite-pr-runtime:${{ steps.meta.outputs.pr_tag }}
           labels: runnumber=${{ github.run_id }}
 
       - name: Start temporary local registry
         run: |
           set -euo pipefail
-          docker rm -f sealos-kite-pr-registry >/dev/null 2>&1 || true
-          docker run -d -p 5000:5000 --name sealos-kite-pr-registry registry:2
+          docker rm -f kite-pr-registry >/dev/null 2>&1 || true
+          docker run -d -p 5000:5000 --name kite-pr-registry registry:2
 
       - name: Push runtime image to temporary local registry
         run: |
           set -euo pipefail
           RUNTIME_TAG="${{ steps.meta.outputs.pr_tag }}"
-          REGISTRY_IMAGE="${LOCAL_REGISTRY}/sealos-kite-pr-runtime:${RUNTIME_TAG}"
-          docker tag "sealos-kite-pr-runtime:${RUNTIME_TAG}" "${REGISTRY_IMAGE}"
+          REGISTRY_IMAGE="${LOCAL_REGISTRY}/kite-pr-runtime:${RUNTIME_TAG}"
+          docker tag "kite-pr-runtime:${RUNTIME_TAG}" "${REGISTRY_IMAGE}"
           docker push "${REGISTRY_IMAGE}"
 
       - name: Install cache images tools
@@ -100,8 +100,8 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME_TAG="${{ steps.meta.outputs.pr_tag }}"
-          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*repository:[[:space:]]*\).*#\1${LOCAL_REGISTRY}/sealos-kite-pr-runtime#" charts/sealos-kite/values.yaml
-          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*tag:[[:space:]]*\).*#\1${RUNTIME_TAG}#" charts/sealos-kite/values.yaml
+          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*repository:[[:space:]]*\).*#\1${LOCAL_REGISTRY}/kite-pr-runtime#" charts/kite/values.yaml
+          sed -i "/^image:/,/^[^[:space:]]/ s#^\([[:space:]]*tag:[[:space:]]*\).*#\1${RUNTIME_TAG}#" charts/kite/values.yaml
           sudo sealos registry save --registry-dir=registry_amd64 --arch amd64 .
           cp -R registry_amd64 registry_arm64
 
@@ -115,25 +115,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-          tags: sealos-kite-cluster-pr:${{ steps.meta.outputs.pr_tag }}-amd64
+          tags: kite-cluster-pr:${{ steps.meta.outputs.pr_tag }}-amd64
           labels: runnumber=${{ github.run_id }}
 
       - name: Save sealos image tar
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          TAR_NAME="sealos-kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64.tar"
-          docker save "sealos-kite-cluster-pr:${{ steps.meta.outputs.pr_tag }}-amd64" -o "artifacts/${TAR_NAME}"
+          TAR_NAME="kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64.tar"
+          docker save "kite-cluster-pr:${{ steps.meta.outputs.pr_tag }}-amd64" -o "artifacts/${TAR_NAME}"
           gzip -f "artifacts/${TAR_NAME}"
 
       - name: Upload sealos image tar
         uses: actions/upload-artifact@v4
         with:
-          name: sealos-kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64
+          name: kite-cluster-pr-${{ github.event.pull_request.number }}-${{ steps.meta.outputs.short_sha }}-amd64
           path: artifacts/*.tar.gz
           if-no-files-found: error
           retention-days: 14
 
       - name: Cleanup temporary local registry
         if: always()
-        run: docker rm -f sealos-kite-pr-registry >/dev/null 2>&1 || true
+        run: docker rm -f kite-pr-registry >/dev/null 2>&1 || true
