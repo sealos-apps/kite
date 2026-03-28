@@ -173,8 +173,8 @@ if [ -n "${HELM_OPTS}" ]; then
   helm_opts_arr=(${HELM_OPTS})
 fi
 
-info "Installing chart charts/sealos-kite into namespace ${NAMESPACE}"
-helm upgrade -i "${RELEASE_NAME}" -n "${NAMESPACE}" --create-namespace charts/sealos-kite \
+info "Installing chart charts/kite into namespace ${NAMESPACE}"
+helm upgrade -i "${RELEASE_NAME}" -n "${NAMESPACE}" --create-namespace charts/kite \
   "${helm_set_args[@]}" \
   "${helm_opts_arr[@]}" \
   --wait
