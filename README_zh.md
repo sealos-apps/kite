@@ -161,6 +161,12 @@ Kite 现在提供 `desktop/` 桌面封装：
     make desktop-build
     ```
 
+如果之前被 pnpm 拦截了 Electron 二进制安装，可执行：
+
+```bash
+cd desktop && pnpm run ensure-electron
+```
+
 ---
 
 ## 🔍 问题排查

@@ -169,6 +169,7 @@ test: ## Run tests
 desktop-deps: ## Install desktop wrapper dependencies
 	@echo "📦 Installing desktop dependencies..."
 	cd $(DESKTOP_DIR) && pnpm install
+	cd $(DESKTOP_DIR) && pnpm run ensure-electron
 
 desktop-dev: desktop-deps ## Run Electron desktop app in development mode
 	@echo "🖥️ Starting desktop development mode..."

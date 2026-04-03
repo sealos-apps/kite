@@ -162,6 +162,12 @@ Kite now includes a desktop wrapper under `desktop/`:
    make desktop-build
    ```
 
+If Electron binary installation was blocked by pnpm before, run:
+
+```bash
+cd desktop && pnpm run ensure-electron
+```
+
 ---
 
 ## 🔍 Troubleshooting

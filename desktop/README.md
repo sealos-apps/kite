@@ -28,3 +28,16 @@ Installers are generated under `desktop/dist/`.
 
 - `KITE_DESKTOP_BACKEND`: absolute path to a backend binary (override auto-detected binary)
 - `KITE_DESKTOP_PORT`: preferred backend start port (default: `18680`)
+
+## Troubleshooting
+
+If you see:
+
+`Electron failed to install correctly, please delete node_modules/electron and try installing again`
+
+run:
+
+```bash
+cd desktop
+pnpm run ensure-electron
+```

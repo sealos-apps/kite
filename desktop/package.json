@@ -5,10 +5,11 @@
   "description": "Desktop wrapper for Kite",
   "main": "electron/main.cjs",
   "scripts": {
+    "ensure-electron": "node ./scripts/ensure-electron.mjs",
     "prepare-backend": "node ./scripts/prepare-backend.mjs",
-    "dev": "pnpm run prepare-backend && electron .",
-    "pack": "pnpm run prepare-backend && electron-builder --dir",
-    "dist": "pnpm run prepare-backend && electron-builder"
+    "dev": "pnpm run ensure-electron && pnpm run prepare-backend && electron .",
+    "pack": "pnpm run ensure-electron && pnpm run prepare-backend && electron-builder --dir",
+    "dist": "pnpm run ensure-electron && pnpm run prepare-backend && electron-builder"
   },
   "devDependencies": {
     "electron": "^35.3.0",
