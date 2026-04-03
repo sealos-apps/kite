@@ -24,6 +24,21 @@ make desktop-build
 
 Installers are generated under `desktop/dist/`.
 
+## App Icon
+
+Desktop icons are stored in `desktop/icons/`:
+
+- `icon.icns` (macOS)
+- `icon.ico` (Windows)
+- `icon.png` (Linux/runtime)
+
+Regenerate from `ui/public/logo.svg`:
+
+```bash
+cd desktop
+pnpm run generate-icons
+```
+
 ## Environment Overrides
 
 - `KITE_DESKTOP_BACKEND`: absolute path to a backend binary (override auto-detected binary)

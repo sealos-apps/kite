@@ -15,6 +15,18 @@ let backendProcess = null
 let backendPort = null
 let isShuttingDown = false
 
+function resolveRuntimeIconPath() {
+  return path.resolve(__dirname, '..', 'icons', 'icon.png')
+}
+
+function getRuntimeIconPath() {
+  const iconPath = resolveRuntimeIconPath()
+  if (fs.existsSync(iconPath)) {
+    return iconPath
+  }
+  return null
+}
+
 function getBinaryName() {
   return process.platform === 'win32' ? 'kite.exe' : 'kite'
 }
@@ -181,11 +193,13 @@ async function stopBackend() {
 }
 
 function createMainWindow() {
+  const runtimeIconPath = getRuntimeIconPath()
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
     minWidth: 1024,
     minHeight: 720,
+    icon: runtimeIconPath || undefined,
     show: false,
     autoHideMenuBar: true,
     title: 'Kite',
@@ -230,6 +244,15 @@ app.on('before-quit', (event) => {
 })
 
 app.whenReady().then(() => {
+  const runtimeIconPath = getRuntimeIconPath()
+  if (
+    process.platform === 'darwin' &&
+    runtimeIconPath &&
+    app.dock &&
+    typeof app.dock.setIcon === 'function'
+  ) {
+    app.dock.setIcon(runtimeIconPath)
+  }
   void boot()
 })
 
