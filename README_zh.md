@@ -139,6 +139,28 @@ docker run --rm -p 8080:8080 ghcr.io/zxh326/kite:latest
     make run
     ```
 
+### 桌面版（Electron 封装）
+
+Kite 现在提供 `desktop/` 桌面封装：
+
+1.  **安装桌面依赖**
+
+    ```bash
+    make desktop-deps
+    ```
+
+2.  **开发模式启动桌面版**
+
+    ```bash
+    make desktop-dev
+    ```
+
+3.  **构建桌面安装包**
+
+    ```bash
+    make desktop-build
+    ```
+
 ---
 
 ## 🔍 问题排查

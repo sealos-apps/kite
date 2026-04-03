@@ -140,6 +140,28 @@ docker run --rm -p 8080:8080 ghcr.io/zxh326/kite:latest
    make run
    ```
 
+### Desktop (Electron Wrapper)
+
+Kite now includes a desktop wrapper under `desktop/`:
+
+1. **Install desktop dependencies**
+
+   ```bash
+   make desktop-deps
+   ```
+
+2. **Run desktop app in dev mode**
+
+   ```bash
+   make desktop-dev
+   ```
+
+3. **Build desktop installers**
+
+   ```bash
+   make desktop-build
+   ```
+
 ---
 
 ## 🔍 Troubleshooting

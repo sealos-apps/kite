@@ -45,3 +45,8 @@ kite
 !deploy/charts/kite
 
 dev.db
+
+desktop/node_modules
+desktop/dist
+desktop/backend/kite
+desktop/backend/kite.exe

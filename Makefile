@@ -1,9 +1,10 @@
 # Makefile for Kite project
-.PHONY: help dev build clean test docker-build docker-run frontend backend install deps
+.PHONY: help dev build clean test docker-build docker-run frontend backend install deps desktop-deps desktop-dev desktop-pack desktop-build
 
 # Variables
 BINARY_NAME=kite
 UI_DIR=ui
+DESKTOP_DIR=desktop
 DOCKER_IMAGE=kite
 DOCKER_TAG=latest
 
@@ -164,6 +165,22 @@ pre-commit: format lint ## Run pre-commit checks
 test: ## Run tests
 	@echo "🧪 Running tests..."
 	go test -v ./...
+
+desktop-deps: ## Install desktop wrapper dependencies
+	@echo "📦 Installing desktop dependencies..."
+	cd $(DESKTOP_DIR) && pnpm install
+
+desktop-dev: desktop-deps ## Run Electron desktop app in development mode
+	@echo "🖥️ Starting desktop development mode..."
+	cd $(DESKTOP_DIR) && pnpm run dev
+
+desktop-pack: desktop-deps ## Build unpacked desktop artifacts
+	@echo "📦 Building unpacked desktop artifacts..."
+	cd $(DESKTOP_DIR) && pnpm run pack
+
+desktop-build: desktop-deps ## Build desktop installers (dmg/AppImage/nsis)
+	@echo "📦 Building desktop installers..."
+	cd $(DESKTOP_DIR) && pnpm run dist
 
 docs-dev: ## Start documentation server in development mode
 	@echo "📚 Starting documentation server..."
