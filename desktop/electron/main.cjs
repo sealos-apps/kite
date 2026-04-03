@@ -2,18 +2,22 @@ const fs = require('node:fs')
 const http = require('node:http')
 const net = require('node:net')
 const path = require('node:path')
-const { spawn } = require('node:child_process')
+const { spawn, spawnSync } = require('node:child_process')
 
 const { app, BrowserWindow, dialog } = require('electron')
 
 const START_PORT = Number.parseInt(process.env.KITE_DESKTOP_PORT || '18680', 10)
 const PORT_SCAN_LIMIT = 80
-const BACKEND_READY_TIMEOUT_MS = 30_000
+const BACKEND_READY_TIMEOUT_MS = Number.parseInt(
+  process.env.KITE_DESKTOP_BACKEND_READY_TIMEOUT_MS || '120000',
+  10
+)
 
 let mainWindow = null
 let backendProcess = null
 let backendPort = null
 let isShuttingDown = false
+let backendReady = false
 
 function resolveRuntimeIconPath() {
   return path.resolve(__dirname, '..', 'icons', 'icon.png')
@@ -31,6 +35,15 @@ function getBinaryName() {
   return process.platform === 'win32' ? 'kite.exe' : 'kite'
 }
 
+function canUseExecutablePath(filePath) {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function resolveBackendBinaryPath() {
   if (process.env.KITE_DESKTOP_BACKEND) {
     return path.resolve(process.env.KITE_DESKTOP_BACKEND)
@@ -41,6 +54,50 @@ function resolveBackendBinaryPath() {
   }
 
   return path.resolve(__dirname, '..', '..', getBinaryName())
+}
+
+function clearMacQuarantine(filePath) {
+  if (process.platform !== 'darwin') return
+  spawnSync('xattr', ['-dr', 'com.apple.quarantine', filePath], {
+    stdio: 'ignore',
+  })
+}
+
+function ensureRunnableBackendBinary(sourceBinaryPath) {
+  if (!app.isPackaged) {
+    return sourceBinaryPath
+  }
+
+  const runtimeBinDir = path.join(app.getPath('userData'), 'runtime-bin')
+  fs.mkdirSync(runtimeBinDir, { recursive: true })
+  const runtimeBinaryPath = path.join(runtimeBinDir, getBinaryName())
+
+  const shouldCopy = (() => {
+    if (!fs.existsSync(runtimeBinaryPath)) {
+      return true
+    }
+    try {
+      const srcStat = fs.statSync(sourceBinaryPath)
+      const dstStat = fs.statSync(runtimeBinaryPath)
+      return srcStat.size !== dstStat.size || srcStat.mtimeMs > dstStat.mtimeMs
+    } catch {
+      return true
+    }
+  })()
+
+  if (shouldCopy) {
+    fs.copyFileSync(sourceBinaryPath, runtimeBinaryPath)
+  }
+
+  if (process.platform !== 'win32') {
+    fs.chmodSync(runtimeBinaryPath, 0o755)
+  }
+  clearMacQuarantine(runtimeBinaryPath)
+
+  if (!canUseExecutablePath(runtimeBinaryPath)) {
+    throw new Error(`Backend binary is not executable: ${runtimeBinaryPath}`)
+  }
+  return runtimeBinaryPath
 }
 
 function wait(ms) {
@@ -54,7 +111,7 @@ function isPortAvailable(port) {
     const server = net.createServer()
     server.unref()
     server.once('error', () => resolve(false))
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, () => {
       server.close(() => resolve(true))
     })
   })
@@ -92,38 +149,61 @@ function requestHealth(port) {
   })
 }
 
-async function waitBackendReady(port, timeoutMs) {
+async function waitBackendReady(port, timeoutMs, getFailureDetails) {
   const startedAt = Date.now()
   while (Date.now() - startedAt < timeoutMs) {
+    const failureDetails = getFailureDetails()
+    if (failureDetails) {
+      throw new Error(failureDetails)
+    }
+
     const isHealthy = await requestHealth(port)
     if (isHealthy) {
       return
     }
     await wait(300)
   }
-  throw new Error(`Backend did not pass health check within ${timeoutMs}ms`)
+  const failureDetails = getFailureDetails()
+  const detailsSuffix = failureDetails ? ` (${failureDetails})` : ''
+  throw new Error(
+    `Backend did not pass health check within ${timeoutMs}ms${detailsSuffix}`
+  )
 }
 
-function pipeBackendLogs(proc) {
+function pipeBackendLogs(proc, logTail) {
+  const appendLog = (prefix, chunk) => {
+    const text = chunk.toString()
+    logTail.push(`${prefix}${text}`)
+    const joined = logTail.join('')
+    if (joined.length > 6000) {
+      const trimmed = joined.slice(joined.length - 6000)
+      logTail.length = 0
+      logTail.push(trimmed)
+    }
+  }
+
   if (proc.stdout) {
     proc.stdout.on('data', (chunk) => {
+      appendLog('[stdout] ', chunk)
       process.stdout.write(`[kite] ${chunk}`)
     })
   }
 
   if (proc.stderr) {
     proc.stderr.on('data', (chunk) => {
+      appendLog('[stderr] ', chunk)
       process.stderr.write(`[kite] ${chunk}`)
     })
   }
 }
 
 async function startBackend() {
-  const binaryPath = resolveBackendBinaryPath()
-  if (!fs.existsSync(binaryPath)) {
-    throw new Error(`Backend binary not found: ${binaryPath}`)
+  const sourceBinaryPath = resolveBackendBinaryPath()
+  if (!fs.existsSync(sourceBinaryPath)) {
+    throw new Error(`Backend binary not found: ${sourceBinaryPath}`)
   }
 
+  const binaryPath = ensureRunnableBackendBinary(sourceBinaryPath)
   backendPort = await findAvailablePort(START_PORT)
   const userDataDir = app.getPath('userData')
   fs.mkdirSync(userDataDir, { recursive: true })
@@ -143,20 +223,43 @@ async function startBackend() {
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  pipeBackendLogs(backendProcess)
+  const logTail = []
+  let spawnError = null
+  let earlyExitReason = null
+  backendReady = false
+
+  backendProcess.once('error', (error) => {
+    spawnError = `Failed to spawn backend: ${error.message}`
+  })
+
+  pipeBackendLogs(backendProcess, logTail)
 
   backendProcess.once('exit', (code, signal) => {
+    const reason =
+      typeof code === 'number'
+        ? `Backend exited with code ${code}`
+        : `Backend terminated by signal ${signal || 'unknown'}`
+    if (!backendReady) {
+      earlyExitReason = reason
+      return
+    }
+
     if (!isShuttingDown) {
-      const reason =
-        typeof code === 'number'
-          ? `Backend exited with code ${code}`
-          : `Backend terminated by signal ${signal || 'unknown'}`
       dialog.showErrorBox('Kite backend stopped', reason)
       app.quit()
     }
   })
 
-  await waitBackendReady(backendPort, BACKEND_READY_TIMEOUT_MS)
+  await waitBackendReady(backendPort, BACKEND_READY_TIMEOUT_MS, () => {
+    if (spawnError) {
+      return spawnError
+    }
+    if (earlyExitReason) {
+      return `${earlyExitReason}. Recent logs: ${logTail.join('').trim()}`
+    }
+    return null
+  })
+  backendReady = true
 }
 
 function terminateProcessTree(pid, signal = 'SIGTERM') {
@@ -176,6 +279,7 @@ async function stopBackend() {
   if (!backendProcess) return
   const proc = backendProcess
   backendProcess = null
+  backendReady = false
 
   await new Promise((resolve) => {
     const timeout = setTimeout(() => {
