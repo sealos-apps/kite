@@ -101,6 +101,7 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 		authGroup.GET("/providers", authHandler.GetProviders)
 		authGroup.POST("/login/password", authHandler.PasswordLogin)
 		authGroup.POST("/login/sealos", authHandler.SealosLogin)
+		authGroup.POST("/login/desktop-auto", authHandler.DesktopAutoLogin)
 		authGroup.GET("/login", authHandler.Login)
 		authGroup.GET("/callback", authHandler.Callback)
 		authGroup.POST("/logout", authHandler.Logout)

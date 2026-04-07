@@ -25,6 +25,9 @@ Kite supports several environment variables by default to change the default val
 - **ENABLE_ANALYTICS**: Enable data analytics functionality, default value is `false`. When enabled, Kite will collect limited data to help improve the product.
 
 - **PORT**: Port on which Kite runs, default value is `8080`.
+- **KITE_DESKTOP_MODE**: Enable desktop mode auto onboarding and auto login. Default is `false`. When `true`, Kite auto-creates a default local admin user (if no users exist) and auto-signs in desktop users.
+- **KITE_DESKTOP_DEFAULT_USERNAME**: Default username for desktop auto-created admin user. Effective when `KITE_DESKTOP_MODE=true`. Default is `admin`.
+- **KITE_DESKTOP_DEFAULT_NAME**: Default display name for desktop auto-created admin user. Effective when `KITE_DESKTOP_MODE=true`. Default is `Admin`.
 
 Optional frontend environment variables (build-time):
 

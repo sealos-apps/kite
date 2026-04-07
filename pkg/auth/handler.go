@@ -301,6 +301,12 @@ func (h *AuthHandler) RequireAuth() gin.HandlerFunc {
 			tokenString, _ = c.Cookie("auth_token")
 		}
 		if tokenString == "" {
+			if user, ok := h.tryDesktopAutoLogin(c); ok && user != nil {
+				user.Roles = rbac.GetUserRoles(*user)
+				c.Set("user", *user)
+				c.Next()
+				return
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid or expired token",
 			})

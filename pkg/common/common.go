@@ -28,6 +28,10 @@ var (
 	Host            = ""
 	Base            = ""
 
+	DesktopMode            = false
+	DesktopDefaultUsername = "admin"
+	DesktopDefaultName     = "Admin"
+
 	NodeTerminalImage = "busybox:latest"
 	DBType            = "sqlite"
 	DBDSN             = "dev.db"
@@ -107,6 +111,16 @@ func LoadEnvs() {
 
 	if v := os.Getenv("DISABLE_VERSION_CHECK"); v == "true" {
 		DisableVersionCheck = true
+	}
+
+	if v := strings.TrimSpace(os.Getenv("KITE_DESKTOP_MODE")); v == "true" {
+		DesktopMode = true
+	}
+	if v := strings.TrimSpace(os.Getenv("KITE_DESKTOP_DEFAULT_USERNAME")); v != "" {
+		DesktopDefaultUsername = v
+	}
+	if v := strings.TrimSpace(os.Getenv("KITE_DESKTOP_DEFAULT_NAME")); v != "" {
+		DesktopDefaultName = v
 	}
 
 	if v := os.Getenv("KITE_BASE"); v != "" {

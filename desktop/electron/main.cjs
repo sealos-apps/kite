@@ -216,6 +216,7 @@ async function startBackend() {
     DB_DSN: dbPath,
     DISABLE_VERSION_CHECK: 'true',
     AUTH_COOKIE_SECURE: 'false',
+    KITE_DESKTOP_MODE: 'true',
   }
 
   backendProcess = spawn(binaryPath, [], {

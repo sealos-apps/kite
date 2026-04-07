@@ -295,6 +295,11 @@ func GetOverview(c *gin.Context) {
 // )
 
 func InitCheck(c *gin.Context) {
+	if common.DesktopMode {
+		c.JSON(http.StatusOK, gin.H{"initialized": true, "step": 2})
+		return
+	}
+
 	// if initialized {
 	// 	c.JSON(http.StatusOK, gin.H{"initialized": true})
 	// 	return

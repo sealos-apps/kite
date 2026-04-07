@@ -25,6 +25,9 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 - **ENABLE_ANALYTICS**：启用数据分析功能，默认值为 `false`。当启用后，Kite 将收集有限数据以帮助改进产品。
 
 - **PORT**：Kite 运行的端口，默认值为 `8080`。
+- **KITE_DESKTOP_MODE**：启用桌面模式的自动引导与自动登录，默认 `false`。当为 `true` 时，若当前无用户，Kite 会自动创建默认本地管理员并自动登录。
+- **KITE_DESKTOP_DEFAULT_USERNAME**：桌面模式自动创建管理员的默认用户名，仅在 `KITE_DESKTOP_MODE=true` 时生效，默认 `admin`。
+- **KITE_DESKTOP_DEFAULT_NAME**：桌面模式自动创建管理员的默认显示名，仅在 `KITE_DESKTOP_MODE=true` 时生效，默认 `Admin`。
 
 可选前端环境变量（构建时生效）：
 

@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/zxh326/kite/pkg/common"
@@ -102,6 +103,40 @@ func GetUserByUsername(username string) (*User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// ListEnabledUsersForAutoLogin returns all enabled interactive users
+// (excluding API key and anonymous pseudo users), sorted by:
+// 1) last_login_at desc (most recent first)
+// 2) id asc (stable deterministic fallback)
+func ListEnabledUsersForAutoLogin() ([]User, error) {
+	var users []User
+	err := DB.
+		Where("provider != ? AND provider != ? AND enabled = ?", common.APIKeyProvider, "Anonymous", true).
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+
+	sort.SliceStable(users, func(i, j int) bool {
+		leftLogin := users[i].LastLoginAt
+		rightLogin := users[j].LastLoginAt
+		if leftLogin != nil && rightLogin != nil {
+			if !leftLogin.Equal(*rightLogin) {
+				return leftLogin.After(*rightLogin)
+			}
+			return users[i].ID < users[j].ID
+		}
+		if leftLogin != nil {
+			return true
+		}
+		if rightLogin != nil {
+			return false
+		}
+		return users[i].ID < users[j].ID
+	})
+
+	return users, nil
 }
 
 // ListUsers returns users with pagination. If limit is 0, defaults to 20.
