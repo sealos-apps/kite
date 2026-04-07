@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { resolveBuildMetadata } from './build-meta.mjs'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -29,23 +31,37 @@ function run(cmd, args, options) {
 
 function main() {
   fs.mkdirSync(backendDir, { recursive: true })
+  const buildMeta = resolveBuildMetadata(repoRoot)
 
   console.log('[desktop] Building frontend static assets...')
   run('pnpm', ['run', 'build'], { cwd: uiRoot })
 
   console.log('[desktop] Building Go backend binary...')
-  run('go', ['build', '-trimpath', '-o', backendBinary, '.'], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      CGO_ENABLED: '0',
-    },
-  })
+  run(
+    'go',
+    [
+      'build',
+      '-trimpath',
+      '-ldflags',
+      `-s -w -X github.com/zxh326/kite/pkg/version.Version=${buildMeta.version} -X github.com/zxh326/kite/pkg/version.BuildDate=${buildMeta.buildDate} -X github.com/zxh326/kite/pkg/version.CommitID=${buildMeta.commitID}`,
+      '-o',
+      backendBinary,
+      '.',
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        CGO_ENABLED: '0',
+      },
+    }
+  )
 
   if (process.platform !== 'win32') {
     fs.chmodSync(backendBinary, 0o755)
   }
 
+  console.log(`[desktop] build version: ${buildMeta.version}`)
   console.log(`[desktop] Backend ready: ${backendBinary}`)
 }
 

@@ -1,16 +1,17 @@
 {
   "name": "kite-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.2-p5-a070ad4",
   "description": "Desktop wrapper for Kite",
   "main": "electron/main.cjs",
   "scripts": {
     "ensure-electron": "node ./scripts/ensure-electron.mjs",
     "generate-icons": "node ./scripts/generate-icons.mjs",
+    "sync-version": "node ./scripts/sync-version.mjs",
     "prepare-backend": "node ./scripts/prepare-backend.mjs",
-    "dev": "pnpm run ensure-electron && pnpm run prepare-backend && electron .",
-    "pack": "pnpm run ensure-electron && pnpm run prepare-backend && electron-builder --dir",
-    "dist": "pnpm run ensure-electron && pnpm run prepare-backend && electron-builder"
+    "dev": "pnpm run sync-version && pnpm run ensure-electron && pnpm run prepare-backend && electron .",
+    "pack": "pnpm run sync-version && pnpm run ensure-electron && pnpm run prepare-backend && electron-builder --dir",
+    "dist": "pnpm run sync-version && pnpm run ensure-electron && pnpm run prepare-backend && electron-builder"
   },
   "devDependencies": {
     "electron": "^35.3.0",
