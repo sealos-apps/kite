@@ -4,12 +4,20 @@ const net = require('node:net')
 const path = require('node:path')
 const { spawn, spawnSync } = require('node:child_process')
 
-const { app, BrowserWindow, dialog } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain } = require('electron')
 
 const START_PORT = Number.parseInt(process.env.KITE_DESKTOP_PORT || '18680', 10)
 const PORT_SCAN_LIMIT = 80
 const BACKEND_READY_TIMEOUT_MS = Number.parseInt(
   process.env.KITE_DESKTOP_BACKEND_READY_TIMEOUT_MS || '120000',
+  10
+)
+const WINDOW_LOAD_RETRY_MAX = Number.parseInt(
+  process.env.KITE_DESKTOP_WINDOW_LOAD_RETRY_MAX || '8',
+  10
+)
+const WINDOW_LOAD_RETRY_DELAY_MS = Number.parseInt(
+  process.env.KITE_DESKTOP_WINDOW_LOAD_RETRY_DELAY_MS || '500',
   10
 )
 
@@ -18,6 +26,8 @@ let backendProcess = null
 let backendPort = null
 let isShuttingDown = false
 let backendReady = false
+let windowLoadRetryCount = 0
+let didShowWindowLoadError = false
 
 function resolveRuntimeIconPath() {
   return path.resolve(__dirname, '..', 'icons', 'icon.png')
@@ -299,6 +309,8 @@ async function stopBackend() {
 
 function createMainWindow() {
   const runtimeIconPath = getRuntimeIconPath()
+  windowLoadRetryCount = 0
+  didShowWindowLoadError = false
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -311,6 +323,7 @@ function createMainWindow() {
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   })
 
@@ -322,8 +335,84 @@ function createMainWindow() {
     mainWindow = null
   })
 
+  mainWindow.webContents.on(
+    'did-fail-load',
+    async (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || !mainWindow || mainWindow.isDestroyed()) {
+        return
+      }
+
+      const isBackendConnectionIssue =
+        errorCode === -102 ||
+        errorCode === -105 ||
+        errorCode === -106 ||
+        errorCode === -118 ||
+        errorCode === -120
+
+      if (
+        isBackendConnectionIssue &&
+        windowLoadRetryCount < WINDOW_LOAD_RETRY_MAX
+      ) {
+        windowLoadRetryCount += 1
+        await wait(WINDOW_LOAD_RETRY_DELAY_MS)
+
+        // Try to ensure backend health before retrying window load.
+        if (backendPort) {
+          await requestHealth(backendPort)
+        }
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          return
+        }
+        mainWindow.loadURL(`http://127.0.0.1:${backendPort}`)
+        return
+      }
+
+      if (didShowWindowLoadError || isShuttingDown) {
+        return
+      }
+      didShowWindowLoadError = true
+
+      const message = [
+        `Failed to load ${validatedURL || `http://127.0.0.1:${backendPort}`}.`,
+        `Error: ${errorDescription} (code ${errorCode})`,
+        `Retries: ${windowLoadRetryCount}/${WINDOW_LOAD_RETRY_MAX}`,
+      ].join('\n')
+      dialog.showErrorBox('Kite failed to load UI', message)
+      app.quit()
+    }
+  )
+
   mainWindow.loadURL(`http://127.0.0.1:${backendPort}`)
 }
+
+ipcMain.handle('kite-desktop:pick-files', async () => {
+  const targetWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
+  const result = await dialog.showOpenDialog(targetWindow, {
+    properties: ['openFile', 'multiSelections'],
+    title: 'Select kubeconfig files',
+  })
+
+  if (result.canceled) {
+    return {
+      canceled: true,
+      files: [],
+    }
+  }
+  const files = await Promise.all(
+    (result.filePaths || []).map(async (filePath) => {
+      const content = await fs.promises.readFile(filePath, 'utf8')
+      return {
+        path: filePath,
+        name: path.basename(filePath),
+        content,
+      }
+    })
+  )
+  return {
+    canceled: false,
+    files,
+  }
+})
 
 async function boot() {
   try {

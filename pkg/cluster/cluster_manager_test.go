@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"gorm.io/gorm"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -18,15 +21,35 @@ import (
 
 func Test_applyNamespaceScope(t *testing.T) {
 	originalExempt := common.NamespaceScopeExemptNamespaces
+	originalProbe := namespaceScopeProbe
 	t.Cleanup(func() {
 		common.NamespaceScopeExemptNamespaces = originalExempt
+		namespaceScopeProbe = originalProbe
 	})
 
-	t.Run("context namespace locks cluster to namespace scope", func(t *testing.T) {
+	t.Run("context namespace does not lock when cluster-scope probe passes", func(t *testing.T) {
 		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+		namespaceScopeProbe = func(*ClientSet) error { return nil }
 		cs := &ClientSet{Name: "test-cluster"}
 
 		cs.applyNamespaceScope(" default ")
+
+		assert.False(t, cs.NamespaceScoped)
+		assert.Equal(t, "default", cs.Namespace)
+	})
+
+	t.Run("context namespace locks cluster to namespace scope when probe is forbidden", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+		namespaceScopeProbe = func(*ClientSet) error {
+			return apierrors.NewForbidden(
+				schema.GroupResource{Group: "", Resource: "pods"},
+				"",
+				errors.New("forbidden"),
+			)
+		}
+		cs := &ClientSet{Name: "test-cluster"}
+
+		cs.applyNamespaceScope("default")
 
 		assert.True(t, cs.NamespaceScoped)
 		assert.Equal(t, "default", cs.Namespace)
@@ -35,6 +58,10 @@ func Test_applyNamespaceScope(t *testing.T) {
 	t.Run("exempt namespace does not lock namespace scope", func(t *testing.T) {
 		common.NamespaceScopeExemptNamespaces = map[string]struct{}{
 			"ns-admin": {},
+		}
+		namespaceScopeProbe = func(*ClientSet) error {
+			t.Fatal("namespaceScopeProbe should not be called for exempt namespace")
+			return nil
 		}
 		cs := &ClientSet{Name: "test-cluster"}
 

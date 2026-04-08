@@ -1,7 +1,7 @@
 {
   "name": "kite-desktop",
   "private": true,
-  "version": "0.3.2-p5-a070ad4",
+  "version": "0.3.2-p6-b57dcbe",
   "description": "Desktop wrapper for Kite",
   "main": "electron/main.cjs",
   "scripts": {

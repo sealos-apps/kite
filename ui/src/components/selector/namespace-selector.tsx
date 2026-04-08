@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { Namespace } from 'kubernetes-types/core/v1'
 
 import { useResources } from '@/lib/api'
@@ -8,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+
+const MAX_NAMESPACE_OPTIONS = 500
 
 export function NamespaceSelector({
   selectedNamespace,
@@ -20,15 +23,20 @@ export function NamespaceSelector({
   showAll?: boolean
   disabled?: boolean
 }) {
+  const [open, setOpen] = useState(false)
   const { data, isLoading } = useResources('namespaces', undefined, {
-    disable: disabled,
+    disable: disabled || !open,
+    limit: MAX_NAMESPACE_OPTIONS,
+    staleTime: 5 * 60 * 1000,
   })
 
-  const sortedNamespaces = (data ? [...data] : []).sort((a, b) => {
-    const nameA = a.metadata?.name?.toLowerCase() || ''
-    const nameB = b.metadata?.name?.toLowerCase() || ''
-    return nameA.localeCompare(nameB)
-  })
+  const sortedNamespaces = useMemo(() => {
+    return (data ? [...data] : []).sort((a, b) => {
+      const nameA = a.metadata?.name?.toLowerCase() || ''
+      const nameB = b.metadata?.name?.toLowerCase() || ''
+      return nameA.localeCompare(nameB)
+    })
+  }, [data])
 
   const fallbackNamespace =
     selectedNamespace && !(showAll && selectedNamespace === '_all')
@@ -41,11 +49,14 @@ export function NamespaceSelector({
       ? [{ metadata: { name: fallbackNamespace } }]
       : []
 
+  const isNamespaceTruncated = namespaces.length >= MAX_NAMESPACE_OPTIONS
+
   return (
     <Select
       value={selectedNamespace}
       onValueChange={handleNamespaceChange}
       disabled={disabled}
+      onOpenChange={setOpen}
     >
       <SelectTrigger className="max-w-48">
         <SelectValue placeholder="Select a namespace" />
@@ -59,6 +70,11 @@ export function NamespaceSelector({
         {showAll && !disabled && (
           <SelectItem key="all" value="_all">
             All Namespaces
+          </SelectItem>
+        )}
+        {isNamespaceTruncated && (
+          <SelectItem disabled value="_truncated">
+            Showing first {MAX_NAMESPACE_OPTIONS} namespaces
           </SelectItem>
         )}
         {namespaces.map((ns: Namespace) => (

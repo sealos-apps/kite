@@ -249,7 +249,17 @@
   "cluster": {
     "loading": "加载集群中...",
     "error": "加载集群时出错: {{error}}",
-    "error403": "您没有权限访问此集群。请联系您的管理员以获取更多信息。"
+    "error403": "您没有权限访问此集群。请联系您的管理员以获取更多信息。",
+    "unavailable": {
+      "titleFetchError": "无法加载集群列表",
+      "titleNoReachable": "当前没有可用集群",
+      "descriptionFetchError": "Kite 已启动，但获取集群列表失败。你可以先去集群设置修复连接，或稍后重试。",
+      "descriptionNoReachable": "当前已配置的集群都不可达或处于同步错误状态。请先在设置中修复任一集群。",
+      "actions": {
+        "goToClusters": "打开集群设置",
+        "retry": "重试"
+      }
+    }
   },
   "resourceTable": {
     "errorLoading": "加载 {{resourceName}} 时出错",
@@ -316,7 +326,8 @@
     "actions": {
       "add": "添加集群",
       "edit": "编辑",
-      "delete": "删除"
+      "delete": "删除",
+      "save": "保存修改"
     },
     "table": {
       "name": "名称",
@@ -347,6 +358,25 @@
     },
     "errors": {
       "loadFailed": "加载集群失败"
+    },
+    "import": {
+      "title": "从本地文件导入",
+      "description": "可选择一个或多个本地文件，不限制文件后缀。",
+      "chooseFiles": "选择文件",
+      "choosing": "正在打开...",
+      "selectedCount": "已选择 {{selected}} / 共 {{total}}",
+      "toggleSelection": "切换全选/反选",
+      "importSelected": "导入所选",
+      "table": {
+        "description": "描述",
+        "server": "地址",
+        "source": "来源文件"
+      },
+      "messages": {
+        "importSuccess": "成功导入 {{count}} 个集群",
+        "importPartial": "已导入 {{success}}/{{total}} 个集群，失败：{{failed}}",
+        "invalidFilesSkipped": "已跳过 {{count}} 个无效 kubeconfig 文件：{{files}}"
+      }
     },
     "deleteConfirmation": "此操作只会移除 kite 中的集群配置，不会删除任何集群资源。",
     "dialog": {

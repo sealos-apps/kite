@@ -48,12 +48,24 @@ var (
 	ErrClusterAccessDenied = errors.New("cluster access denied")
 	ErrNoAccessibleCluster = errors.New("no accessible cluster")
 	getClusterByName       = model.GetClusterByName
+	namespaceScopeProbe    = func(cs *ClientSet) error {
+		if cs == nil || cs.K8sClient == nil || cs.K8sClient.ClientSet == nil {
+			return fmt.Errorf("k8s client unavailable")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_, err := cs.K8sClient.ClientSet.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1})
+		return err
+	}
 )
 
 func createClientSetInCluster(name, prometheusURL string) (*ClientSet, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
+	}
+	if config.Timeout <= 0 {
+		config.Timeout = 8 * time.Second
 	}
 
 	return newClientSet(name, config, prometheusURL)
@@ -64,6 +76,9 @@ func createClientSetFromConfig(name, content, prometheusURL string) (*ClientSet,
 	if err != nil {
 		klog.Warningf("Failed to create REST config for cluster %s: %v", name, err)
 		return nil, err
+	}
+	if restConfig.Timeout <= 0 {
+		restConfig.Timeout = 8 * time.Second
 	}
 	contextNamespace := parseCurrentContextNamespace(content)
 	cs, err := newClientSet(name, restConfig, prometheusURL)
@@ -104,27 +119,19 @@ func (cs *ClientSet) applyNamespaceScope(contextNamespace string) {
 		return
 	}
 
-	// Honor kubeconfig current-context namespace directly:
-	// when context namespace is set, Kite keeps this cluster namespace-scoped.
-	cs.NamespaceScoped = true
-	klog.Infof("Cluster %s namespace locked by kubeconfig context: %s", cs.Name, cs.Namespace)
-
-	if cs.K8sClient == nil || cs.K8sClient.ClientSet == nil {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	_, err := cs.K8sClient.ClientSet.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1})
+	err := namespaceScopeProbe(cs)
 	if err == nil {
-		klog.Warningf("Cluster %s credentials can list cluster-wide pods, but Kite keeps namespace scope from kubeconfig context: %s", cs.Name, cs.Namespace)
+		cs.NamespaceScoped = false
+		klog.Infof("Cluster %s keeps preferred namespace from kubeconfig context without namespace lock: %s", cs.Name, cs.Namespace)
 		return
 	}
 	if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+		cs.NamespaceScoped = true
 		klog.Infof("Cluster %s cluster-scope probe denied, namespace scope remains locked: %s", cs.Name, cs.Namespace)
 		return
 	}
-	klog.Warningf("Namespace scope probe failed for cluster %s: %v", cs.Name, err)
+	cs.NamespaceScoped = true
+	klog.Warningf("Cluster %s namespace scope probe failed, keeping namespace lock from kubeconfig context %s: %v", cs.Name, cs.Namespace, err)
 }
 
 func newClientSet(name string, k8sConfig *rest.Config, prometheusURL string) (*ClientSet, error) {
@@ -510,6 +517,13 @@ func NewClusterManager() (*ClusterManager, error) {
 			}
 		}
 	}()
+
+	if common.DesktopMode {
+		// Do not block desktop startup on initial cluster connectivity.
+		// A background sync is enough to hydrate clusters shortly after boot.
+		cm.TriggerSync()
+		return cm, nil
+	}
 
 	if err := syncClusters(cm); err != nil {
 		klog.Warningf("Failed to sync clusters: %v", err)

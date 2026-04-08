@@ -233,7 +233,17 @@
   "cluster": {
     "loading": "Loading clusters...",
     "error": "Error loading clusters: {{error}}",
-    "error403": "You do not have permission to access this cluster. Please contact your administrator for more information."
+    "error403": "You do not have permission to access this cluster. Please contact your administrator for more information.",
+    "unavailable": {
+      "titleFetchError": "Unable to load cluster list",
+      "titleNoReachable": "No reachable cluster",
+      "descriptionFetchError": "Kite is running, but cluster list retrieval failed. You can open cluster settings to fix connectivity or retry.",
+      "descriptionNoReachable": "Clusters are configured, but all are currently unreachable or in sync error state. Please fix any cluster in settings first.",
+      "actions": {
+        "goToClusters": "Open Cluster Settings",
+        "retry": "Retry"
+      }
+    }
   },
   "resourceTable": {
     "errorLoading": "Error loading {{resourceName}}",
@@ -294,7 +304,8 @@
     "actions": {
       "add": "Add Cluster",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "save": "Save Changes"
     },
     "table": {
       "name": "Name",
@@ -325,6 +336,25 @@
     },
     "errors": {
       "loadFailed": "Failed to load clusters"
+    },
+    "import": {
+      "title": "Import from local files",
+      "description": "Select one or multiple local files. File extension is not restricted.",
+      "chooseFiles": "Choose Files",
+      "choosing": "Opening...",
+      "selectedCount": "{{selected}} selected / {{total}} total",
+      "toggleSelection": "Toggle selection",
+      "importSelected": "Import Selected",
+      "table": {
+        "description": "Description",
+        "server": "Server",
+        "source": "Source File"
+      },
+      "messages": {
+        "importSuccess": "Imported {{count}} clusters successfully",
+        "importPartial": "Imported {{success}}/{{total}} clusters. Failed: {{failed}}",
+        "invalidFilesSkipped": "Skipped {{count}} invalid kubeconfig files: {{files}}"
+      }
     },
     "deleteConfirmation": "This action will only remove the current cluster's configuration in kite and will not delete any cluster resources.",
     "dialog": {

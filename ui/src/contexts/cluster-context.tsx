@@ -14,12 +14,16 @@ import {
 import { withSubPath } from '@/lib/subpath'
 
 const isAsciiClusterName = (value: string) => /^[\x21-\x7E]+$/.test(value)
+const isReachableCluster = (cluster: Cluster) =>
+  isAsciiClusterName(cluster.name) && !cluster.error
 
 interface ClusterContextType {
   clusters: Cluster[]
   currentCluster: string | null
   currentClusterInfo: Cluster | null
   setCurrentCluster: (clusterName: string) => void
+  hasReachableCluster: boolean
+  refetchClusters: () => void
   isLoading: boolean
   isSwitching?: boolean
   error: Error | null
@@ -48,6 +52,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     data: clusters = [],
     isLoading,
     error,
+    refetch,
   } = useQuery<Cluster[]>({
     queryKey: ['clusters'],
     queryFn: async () => {
@@ -135,29 +140,40 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentCluster])
 
-  // Set default cluster if none is selected
+  // Keep current cluster aligned with an available/healthy cluster.
   useEffect(() => {
-    if (clusters.length > 0 && !currentCluster) {
-      const defaultCluster = clusters.find(
-        (c) => c.isDefault && isAsciiClusterName(c.name)
-      )
-      const fallbackCluster = clusters.find((c) => isAsciiClusterName(c.name))
-      if (defaultCluster) {
-        setCurrentClusterState(defaultCluster.name)
-        writeCurrentCluster(defaultCluster.name)
-      } else if (fallbackCluster) {
-        // If no default cluster, use the first one
-        setCurrentClusterState(fallbackCluster.name)
-        writeCurrentCluster(fallbackCluster.name)
+    if (clusters.length === 0) {
+      if (currentCluster) {
+        setCurrentClusterState(null)
+        writeCurrentCluster(null)
       }
+      return
     }
-    if (
-      currentCluster &&
-      clusters.length > 0 &&
-      (!clusters.some((c) => c.name === currentCluster) ||
-        !isAsciiClusterName(currentCluster))
-    ) {
-      // If current cluster is not in the list, reset it
+
+    const currentClusterData = currentCluster
+      ? clusters.find((cluster) => cluster.name === currentCluster)
+      : null
+    if (currentClusterData && isReachableCluster(currentClusterData)) {
+      return
+    }
+
+    const defaultCluster = clusters.find(
+      (cluster) => cluster.isDefault && isReachableCluster(cluster)
+    )
+    const fallbackCluster = clusters.find((cluster) =>
+      isReachableCluster(cluster)
+    )
+    const nextCluster = defaultCluster ?? fallbackCluster
+
+    if (nextCluster) {
+      if (nextCluster.name !== currentCluster) {
+        setCurrentClusterState(nextCluster.name)
+        writeCurrentCluster(nextCluster.name)
+      }
+      return
+    }
+
+    if (currentCluster) {
       setCurrentClusterState(null)
       writeCurrentCluster(null)
     }
@@ -165,6 +181,17 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const setCurrentCluster = (clusterName: string) => {
     if (clusterName !== currentCluster && !isSwitching) {
+      const selectedCluster = clusters.find(
+        (cluster) => cluster.name === clusterName
+      )
+      if (!selectedCluster) {
+        toast.error(`Cluster not found: ${clusterName}`)
+        return
+      }
+      if (selectedCluster.error) {
+        toast.error(`Cluster is unavailable: ${clusterName}`)
+        return
+      }
       if (!isAsciiClusterName(clusterName)) {
         toast.error('Cluster name must use English/ASCII characters only')
         return
@@ -174,9 +201,6 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentClusterState(clusterName)
         writeCurrentCluster(clusterName)
 
-        const selectedCluster = clusters.find(
-          (cluster) => cluster.name === clusterName
-        )
         if (selectedCluster?.namespaceScoped && selectedCluster.namespace) {
           localStorage.setItem(
             getScopedNamespaceKey(clusterName),
@@ -215,6 +239,10 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     currentCluster,
     currentClusterInfo,
     setCurrentCluster,
+    hasReachableCluster: clusters.some((cluster) => isReachableCluster(cluster)),
+    refetchClusters: () => {
+      void refetch()
+    },
     isLoading,
     isSwitching,
     error: error as Error | null,

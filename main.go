@@ -217,10 +217,14 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 	common.LoadEnvs()
+	// In desktop mode the app may run repeatedly in one user session;
+	// avoid exiting when pprof localhost:6060 is already occupied.
+	if !common.DesktopMode {
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
+	}
 	if klog.V(1).Enabled() {
 		gin.SetMode(gin.DebugMode)
 	} else {

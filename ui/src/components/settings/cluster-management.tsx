@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconEdit, IconPlus, IconServer, IconTrash } from '@tabler/icons-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ColumnDef } from '@tanstack/react-table'
@@ -36,6 +36,7 @@ export function ClusterManagement() {
   const [showClusterDialog, setShowClusterDialog] = useState(false)
   const [editingCluster, setEditingCluster] = useState<Cluster | null>(null)
   const [deletingCluster, setDeletingCluster] = useState<Cluster | null>(null)
+  const versionPollAttemptsRef = useRef(0)
 
   const refreshClusterQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
@@ -46,6 +47,33 @@ export function ClusterManagement() {
       queryClient.refetchQueries({ queryKey: ['clusters'], type: 'active' })
     }, 1200)
   }
+
+  useEffect(() => {
+    const hasPendingVersion = clusters.some(
+      (cluster) => cluster.enabled && !cluster.version && !cluster.error
+    )
+
+    if (!hasPendingVersion) {
+      versionPollAttemptsRef.current = 0
+      return
+    }
+
+    if (versionPollAttemptsRef.current >= 8) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      if (versionPollAttemptsRef.current >= 8) {
+        window.clearInterval(timer)
+        return
+      }
+      versionPollAttemptsRef.current += 1
+      queryClient.refetchQueries({ queryKey: ['cluster-list'], type: 'active' })
+      queryClient.refetchQueries({ queryKey: ['clusters'], type: 'active' })
+    }, 2000)
+
+    return () => window.clearInterval(timer)
+  }, [clusters, queryClient])
 
   const getClusterTypeBadge = useCallback(
     (cluster: Cluster) => {
@@ -122,6 +150,13 @@ export function ClusterManagement() {
                   <p className="max-w-xs break-all">{cluster.error}</p>
                 </TooltipContent>
               </Tooltip>
+            )
+          }
+          if (cluster.enabled && !cluster.version) {
+            return (
+              <Badge variant="secondary">
+                {t('common.loading', 'Loading...')}
+              </Badge>
             )
           }
           return <Badge variant="secondary">{cluster.version || '-'}</Badge>
@@ -248,7 +283,84 @@ export function ClusterManagement() {
     },
   })
 
-  const handleSubmitCluster = (clusterData: ClusterCreateRequest) => {
+  const handleSubmitCluster = (
+    clusterData: ClusterCreateRequest | ClusterCreateRequest[]
+  ) => {
+    if (Array.isArray(clusterData)) {
+      if (clusterData.length === 0) {
+        return
+      }
+      const run = async () => {
+        const total = clusterData.length
+        let createdCount = 0
+        let skippedCount = 0
+        const failed: Array<{ name: string; reason: string }> = []
+
+        for (const item of clusterData) {
+          try {
+            await createCluster(item)
+            createdCount += 1
+          } catch (error) {
+            const reason =
+              error instanceof Error && error.message
+                ? error.message
+                : t('clusterManagement.import.messages.unknownError', 'unknown error')
+            if (reason.includes('cluster already exists')) {
+              skippedCount += 1
+              continue
+            }
+            failed.push({ name: item.name, reason })
+          }
+        }
+
+        refreshClusterQueries()
+        setShowClusterDialog(false)
+        setEditingCluster(null)
+
+        if (failed.length === 0 && skippedCount === 0) {
+          toast.success(
+            t(
+              'clusterManagement.import.messages.importSuccess',
+              'Imported {{count}} clusters successfully',
+              { count: createdCount }
+            )
+          )
+          return
+        }
+
+        if (failed.length === 0 && skippedCount > 0) {
+          toast.success(
+            t(
+              'clusterManagement.import.messages.importWithSkipped',
+              'Imported {{created}} clusters, skipped {{skipped}} existing clusters',
+              { created: createdCount, skipped: skippedCount }
+            )
+          )
+          return
+        }
+
+        const failureDetails = failed
+          .slice(0, 3)
+          .map((item) => `${item.name}: ${item.reason}`)
+          .join('; ')
+        toast.error(
+          t(
+            'clusterManagement.import.messages.importFailedWithReasons',
+            'Imported {{created}}/{{total}} clusters, skipped {{skipped}}. Failed: {{details}}',
+            {
+              created: createdCount,
+              total,
+              skipped: skippedCount,
+              details: failureDetails,
+            }
+          )
+        )
+      }
+
+      void run()
+      return
+    }
+
     if (editingCluster) {
       // Update existing cluster - use the form data directly
       updateMutation.mutate({
@@ -262,7 +374,7 @@ export function ClusterManagement() {
   }
 
   const handleDeleteCluster = () => {
-    if (!deletingCluster) return
+    if (!deletingCluster || deleteMutation.isPending) return
     deleteMutation.mutate(deletingCluster.id)
   }
 
@@ -348,6 +460,7 @@ export function ClusterManagement() {
         onConfirm={handleDeleteCluster}
         resourceName={deletingCluster?.name || ''}
         resourceType="cluster"
+        isDeleting={deleteMutation.isPending}
         additionalNote={t(
           'clusterManagement.deleteConfirmation',
           "This action will only remove the current cluster's configuration in kite and will not delete any cluster resources."
