@@ -382,6 +382,7 @@ func (h *CRHandler) Delete(c *gin.Context) {
 	}
 
 	forceDelete := c.Query("force") == "true"
+	removeFinalizers := c.Query("removeFinalizers") == "true"
 
 	opts := &client.DeleteOptions{
 		PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationBackground}[0],
@@ -403,12 +404,19 @@ func (h *CRHandler) Delete(c *gin.Context) {
 		err := kube.WaitForResourceDeletion(ctx, cs.K8sClient, cr, timeout)
 		if err != nil {
 			if forceDelete {
-				cr.SetFinalizers([]string{})
-				if err := cs.K8sClient.Update(ctx, cr); err != nil {
-					klog.Errorf("Failed to remove finalizers for %s/%s: %v", cr.GetNamespace(), cr.GetName(), err)
-				}
-				err = kube.WaitForResourceDeletion(ctx, cs.K8sClient, cr, 1*time.Second)
-				if err == nil {
+				if removeFinalizers {
+					cr.SetFinalizers([]string{})
+					if err := cs.K8sClient.Update(ctx, cr); err != nil {
+						klog.Errorf("Failed to remove finalizers for %s/%s: %v", cr.GetNamespace(), cr.GetName(), err)
+					}
+					err = kube.WaitForResourceDeletion(ctx, cs.K8sClient, cr, 1*time.Second)
+					if err == nil {
+						return
+					}
+				} else {
+					c.JSON(http.StatusConflict, gin.H{
+						"error": "force delete timed out, retry with removeFinalizers=true only when you are sure it is safe",
+					})
 					return
 				}
 			}

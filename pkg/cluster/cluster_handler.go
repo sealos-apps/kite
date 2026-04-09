@@ -17,21 +17,22 @@ import (
 )
 
 func (cm *ClusterManager) GetClusters(c *gin.Context) {
-	result := make([]common.ClusterInfo, 0, len(cm.clusters))
+	clusters, errorsMap, defaultContext := cm.snapshotState()
+	result := make([]common.ClusterInfo, 0, len(clusters))
 	user := c.MustGet("user").(model.User)
-	for name, cluster := range cm.clusters {
+	for name, cluster := range clusters {
 		if !rbac.CanAccessCluster(user, name) {
 			continue
 		}
 		result = append(result, common.ClusterInfo{
 			Name:            name,
 			Version:         cluster.Version,
-			IsDefault:       name == cm.defaultContext,
+			IsDefault:       name == defaultContext,
 			NamespaceScoped: cluster.NamespaceScoped,
 			Namespace:       cluster.Namespace,
 		})
 	}
-	for name, errMsg := range cm.errors {
+	for name, errMsg := range errorsMap {
 		if !rbac.CanAccessCluster(user, name) {
 			continue
 		}
@@ -54,6 +55,7 @@ func (cm *ClusterManager) GetClusterList(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	clusterClients, errorMap, _ := cm.snapshotState()
 
 	result := make([]gin.H, 0, len(clusters))
 	for _, cluster := range clusters {
@@ -68,10 +70,10 @@ func (cm *ClusterManager) GetClusterList(c *gin.Context) {
 			"config":        "",
 		}
 
-		if clientSet, exists := cm.clusters[cluster.Name]; exists {
+		if clientSet, exists := clusterClients[cluster.Name]; exists {
 			clusterInfo["version"] = clientSet.Version
 		}
-		if errMsg, exists := cm.errors[cluster.Name]; exists {
+		if errMsg, exists := errorMap[cluster.Name]; exists {
 			clusterInfo["error"] = errMsg
 		}
 
@@ -126,7 +128,7 @@ func (cm *ClusterManager) CreateCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	cm.TriggerSync()
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      cluster.ID,
@@ -195,7 +197,7 @@ func (cm *ClusterManager) UpdateCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	cm.TriggerSync()
 
 	c.JSON(http.StatusOK, gin.H{"message": "cluster updated successfully"})
 }
@@ -228,7 +230,7 @@ func (cm *ClusterManager) DeleteCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	cm.TriggerSync()
 
 	c.JSON(http.StatusOK, gin.H{"message": "cluster deleted successfully"})
 }
@@ -268,7 +270,7 @@ func (cm *ClusterManager) ImportClustersFromKubeconfig(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		syncNow <- struct{}{}
+		cm.TriggerSync()
 		// wait for sync to complete
 		time.Sleep(1 * time.Second)
 		c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("imported %d clusters successfully", 1)})
@@ -282,7 +284,7 @@ func (cm *ClusterManager) ImportClustersFromKubeconfig(c *gin.Context) {
 	}
 
 	importedCount := ImportClustersFromKubeconfig(kubeconfig)
-	syncNow <- struct{}{}
+	cm.TriggerSync()
 	// wait for sync to complete
 	time.Sleep(1 * time.Second)
 	c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("imported %d clusters successfully", importedCount)})

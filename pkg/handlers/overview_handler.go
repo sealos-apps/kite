@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zxh326/kite/pkg/cluster"
@@ -39,6 +41,18 @@ type overviewResourceSummary struct {
 	cpuBasis       string
 	memoryBasis    string
 }
+
+type cachedOverviewData struct {
+	value     OverviewData
+	expiresAt time.Time
+}
+
+const overviewCacheTTL = 10 * time.Second
+
+var (
+	overviewCacheMu sync.RWMutex
+	overviewCache   = make(map[string]cachedOverviewData)
+)
 
 func newOverviewResourceSummary() overviewResourceSummary {
 	return overviewResourceSummary{
@@ -223,6 +237,32 @@ func listOverviewPVCs(ctx context.Context, cs *cluster.ClientSet) (*v1.Persisten
 	return pvcs, nil
 }
 
+func makeOverviewCacheKey(cs *cluster.ClientSet) string {
+	if cs.NamespaceScoped && cs.Namespace != "" {
+		return cs.Name + ":" + cs.Namespace
+	}
+	return cs.Name + ":_all"
+}
+
+func getCachedOverview(cacheKey string) (OverviewData, bool) {
+	overviewCacheMu.RLock()
+	defer overviewCacheMu.RUnlock()
+	entry, ok := overviewCache[cacheKey]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return OverviewData{}, false
+	}
+	return entry.value, true
+}
+
+func setCachedOverview(cacheKey string, overview OverviewData) {
+	overviewCacheMu.Lock()
+	defer overviewCacheMu.Unlock()
+	overviewCache[cacheKey] = cachedOverviewData{
+		value:     overview,
+		expiresAt: time.Now().Add(overviewCacheTTL),
+	}
+}
+
 func GetOverview(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -230,6 +270,11 @@ func GetOverview(c *gin.Context) {
 	user := c.MustGet("user").(model.User)
 	if len(user.Roles) == 0 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+	cacheKey := makeOverviewCacheKey(cs)
+	if cached, ok := getCachedOverview(cacheKey); ok {
+		c.JSON(http.StatusOK, cached)
 		return
 	}
 
@@ -286,6 +331,7 @@ func GetOverview(c *gin.Context) {
 		PromEnabled:     cs.PromClient != nil,
 		Resource:        resourceSummary.toMetric(),
 	}
+	setCachedOverview(cacheKey, overview)
 
 	c.JSON(http.StatusOK, overview)
 }

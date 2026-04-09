@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"golang.org/x/net/websocket"
 	corev1 "k8s.io/api/core/v1"
@@ -25,10 +26,22 @@ type BatchLogHandler struct {
 	opts      *corev1.PodLogOptions
 	ctx       context.Context
 	cancel    context.CancelFunc
+	maxPods   int
+	streamSem chan struct{}
+
+	mu             sync.RWMutex
+	writeMu        sync.Mutex
+	podLimitWarned bool
 }
 
-func NewBatchLogHandler(conn *websocket.Conn, client *K8sClient, opts *corev1.PodLogOptions) *BatchLogHandler {
+func NewBatchLogHandler(conn *websocket.Conn, client *K8sClient, opts *corev1.PodLogOptions, maxPods, maxConcurrentStreams int) *BatchLogHandler {
 	ctx, cancel := context.WithCancel(context.Background())
+	if maxPods <= 0 {
+		maxPods = 1
+	}
+	if maxConcurrentStreams <= 0 {
+		maxConcurrentStreams = 1
+	}
 	l := &BatchLogHandler{
 		conn:      conn,
 		pods:      make(map[string]*PodLogStream),
@@ -36,6 +49,8 @@ func NewBatchLogHandler(conn *websocket.Conn, client *K8sClient, opts *corev1.Po
 		opts:      opts,
 		ctx:       ctx,
 		cancel:    cancel,
+		maxPods:   maxPods,
+		streamSem: make(chan struct{}, maxConcurrentStreams),
 	}
 	return l
 }
@@ -57,6 +72,15 @@ func (l *BatchLogHandler) StreamLogs(ctx context.Context) {
 
 func (l *BatchLogHandler) startPodLogStream(podStream *PodLogStream) {
 	pod := podStream.Pod
+	select {
+	case l.streamSem <- struct{}{}:
+	case <-l.ctx.Done():
+		return
+	}
+	defer func() {
+		<-l.streamSem
+	}()
+
 	podCtx, cancel := context.WithCancel(l.ctx)
 	podStream.Cancel = cancel
 
@@ -67,7 +91,7 @@ func (l *BatchLogHandler) startPodLogStream(podStream *PodLogStream) {
 	req := l.k8sClient.ClientSet.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, l.opts)
 	podLogs, err := req.Stream(podCtx)
 	if err != nil {
-		_ = sendErrorMessage(l.conn, fmt.Sprintf("Failed to get pod logs for %s: %v", pod.Name, err))
+		_ = l.sendErrorMessage(fmt.Sprintf("Failed to get pod logs for %s: %v", pod.Name, err))
 		return
 	}
 	defer func() {
@@ -81,10 +105,10 @@ func (l *BatchLogHandler) startPodLogStream(podStream *PodLogStream) {
 			if line == "" {
 				continue
 			}
-			if len(l.pods) > 1 {
+			if l.PodCount() > 1 {
 				line = fmt.Sprintf("[%s]: %s", pod.Name, line)
 			}
-			err := sendMessage(l.conn, "log", line)
+			err := l.sendMessage("log", line)
 			if err != nil {
 				return 0, err
 			}
@@ -95,10 +119,10 @@ func (l *BatchLogHandler) startPodLogStream(podStream *PodLogStream) {
 
 	_, err = io.Copy(lw, podLogs)
 	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-		_ = sendErrorMessage(l.conn, fmt.Sprintf("Failed to stream pod logs for %s: %v", pod.Name, err))
+		_ = l.sendErrorMessage(fmt.Sprintf("Failed to stream pod logs for %s: %v", pod.Name, err))
 	}
 
-	_ = sendMessage(l.conn, "close", fmt.Sprintf("{\"status\":\"closed\",\"pod\":\"%s\"}", pod.Name))
+	_ = l.sendMessage("close", fmt.Sprintf("{\"status\":\"closed\",\"pod\":\"%s\"}", pod.Name))
 }
 
 func (l *BatchLogHandler) heartbeat(ctx context.Context) {
@@ -121,7 +145,7 @@ func (l *BatchLogHandler) heartbeat(ctx context.Context) {
 				return
 			}
 			if strings.Contains(string(temp), "ping") {
-				err = sendMessage(l.conn, "pong", "pong")
+				err = l.sendMessage("pong", "pong")
 				if err != nil {
 					klog.Infof("Failed to send pong, cancelling internal context: %v", err)
 					l.cancel() // Cancel internal context when send fails
@@ -133,11 +157,22 @@ func (l *BatchLogHandler) heartbeat(ctx context.Context) {
 }
 
 // AddPod adds a new pod to the batch log handler and starts streaming its logs
-func (l *BatchLogHandler) AddPod(pod corev1.Pod) {
+func (l *BatchLogHandler) AddPod(pod corev1.Pod) bool {
 	key := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 
+	l.mu.Lock()
 	if _, exists := l.pods[key]; exists {
-		return
+		l.mu.Unlock()
+		return true
+	}
+	if len(l.pods) >= l.maxPods {
+		shouldWarn := !l.podLimitWarned
+		l.podLimitWarned = true
+		l.mu.Unlock()
+		if shouldWarn {
+			_ = l.sendMessage("warning", fmt.Sprintf("maximum pod log streams reached: %d", l.maxPods))
+		}
+		return false
 	}
 
 	podStream := &PodLogStream{
@@ -145,21 +180,27 @@ func (l *BatchLogHandler) AddPod(pod corev1.Pod) {
 		Done: make(chan struct{}),
 	}
 	l.pods[key] = podStream
+	l.mu.Unlock()
 
 	// Start streaming for this pod
 	go l.startPodLogStream(podStream)
 
-	_ = sendMessage(l.conn, "pod_added", fmt.Sprintf("{\"pod\":\"%s\",\"namespace\":\"%s\"}",
+	_ = l.sendMessage("pod_added", fmt.Sprintf("{\"pod\":\"%s\",\"namespace\":\"%s\"}",
 		pod.Name, pod.Namespace))
+	return true
 }
 
 // RemovePod removes a pod from the batch log handler and stops streaming its logs
 func (l *BatchLogHandler) RemovePod(pod corev1.Pod) {
 	key := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+	l.mu.Lock()
 	podStream, exists := l.pods[key]
 	if !exists {
+		l.mu.Unlock()
 		return
 	}
+	delete(l.pods, key)
+	l.mu.Unlock()
 
 	if podStream.Cancel != nil {
 		podStream.Cancel()
@@ -167,21 +208,32 @@ func (l *BatchLogHandler) RemovePod(pod corev1.Pod) {
 
 	go func() {
 		<-podStream.Done
-		_ = sendMessage(l.conn, "pod_removed", fmt.Sprintf("{\"pod\":\"%s\",\"namespace\":\"%s\"}",
+		_ = l.sendMessage("pod_removed", fmt.Sprintf("{\"pod\":\"%s\",\"namespace\":\"%s\"}",
 			pod.Name, pod.Namespace))
 	}()
-
-	delete(l.pods, key)
 }
 
 func (l *BatchLogHandler) Stop() {
+	l.mu.Lock()
+	podStreams := make([]*PodLogStream, 0, len(l.pods))
 	for _, podStream := range l.pods {
+		podStreams = append(podStreams, podStream)
+	}
+	l.pods = make(map[string]*PodLogStream)
+	l.mu.Unlock()
+
+	for _, podStream := range podStreams {
 		if podStream.Cancel != nil {
 			podStream.Cancel()
 		}
 	}
 	l.cancel()
-	l.pods = make(map[string]*PodLogStream)
+}
+
+func (l *BatchLogHandler) PodCount() int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return len(l.pods)
 }
 
 // writerFunc adapts a function to io.Writer so we can create
@@ -197,17 +249,20 @@ type LogsMessage struct {
 	Data string `json:"data"`
 }
 
-func sendMessage(ws *websocket.Conn, msgType, data string) error {
+func (l *BatchLogHandler) sendMessage(msgType, data string) error {
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+
 	msg := LogsMessage{
 		Type: msgType,
 		Data: data,
 	}
-	if err := websocket.JSON.Send(ws, msg); err != nil {
+	if err := websocket.JSON.Send(l.conn, msg); err != nil {
 		return err
 	}
 	return nil
 }
 
-func sendErrorMessage(ws *websocket.Conn, errMsg string) error {
-	return sendMessage(ws, "error", errMsg)
+func (l *BatchLogHandler) sendErrorMessage(errMsg string) error {
+	return l.sendMessage("error", errMsg)
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zxh326/kite/pkg/common"
@@ -41,6 +42,7 @@ type ClusterManager struct {
 	clusters       map[string]*ClientSet
 	errors         map[string]string
 	defaultContext string
+	mu             sync.RWMutex
 }
 
 var (
@@ -243,21 +245,30 @@ func (t *k8sProxyTransport) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func (cm *ClusterManager) GetClientSet(clusterName string) (*ClientSet, error) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
 	if len(cm.clusters) == 0 {
 		return nil, fmt.Errorf("no clusters available")
 	}
+
 	if clusterName == "" {
-		if cm.defaultContext == "" {
-			// If no default context is set, return the first available cluster
-			for _, cs := range cm.clusters {
-				return cs, nil
+		if cm.defaultContext != "" {
+			if cluster, ok := cm.clusters[cm.defaultContext]; ok {
+				return cluster, nil
 			}
 		}
-		return cm.GetClientSet(cm.defaultContext)
+		// If no default context is set, return the first available cluster.
+		for _, cs := range cm.clusters {
+			return cs, nil
+		}
+		return nil, fmt.Errorf("no clusters available")
 	}
+
 	if cluster, ok := cm.clusters[clusterName]; ok {
 		return cluster, nil
 	}
+
 	return nil, fmt.Errorf("cluster not found: %s", clusterName)
 }
 
@@ -277,14 +288,21 @@ func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName s
 		return nil, fmt.Errorf("no clusters available")
 	}
 
-	if cm.defaultContext != "" {
-		if cluster, ok := cm.clusters[cm.defaultContext]; ok && rbac.CanAccessCluster(user, cm.defaultContext) {
-			return cluster, nil
-		}
+	cm.mu.RLock()
+	defaultContext := cm.defaultContext
+	defaultCluster, hasDefaultCluster := cm.clusters[defaultContext]
+	clusterNames := make([]string, 0, len(cm.clusters))
+	for name := range cm.clusters {
+		clusterNames = append(clusterNames, name)
+	}
+	cm.mu.RUnlock()
+
+	if defaultContext != "" && hasDefaultCluster && rbac.CanAccessCluster(user, defaultContext) {
+		return defaultCluster, nil
 	}
 
-	accessible := make([]string, 0, len(cm.clusters))
-	for name := range cm.clusters {
+	accessible := make([]string, 0, len(clusterNames))
+	for _, name := range clusterNames {
 		if rbac.CanAccessCluster(user, name) {
 			accessible = append(accessible, name)
 		}
@@ -294,7 +312,14 @@ func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName s
 	}
 
 	sort.Strings(accessible)
-	return cm.clusters[accessible[0]], nil
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	for _, name := range accessible {
+		if cs, ok := cm.clusters[name]; ok {
+			return cs, nil
+		}
+	}
+	return nil, ErrNoAccessibleCluster
 }
 
 func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet, bool) {
@@ -302,11 +327,15 @@ func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet
 		return nil, false
 	}
 
+	cm.mu.RLock()
 	if cluster, ok := cm.clusters[clusterName]; ok {
+		cm.mu.RUnlock()
 		return cluster, true
 	}
 
-	if _, hasBuildError := cm.errors[clusterName]; hasBuildError {
+	_, hasBuildError := cm.errors[clusterName]
+	cm.mu.RUnlock()
+	if hasBuildError {
 		return nil, false
 	}
 
@@ -326,6 +355,8 @@ func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet
 		return nil, false
 	}
 
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
 	cluster, ok := cm.clusters[clusterName]
 	return cluster, ok
 }
@@ -388,14 +419,20 @@ func (cm *ClusterManager) WaitForCluster(name string, timeout time.Duration) boo
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
+		cm.mu.RLock()
 		if _, ok := cm.clusters[name]; ok {
+			cm.mu.RUnlock()
 			return true
 		}
 		if _, ok := cm.errors[name]; ok {
+			cm.mu.RUnlock()
 			return false
 		}
+		cm.mu.RUnlock()
 		time.Sleep(100 * time.Millisecond)
 	}
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
 	_, ok := cm.clusters[name]
 	return ok
 }
@@ -411,37 +448,79 @@ func syncClusters(cm *ClusterManager) error {
 	for _, cluster := range clusters {
 		dbClusterMap[cluster.Name] = cluster
 		if cluster.IsDefault {
+			cm.mu.Lock()
 			cm.defaultContext = cluster.Name
+			cm.mu.Unlock()
 		}
+
+		cm.mu.RLock()
 		current, currentExist := cm.clusters[cluster.Name]
+		cm.mu.RUnlock()
 		if shouldUpdateCluster(current, cluster) {
 			if currentExist {
-				delete(cm.clusters, cluster.Name)
-				current.K8sClient.Stop(cluster.Name)
+				cm.mu.Lock()
+				if latest, ok := cm.clusters[cluster.Name]; ok {
+					current = latest
+					delete(cm.clusters, cluster.Name)
+				} else {
+					currentExist = false
+				}
+				cm.mu.Unlock()
+				if currentExist {
+					current.K8sClient.Stop(cluster.Name)
+				}
 			}
 			if cluster.Enable {
 				clientSet, err := buildClientSet(cluster)
 				if err != nil {
 					klog.Errorf("Failed to build k8s client for cluster %s, in cluster: %t, err: %v", cluster.Name, cluster.InCluster, err)
+					cm.mu.Lock()
 					cm.errors[cluster.Name] = err.Error()
+					cm.mu.Unlock()
 					continue
 				}
+				cm.mu.Lock()
 				delete(cm.errors, cluster.Name)
 				cm.clusters[cluster.Name] = clientSet
+				cm.mu.Unlock()
 			} else {
+				cm.mu.Lock()
 				delete(cm.errors, cluster.Name)
+				cm.mu.Unlock()
 			}
 		}
 	}
+
+	cm.mu.RLock()
+	clusterSnapshot := make(map[string]*ClientSet, len(cm.clusters))
 	for name, clientSet := range cm.clusters {
+		clusterSnapshot[name] = clientSet
+	}
+	errorSnapshot := make([]string, 0, len(cm.errors))
+	for name := range cm.errors {
+		errorSnapshot = append(errorSnapshot, name)
+	}
+	cm.mu.RUnlock()
+
+	for name, clientSet := range clusterSnapshot {
 		if _, ok := dbClusterMap[name]; !ok {
-			delete(cm.clusters, name)
-			clientSet.K8sClient.Stop(name)
+			removed := false
+			cm.mu.Lock()
+			if latest, exists := cm.clusters[name]; exists && latest == clientSet {
+				delete(cm.clusters, name)
+				removed = true
+			}
+			cm.mu.Unlock()
+			if removed {
+				clientSet.K8sClient.Stop(name)
+			}
 		}
 	}
-	for name := range cm.errors {
+	for _, name := range errorSnapshot {
 		if _, ok := dbClusterMap[name]; !ok {
+			cm.mu.Lock()
 			delete(cm.errors, name)
+			cm.mu.Unlock()
 		}
 	}
 
@@ -529,4 +608,19 @@ func NewClusterManager() (*ClusterManager, error) {
 		klog.Warningf("Failed to sync clusters: %v", err)
 	}
 	return cm, nil
+}
+
+func (cm *ClusterManager) snapshotState() (map[string]*ClientSet, map[string]string, string) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	clusters := make(map[string]*ClientSet, len(cm.clusters))
+	for name, cs := range cm.clusters {
+		clusters[name] = cs
+	}
+	errors := make(map[string]string, len(cm.errors))
+	for name, errMsg := range cm.errors {
+		errors[name] = errMsg
+	}
+	return clusters, errors, cm.defaultContext
 }

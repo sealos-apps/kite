@@ -37,6 +37,11 @@ type GenericResourceHandler[T client.Object, V client.ObjectList] struct {
 	enableSearch    bool
 }
 
+const (
+	defaultSearchScanLimit int64 = 1000
+	maxSearchScanLimit     int64 = 5000
+)
+
 func NewGenericResourceHandler[T client.Object, V client.ObjectList](
 	name string,
 	isClusterScoped bool,
@@ -206,29 +211,11 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 		return zero, err
 	}
 
-	// Sort by creation timestamp in descending order (newest first)
-	// Extract items using reflection and sort them directly
-
 	items, err := meta.ExtractList(objectList)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to extract items from list"})
 		return zero, err
 	}
-	sort.Slice(items, func(i, j int) bool {
-		o1, _ := meta.Accessor(items[i])
-		o2, _ := meta.Accessor(items[j])
-		if o1 == nil || o2 == nil {
-			return false // Handle nil cases gracefully
-		}
-
-		t1 := o1.GetCreationTimestamp()
-		t2 := o2.GetCreationTimestamp()
-		if t1.Equal(&t2) {
-			return o1.GetName() < o2.GetName()
-		}
-
-		return t1.After(t2.Time)
-	})
 
 	user := c.MustGet("user").(model.User)
 	filterItems := make([]runtime.Object, 0, len(items))
@@ -252,6 +239,24 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 		}
 		filterItems = append(filterItems, items[i])
 	}
+
+	// Sort by creation timestamp in descending order (newest first)
+	sort.Slice(filterItems, func(i, j int) bool {
+		o1, _ := meta.Accessor(filterItems[i])
+		o2, _ := meta.Accessor(filterItems[j])
+		if o1 == nil || o2 == nil {
+			return false // Handle nil cases gracefully
+		}
+
+		t1 := o1.GetCreationTimestamp()
+		t2 := o2.GetCreationTimestamp()
+		if t1.Equal(&t2) {
+			return o1.GetName() < o2.GetName()
+		}
+
+		return t1.After(t2.Time)
+	})
+
 	_ = meta.SetList(objectList, filterItems)
 
 	return objectList, nil
@@ -418,6 +423,7 @@ func (h *GenericResourceHandler[T, V]) Delete(c *gin.Context) {
 	cascadeDelete := c.Query("cascade") != "false"
 	forceDelete := c.Query("force") == "true"
 	wait := c.Query("wait") != "false"
+	removeFinalizers := c.Query("removeFinalizers") == "true"
 
 	// Set propagation policy based on the cascadeDelete flag
 	deleteOptions := &client.DeleteOptions{}
@@ -446,11 +452,18 @@ func (h *GenericResourceHandler[T, V]) Delete(c *gin.Context) {
 		err := kube.WaitForResourceDeletion(ctx, cs.K8sClient, resource, timeout)
 		if err != nil {
 			if forceDelete {
-				klog.Infof("Force deleting resource %s/%s timed out, will attempt to remove finalizers", resource.GetNamespace(), resource.GetName())
-				patch := client.MergeFrom(resource.DeepCopyObject().(T))
-				resource.SetFinalizers([]string{})
-				if err := cs.K8sClient.Patch(context.Background(), resource, patch); err != nil {
-					klog.Errorf("Failed to remove finalizers: %v", err)
+				if removeFinalizers {
+					klog.Infof("Force deleting resource %s/%s timed out, removeFinalizers=true, attempting to clear finalizers", resource.GetNamespace(), resource.GetName())
+					patch := client.MergeFrom(resource.DeepCopyObject().(T))
+					resource.SetFinalizers([]string{})
+					if err := cs.K8sClient.Patch(context.Background(), resource, patch); err != nil {
+						klog.Errorf("Failed to remove finalizers: %v", err)
+					}
+				} else {
+					c.JSON(http.StatusConflict, gin.H{
+						"error": "force delete timed out, retry with removeFinalizers=true only when you are sure it is safe",
+					})
+					return
 				}
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -477,6 +490,18 @@ func (h *GenericResourceHandler[T, V]) Search(c *gin.Context, q string, limit in
 		labelValue := strings.TrimSpace(q[idx+1:])
 		listOpts = append(listOpts, client.MatchingLabels{labelKey: labelValue})
 	}
+	scanLimit := defaultSearchScanLimit
+	if limit > 0 {
+		scanLimit = limit * 20
+		if scanLimit < defaultSearchScanLimit {
+			scanLimit = defaultSearchScanLimit
+		}
+	}
+	if scanLimit > maxSearchScanLimit {
+		scanLimit = maxSearchScanLimit
+	}
+	listOpts = append(listOpts, client.Limit(scanLimit))
+
 	if err := cs.K8sClient.List(ctx, objectList, listOpts...); err != nil {
 		klog.Errorf("failed to list %s: %v", h.name, err)
 		return nil, err

@@ -17,6 +17,7 @@ import (
 	"github.com/zxh326/kite/pkg/rbac"
 	"github.com/zxh326/kite/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -28,6 +29,10 @@ type NodeTerminalHandler struct {
 func NewNodeTerminalHandler() *NodeTerminalHandler {
 	return &NodeTerminalHandler{}
 }
+
+const maxConcurrentNodeTerminalSessions = 5
+
+var nodeTerminalSessionSem = make(chan struct{}, maxConcurrentNodeTerminalSessions)
 
 // HandleNodeTerminalWebSocket handles WebSocket connections for node terminal access
 func (h *NodeTerminalHandler) HandleNodeTerminalWebSocket(c *gin.Context) {
@@ -62,6 +67,11 @@ func (h *NodeTerminalHandler) HandleNodeTerminalWebSocket(c *gin.Context) {
 		}
 		ctx, cancel := context.WithCancel(c.Request.Context())
 		defer cancel()
+		if err := h.acquireSessionSlot(ctx); err != nil {
+			h.sendErrorMessage(conn, "Too many concurrent node terminal sessions, please retry later")
+			return
+		}
+		defer h.releaseSessionSlot()
 
 		nodeAgentName, err := h.createNodeAgent(ctx, cs, nodeName)
 		if err != nil {
@@ -108,6 +118,10 @@ func (h *NodeTerminalHandler) createNodeAgent(ctx context.Context, cs *cluster.C
 			HostPID:       true,
 			HostIPC:       true,
 			RestartPolicy: corev1.RestartPolicyNever,
+			ActiveDeadlineSeconds: func() *int64 {
+				v := int64(3600)
+				return &v
+			}(),
 			Tolerations: []corev1.Toleration{
 				{
 					Operator: corev1.TolerationOpExists,
@@ -131,6 +145,16 @@ func (h *NodeTerminalHandler) createNodeAgent(ctx context.Context, cs *cluster.C
 					StdinOnce: true,
 					TTY:       true,
 					Command:   []string{"/bin/sh", "-c", "chroot /host || (exec /bin/zsh || exec /bin/bash || exec /bin/sh)"},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("50m"),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
 					SecurityContext: &corev1.SecurityContext{
 						Privileged: &[]bool{true}[0],
 					},
@@ -207,6 +231,22 @@ func (h *NodeTerminalHandler) cleanupNodeAgentPod(cs *cluster.ClientSet, podName
 		podName,
 		metav1.DeleteOptions{},
 	)
+}
+
+func (h *NodeTerminalHandler) acquireSessionSlot(ctx context.Context) error {
+	select {
+	case nodeTerminalSessionSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (h *NodeTerminalHandler) releaseSessionSlot() {
+	select {
+	case <-nodeTerminalSessionSem:
+	default:
+	}
 }
 
 // sendErrorMessage sends an error message through WebSocket

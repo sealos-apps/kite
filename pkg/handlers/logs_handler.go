@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,11 @@ type LogsHandler struct {
 func NewLogsHandler() *LogsHandler {
 	return &LogsHandler{}
 }
+
+const (
+	maxPodsPerLogStream          = 50
+	maxConcurrentStreamsPerLogWS = 10
+)
 
 type LogsMessage struct {
 	Type string `json:"type"` // "log", "error", "connected", "close"
@@ -87,28 +93,37 @@ func (h *LogsHandler) HandleLogsWebSocket(c *gin.Context) {
 		}
 
 		labelSelector := c.Query("labelSelector")
-		bl := kube.NewBatchLogHandler(ws, cs.K8sClient, logOptions)
+		bl := kube.NewBatchLogHandler(ws, cs.K8sClient, logOptions, maxPodsPerLogStream, maxConcurrentStreamsPerLogWS)
 
-		if podName == "_all" && labelSelector != "" {
-			selector, err := metav1.ParseToLabelSelector(labelSelector)
-			if err != nil {
-				_ = sendErrorMessage(ws, "invalid labelSelector parameter: "+err.Error())
-				return
-			}
-			labelSelectorOption, err := metav1.LabelSelectorAsSelector(selector)
-			if err != nil {
-				_ = sendErrorMessage(ws, "failed to convert labelSelector: "+err.Error())
-				return
-			}
-
+		if podName == "_all" {
 			podList := &corev1.PodList{}
 			var listOpts []client.ListOption
 			listOpts = append(listOpts, client.InNamespace(namespace))
-			listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: labelSelectorOption})
+			listOpts = append(listOpts, client.Limit(int64(maxPodsPerLogStream+1)))
+			labelSelectorOption := labels.Everything()
+			if labelSelector != "" {
+				selector, err := metav1.ParseToLabelSelector(labelSelector)
+				if err != nil {
+					_ = sendErrorMessage(ws, "invalid labelSelector parameter: "+err.Error())
+					return
+				}
+				labelSelectorOption, err = metav1.LabelSelectorAsSelector(selector)
+				if err != nil {
+					_ = sendErrorMessage(ws, "failed to convert labelSelector: "+err.Error())
+					return
+				}
+				listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: labelSelectorOption})
+			}
 			if err := cs.K8sClient.List(ctx, podList, listOpts...); err != nil {
 				_ = sendErrorMessage(ws, "failed to list pods: "+err.Error())
 				return
 			}
+
+			if len(podList.Items) > maxPodsPerLogStream {
+				_ = sendErrorMessage(ws, fmt.Sprintf("too many pods matched (%d), please narrow selector to <= %d pods", len(podList.Items), maxPodsPerLogStream))
+				return
+			}
+
 			for _, pod := range podList.Items {
 				if pod.Status.Phase == corev1.PodRunning {
 					bl.AddPod(pod)
@@ -154,7 +169,7 @@ func (h *LogsHandler) watchPods(ctx context.Context, cs *cluster.ClientSet, name
 				continue
 			}
 
-			klog.Infof("Pod %s in namespace %s is %s, event Type: %s", pod.Name, pod.Namespace, pod.Status.Phase, event.Type)
+			klog.V(2).Infof("Pod %s in namespace %s is %s, event Type: %s", pod.Name, pod.Namespace, pod.Status.Phase, event.Type)
 
 			switch event.Type {
 			case watch.Added, watch.Modified:

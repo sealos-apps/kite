@@ -65,6 +65,10 @@ import { ErrorMessage } from './error-message'
 import { ResourceTableView } from './resource-table-view'
 import { NamespaceSelector } from './selector/namespace-selector'
 
+const DEFAULT_PAGE_SIZE = 20
+const MAX_SAFE_PAGE_SIZE = 100
+const MAX_ALL_PAGE_SIZE = 200
+
 export interface ResourceTableProps<T> {
   resourceName: string
   resourceType?: ResourceType // Optional, used for fetching resources
@@ -92,7 +96,11 @@ export function ResourceTable<T>({
   const { t } = useTranslation()
   const { user } = useAuth()
   const { currentCluster, currentClusterInfo } = useCluster()
-  const defaultNamespace = user?.isAdmin() ? '_all' : 'default'
+  const resolvedResourceType = (
+    resourceType ?? resourceName.toLowerCase()
+  ) as ResourceType
+  const defaultNamespace =
+    user?.isAdmin() && resolvedResourceType !== 'pods' ? '_all' : 'default'
   const fixedNamespace =
     !clusterScope && currentClusterInfo?.namespaceScoped
       ? currentClusterInfo.namespace
@@ -134,12 +142,17 @@ export function ResourceTable<T>({
     const currentCluster = localStorage.getItem('current-cluster')
     const storageKey = `${currentCluster}-${resourceName}-pageSize`
     const savedPageSize = sessionStorage.getItem(storageKey)
+    const parsedPageSize = Number(savedPageSize)
+    const pageSize =
+      Number.isFinite(parsedPageSize) && parsedPageSize > 0
+        ? Math.min(parsedPageSize, MAX_ALL_PAGE_SIZE)
+        : DEFAULT_PAGE_SIZE
     return {
       pageIndex: 0,
-      pageSize: savedPageSize ? Number(savedPageSize) : 20,
+      pageSize,
     }
   })
-  const [refreshInterval, setRefreshInterval] = useState(5000)
+  const [refreshInterval, setRefreshInterval] = useState(15000)
 
   const [selectedNamespace, setSelectedNamespace] = useState<
     string | undefined
@@ -164,7 +177,7 @@ export function ResourceTable<T>({
     error: queryError,
     refetch: queryRefetch,
   } = useResources(
-    resourceType ?? (resourceName.toLowerCase() as ResourceType),
+    resolvedResourceType,
     requestNamespace,
     {
       refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
@@ -182,8 +195,7 @@ export function ResourceTable<T>({
     isConnected,
     refetch: reconnectSSE,
   } = useResourcesWatch(
-    (resourceType ??
-      (resourceName.toLowerCase() as ResourceType)) as ResourceType,
+    resolvedResourceType,
     requestNamespace,
     { reduce: true, enabled: useSSE }
   )
@@ -361,6 +373,39 @@ export function ResourceTable<T>({
       setRefreshInterval(0)
     }
   }, [useSSE, error])
+
+  useEffect(() => {
+    const currentRowCount = (data as T[] | undefined)?.length || 0
+    const isStandardPageSize = [10, 20, 50, 100].includes(pagination.pageSize)
+    const isSmallDatasetAllMode =
+      currentRowCount > 0 &&
+      currentRowCount <= MAX_ALL_PAGE_SIZE &&
+      pagination.pageSize === currentRowCount
+
+    if (
+      isStandardPageSize ||
+      isSmallDatasetAllMode ||
+      pagination.pageSize <= MAX_SAFE_PAGE_SIZE
+    ) {
+      return
+    }
+
+    if (
+      pagination.pageSize > MAX_ALL_PAGE_SIZE ||
+      currentRowCount > MAX_ALL_PAGE_SIZE
+    ) {
+      setPagination((prev) => {
+        if (prev.pageSize === MAX_SAFE_PAGE_SIZE) {
+          return prev
+        }
+        return {
+          ...prev,
+          pageIndex: 0,
+          pageSize: MAX_SAFE_PAGE_SIZE,
+        }
+      })
+    }
+  }, [data, pagination.pageSize])
 
   // Create table instance using TanStack Table
   const table = useReactTable<T>({
@@ -768,6 +813,7 @@ export function ResourceTable<T>({
         columnCount={enhancedColumns.length}
         isLoading={isLoading}
         data={data as T[] | undefined}
+        maxAllPageSize={MAX_ALL_PAGE_SIZE}
         emptyState={emptyState}
         hasActiveFilters={hasActiveFilters}
         filteredRowCount={filteredRowCount}

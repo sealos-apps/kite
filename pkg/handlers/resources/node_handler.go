@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -20,6 +22,8 @@ import (
 
 type NodeHandler struct {
 	*GenericResourceHandler[*corev1.Node, *corev1.NodeList]
+	cacheMu sync.RWMutex
+	cache   map[string]cachedNodeList
 }
 
 func NewNodeHandler() *NodeHandler {
@@ -29,8 +33,16 @@ func NewNodeHandler() *NodeHandler {
 			true, // Nodes are cluster-scoped resources
 			true,
 		),
+		cache: make(map[string]cachedNodeList),
 	}
 }
+
+type cachedNodeList struct {
+	value     *common.NodeListWithMetrics
+	expiresAt time.Time
+}
+
+const nodeListCacheTTL = 5 * time.Second
 
 // DrainNode drains a node by evicting all pods
 func (h *NodeHandler) DrainNode(c *gin.Context) {
@@ -250,6 +262,12 @@ func (h *NodeHandler) UntaintNode(c *gin.Context) {
 
 func (h *NodeHandler) List(c *gin.Context) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	cacheKey := cs.Name
+	if cached := h.getCached(cacheKey); cached != nil {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
 	var nodeMetrics metricsv1.NodeMetricsList
 
 	var nodes corev1.NodeList
@@ -333,6 +351,7 @@ func (h *NodeHandler) List(c *gin.Context) {
 	sort.Slice(result.Items, func(i, j int) bool {
 		return result.Items[i].Name < result.Items[j].Name
 	})
+	h.setCached(cacheKey, result)
 	c.JSON(http.StatusOK, result)
 }
 
@@ -342,4 +361,23 @@ func (h *NodeHandler) registerCustomRoutes(group *gin.RouterGroup) {
 	group.POST("/_all/:name/uncordon", h.UncordonNode)
 	group.POST("/_all/:name/taint", h.TaintNode)
 	group.POST("/_all/:name/untaint", h.UntaintNode)
+}
+
+func (h *NodeHandler) getCached(key string) *common.NodeListWithMetrics {
+	h.cacheMu.RLock()
+	defer h.cacheMu.RUnlock()
+	entry, ok := h.cache[key]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return nil
+	}
+	return entry.value
+}
+
+func (h *NodeHandler) setCached(key string, value *common.NodeListWithMetrics) {
+	h.cacheMu.Lock()
+	defer h.cacheMu.Unlock()
+	h.cache[key] = cachedNodeList{
+		value:     value,
+		expiresAt: time.Now().Add(nodeListCacheTTL),
+	}
 }

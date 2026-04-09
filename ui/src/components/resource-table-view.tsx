@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import {
   flexRender,
   PaginationState,
@@ -28,6 +28,7 @@ interface ResourceTableViewProps<T> {
   isLoading: boolean
   data?: T[]
   allPageSize?: number
+  maxAllPageSize?: number
   maxBodyHeightClassName?: string
   containerClassName?: string
   emptyState: React.ReactNode
@@ -45,6 +46,7 @@ export function ResourceTableView<T>({
   isLoading,
   data,
   allPageSize,
+  maxAllPageSize = 200,
   maxBodyHeightClassName = 'max-h-[calc(100vh-210px)]',
   containerClassName = 'flex flex-col gap-3',
   emptyState,
@@ -86,6 +88,19 @@ export function ResourceTableView<T>({
 
   const dataLength = data?.length ?? 0
   const resolvedAllPageSize = allPageSize ?? dataLength
+  const canSelectAllPageSize =
+    resolvedAllPageSize > 0 && resolvedAllPageSize <= maxAllPageSize
+  const pageSizeOptions = useMemo(() => {
+    const baseOptions = [10, 20, 50, 100]
+    const shouldAddCurrent =
+      pagination.pageSize > 0 &&
+      !baseOptions.includes(pagination.pageSize) &&
+      (!canSelectAllPageSize || pagination.pageSize !== resolvedAllPageSize)
+
+    if (!shouldAddCurrent) return baseOptions
+
+    return [...baseOptions, pagination.pageSize].sort((a, b) => a - b)
+  }, [canSelectAllPageSize, pagination.pageSize, resolvedAllPageSize])
 
   return (
     <div className={containerClassName}>
@@ -183,12 +198,12 @@ export function ResourceTableView<T>({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[10, 20, 50, 100].map((pageSize) => (
+                  {pageSizeOptions.map((pageSize) => (
                     <SelectItem key={pageSize} value={`${pageSize}`}>
                       {pageSize}
                     </SelectItem>
                   ))}
-                  {resolvedAllPageSize > 0 && (
+                  {canSelectAllPageSize && (
                     <SelectItem value={`${resolvedAllPageSize}`}>
                       All
                     </SelectItem>

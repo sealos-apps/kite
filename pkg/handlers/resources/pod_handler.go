@@ -121,7 +121,7 @@ func (h *PodHandler) ListMetrics(c *gin.Context) (map[string]metricsv1.PodMetric
 		}
 		listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: labelSelectorOption})
 	}
-	if err := cs.K8sClient.List(c, &metricsList, listOpts...); err != nil {
+	if err := cs.K8sClient.List(c.Request.Context(), &metricsList, listOpts...); err != nil {
 		klog.Warningf("Failed to list pod metrics: %v", err)
 	}
 
@@ -547,7 +547,7 @@ func (h *PodHandler) Watch(c *gin.Context) {
 		klog.Warningf("Failed to list pod metrics: %v", err)
 	}
 
-	watchInterface, err := cs.K8sClient.ClientSet.CoreV1().Pods(ns).Watch(c, listOpts)
+	watchInterface, err := cs.K8sClient.ClientSet.CoreV1().Pods(ns).Watch(c.Request.Context(), listOpts)
 	if err != nil {
 		_ = writeSSE(c, "error", gin.H{"error": fmt.Sprintf("failed to start watch: %v", err)})
 		return
@@ -557,6 +557,8 @@ func (h *PodHandler) Watch(c *gin.Context) {
 	// Keep-alive pings
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
+	metricsTicker := time.NewTicker(30 * time.Second)
+	defer metricsTicker.Stop()
 
 	flusher, _ := c.Writer.(http.Flusher)
 
@@ -566,19 +568,15 @@ func (h *PodHandler) Watch(c *gin.Context) {
 			_ = writeSSE(c, "close", gin.H{"message": "connection closed"})
 			return
 		case <-ticker.C:
-			metricsMap, _ = h.ListMetrics(c)
-			for _, metrics := range metricsMap {
-				pod, err := h.GetResource(c, metrics.Namespace, metrics.Name)
-				if err != nil {
-					klog.Warningf("Failed to get pod: %v", err)
-					continue
-				}
-				p := pod.(*corev1.Pod)
-				obj := &PodWithMetrics{Pod: p, Metrics: GetPodMetrics(metricsMap, p)}
-				_ = writeSSE(c, "modified", obj)
-			}
 			_, _ = fmt.Fprintf(c.Writer, ": ping\n\n") // comment line per SSE
 			flusher.Flush()
+		case <-metricsTicker.C:
+			refreshedMetrics, metricsErr := h.ListMetrics(c)
+			if metricsErr != nil {
+				klog.Warningf("Failed to refresh pod metrics for watch: %v", metricsErr)
+				continue
+			}
+			metricsMap = refreshedMetrics
 		case event, ok := <-watchInterface.ResultChan():
 			if !ok {
 				_ = writeSSE(c, "close", gin.H{"message": "watch channel closed"})

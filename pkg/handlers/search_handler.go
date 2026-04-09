@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,12 +37,17 @@ func (h *SearchHandler) createCacheKey(query string) string {
 func (h *SearchHandler) Search(c *gin.Context, query string, limit int) ([]common.SearchResult, error) {
 	var allResults []common.SearchResult
 
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	searchCtx := c.Copy()
+	searchCtx.Request = c.Request.WithContext(ctx)
+
 	// Search in different resource types
 	searchFuncs := resources.SearchFuncs
 	guessSearchResources, q := utils.GuessSearchResources(query)
 	for name, searchFunc := range searchFuncs {
 		if guessSearchResources == "all" || name == guessSearchResources {
-			results, err := searchFunc(c, q, int64(limit))
+			results, err := searchFunc(searchCtx, q, int64(limit))
 			if err != nil {
 				continue
 			}
@@ -82,10 +89,6 @@ func (h *SearchHandler) GlobalSearch(c *gin.Context) {
 			Results: cachedResults,
 			Total:   len(cachedResults),
 		}
-		go func() {
-			// Perform search in the background to update cache
-			_, _ = h.Search(c, query, limit)
-		}()
 		c.JSON(http.StatusOK, response)
 		return
 	}
@@ -139,22 +142,12 @@ func sortResults(results []common.SearchResult, query string) {
 		return getResourceOrder(a.ResourceType) < getResourceOrder(b.ResourceType)
 	}
 
-	// Simple bubble sort for demonstration
-	for i := 0; i < len(exactMatches)-1; i++ {
-		for j := 0; j < len(exactMatches)-i-1; j++ {
-			if !sortByResources(exactMatches[j], exactMatches[j+1]) {
-				exactMatches[j], exactMatches[j+1] = exactMatches[j+1], exactMatches[j]
-			}
-		}
-	}
-
-	for i := 0; i < len(partialMatches)-1; i++ {
-		for j := 0; j < len(partialMatches)-i-1; j++ {
-			if !sortByResources(partialMatches[j], partialMatches[j+1]) {
-				partialMatches[j], partialMatches[j+1] = partialMatches[j+1], partialMatches[j]
-			}
-		}
-	}
+	sort.Slice(exactMatches, func(i, j int) bool {
+		return sortByResources(exactMatches[i], exactMatches[j])
+	})
+	sort.Slice(partialMatches, func(i, j int) bool {
+		return sortByResources(partialMatches[i], partialMatches[j])
+	})
 
 	// Combine results
 	copy(results, append(exactMatches, partialMatches...))
