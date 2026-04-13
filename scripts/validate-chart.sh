@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-CHART_DIR="charts/kite"
+CHART_DIR="deploy/charts/kite"
 TEMP_DIR=$(mktemp -d)
 
 echo "🔍 Validating Helm Chart..."
@@ -38,7 +38,7 @@ echo "✅ Chart.yaml structure is valid"
 
 # Lint the chart
 echo "🔍 Linting Helm chart..."
-if helm lint "$CHART_DIR"; then
+if helm lint "$CHART_DIR" -f "$CHART_DIR/kite-values.yaml"; then
     echo "✅ Chart linting passed"
 else
     echo "❌ Chart linting failed"
@@ -58,7 +58,7 @@ fi
 
 # Test template rendering
 echo "🔧 Testing template rendering..."
-if helm template test-release "$CHART_DIR" > "$TEMP_DIR/rendered.yaml"; then
+if helm template test-release "$CHART_DIR" -f "$CHART_DIR/kite-values.yaml" > "$TEMP_DIR/rendered.yaml"; then
     echo "✅ Template rendering successful"
 else
     echo "❌ Template rendering failed"
@@ -122,28 +122,40 @@ fi
 
 echo "✅ Sqlite rendered content looks correct"
 
-# Test with postgres DSN provided
-echo "🔧 Testing with custom values (postgres dsn)..."
+# Test with external postgres DSN provided
+echo "🔧 Testing with custom values (external postgres dsn)..."
 cat > "$TEMP_DIR/test-values-postgres.yaml" << EOF
 replicaCount: 1
 db:
     type: postgres
-    postgres:
-        dsn: "host=127.0.0.1 port=5432 user=test password=test dbname=kite sslmode=disable"
+    dns: "host=127.0.0.1 port=5432 user=test password=test dbname=kite sslmode=disable"
 EOF
 
 if helm template test-release "$CHART_DIR" -f "$TEMP_DIR/test-values-postgres.yaml" > "$TEMP_DIR/rendered-custom-postgres.yaml"; then
-        echo "✅ Custom values (postgres) rendering successful"
+        echo "✅ Custom values (external postgres) rendering successful"
 else
-        echo "❌ Custom values (postgres) rendering failed"
+        echo "❌ Custom values (external postgres) rendering failed"
         exit 1
 fi
 
-# Content checks for postgres rendering
-echo "📋 Verifying rendered content for postgres DSN..."
+# Content checks for external postgres rendering
+echo "📋 Verifying rendered content for external postgres DSN..."
 RENDERED_PG="$TEMP_DIR/rendered-custom-postgres.yaml"
+EXPECTED_PG_DSN_B64=$(printf '%s' "host=127.0.0.1 port=5432 user=test password=test dbname=kite sslmode=disable" | base64 | tr -d '\n')
 
-echo "✅ Postgres rendered content looks correct"
+if grep -E -q "^kind:\s*Cluster\s*$" "$RENDERED_PG"; then
+    fail "Kubeblocks Cluster should not be rendered when external postgres DSN is provided"
+fi
+
+if grep -q "KITE_PG_HOST" "$RENDERED_PG"; then
+    fail "Kubeblocks credential secret env refs should not be rendered when external postgres DSN is provided"
+fi
+
+if ! grep -F -q "DB_DSN: \"${EXPECTED_PG_DSN_B64}\"" "$RENDERED_PG"; then
+    fail "Expected external postgres DSN not found in rendered Secret"
+fi
+
+echo "✅ External postgres rendered content looks correct"
 
 # Clean up
 rm -rf "$TEMP_DIR"

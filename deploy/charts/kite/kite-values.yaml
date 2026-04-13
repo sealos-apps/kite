@@ -1,0 +1,114 @@
+# Custom values for kite helm chart.
+#
+# Note: The following values are automatically managed by deploy/kite-entrypoint.sh
+# for Sealos package deployments and usually do not need manual configuration here:
+#   - jwtSecret
+#   - encryptKey
+#   - cloudDomain
+#   - sealos.jwtSecret
+#
+# See values.yaml for chart defaults and auto-config reference values.
+
+replicaCount: 1
+
+debug: false
+host: ''
+basePath: ''
+
+anonymousUserEnabled: false
+
+superUser:
+  create: false
+  username: 'admin'
+  password: ''
+
+secret:
+  create: true
+  existingSecret: ''
+
+db:
+  type: postgres
+  dsn: ''
+
+  postgres:
+    database: postgres
+    sslMode: disable
+    extraOptions: ''
+
+    native:
+      enabled: true
+      clusterName: kite-pg
+      credentialSecretName: ''
+      version: postgresql-14.8.0
+      replicas: 3
+      storage: 3Gi
+      backup:
+        enabled: true
+        cron: '0 7 * * *'
+        retentionPeriod: 7d
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1024Mi
+        requests:
+          cpu: 10m
+          memory: 50Mi
+      terminationPolicy: Delete
+
+  sqlite:
+    persistence:
+      pvc:
+        enabled: false
+        existingClaim: ''
+        storageClass: ''
+        accessModes:
+          - ReadWriteOnce
+        size: 1Gi
+      hostPath:
+        enabled: false
+        path: /path/to/host/dir
+        type: DirectoryOrCreate
+      mountPath: /data
+      filename: kite.db
+    options: ''
+
+extraEnvs:
+  - name: SEALOS_AUTH_ENABLED
+    value: 'true'
+  - name: AUTH_COOKIE_SAMESITE
+    value: 'none'
+  - name: AUTH_COOKIE_SECURE
+    value: 'true'
+  - name: SEALOS_DEFAULT_PROMETHEUS_URL
+    value: 'http://vmselect-vm-stack-victoria-metrics-k8s-stack.vm.svc:8481/select/0/prometheus'
+  - name: KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES
+    value: 'ns-admin'
+
+app:
+  enabled: true
+
+gateway:
+  enabled: false
+  className: ''
+  create: false
+  name: ''
+  namespace: ''
+  annotations: {}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+  httpRoutes:
+    - name: kite
+      annotations: {}
+      hostnames: []
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+
+resources: {}

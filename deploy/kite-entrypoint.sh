@@ -25,14 +25,19 @@ error() {
 }
 
 RELEASE_NAME="${RELEASE_NAME:-kite}"
-NAMESPACE="${NAMESPACE:-kite-system}"
+RELEASE_NAMESPACE="${RELEASE_NAMESPACE:-${NAMESPACE:-kite-system}}"
+CHART_PATH="${CHART_PATH:-./charts/kite}"
 HELM_OPTS="${HELM_OPTS:-}"
-ENABLE_APP="${ENABLE_APP:-true}"
+ENABLE_APP="${ENABLE_APP:-}"
 STRICT_SECRET_REUSE="${STRICT_SECRET_REUSE:-true}"
+SERVICE_NAME="kite"
+USER_VALUES_PATH="${USER_VALUES_PATH:-/root/.sealos/cloud/values/core/${SERVICE_NAME}-values.yaml}"
 
-get_sealos_config() {
-  local key=$1
-  kubectl get configmap sealos-config -n sealos-system -o "jsonpath={.data.${key}}"
+get_cm_value() {
+  local namespace=$1
+  local name=$2
+  local key=$3
+  kubectl get configmap "${name}" -n "${namespace}" -o "jsonpath={.data.${key}}" 2>/dev/null || true
 }
 
 decode_base64() {
@@ -57,7 +62,7 @@ get_secret_data() {
   local key=$2
   local encoded=""
 
-  encoded="$(kubectl get secret "${secret_name}" -n "${NAMESPACE}" -o "jsonpath={.data.${key}}" 2>/dev/null || true)"
+  encoded="$(kubectl get secret "${secret_name}" -n "${RELEASE_NAMESPACE}" -o "jsonpath={.data.${key}}" 2>/dev/null || true)"
   [ -n "${encoded}" ] || return 1
 
   decode_base64 "${encoded}"
@@ -67,7 +72,7 @@ find_existing_kite_secret() {
   local name=""
 
   for name in "${RELEASE_NAME}-secret" "${RELEASE_NAME}-kite-secret"; do
-    if kubectl get secret "${name}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+    if kubectl get secret "${name}" -n "${RELEASE_NAMESPACE}" >/dev/null 2>&1; then
       echo "${name}"
       return 0
     fi
@@ -75,11 +80,11 @@ find_existing_kite_secret() {
 
   while IFS= read -r name; do
     [ -n "${name}" ] || continue
-    if kubectl get secret "${name}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+    if kubectl get secret "${name}" -n "${RELEASE_NAMESPACE}" >/dev/null 2>&1; then
       echo "${name}"
       return 0
     fi
-  done < <(kubectl get secret -n "${NAMESPACE}" \
+  done < <(kubectl get secret -n "${RELEASE_NAMESPACE}" \
     -l "app.kubernetes.io/instance=${RELEASE_NAME},app.kubernetes.io/name=kite" \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 
@@ -87,14 +92,24 @@ find_existing_kite_secret() {
 }
 
 is_existing_release() {
-  helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1
+  helm status "${RELEASE_NAME}" -n "${RELEASE_NAMESPACE}" >/dev/null 2>&1
 }
 
-sealos_jwt_secret="$(get_sealos_config jwtInternal || true)"
-sealos_cloud_domain="$(get_sealos_config cloudDomain || true)"
+prepare_user_values() {
+  if [ ! -f "${USER_VALUES_PATH}" ]; then
+    mkdir -p "$(dirname "${USER_VALUES_PATH}")"
+    cp "./charts/${SERVICE_NAME}/${SERVICE_NAME}-values.yaml" "${USER_VALUES_PATH}"
+    info "Initialized user values template at ${USER_VALUES_PATH}"
+  fi
+}
+
+sealos_jwt_secret="$(get_cm_value sealos-system sealos-config jwtInternal)"
+sealos_cloud_domain="$(get_cm_value sealos-system sealos-config cloudDomain)"
 
 [ -n "${sealos_jwt_secret}" ] || error "Failed to read sealos-config.data.jwtInternal"
 [ -n "${sealos_cloud_domain}" ] || error "Failed to read sealos-config.data.cloudDomain"
+
+prepare_user_values
 
 jwt_secret=""
 encrypt_key=""
@@ -102,6 +117,7 @@ jwt_secret_source="generated"
 encrypt_key_source="generated"
 existing_secret_name="$(find_existing_kite_secret || true)"
 release_exists="false"
+
 if is_existing_release; then
   release_exists="true"
 fi
@@ -112,7 +128,7 @@ if [ "${STRICT_SECRET_REUSE}" = "true" ]; then
 fi
 
 if [ "${release_exists}" = "true" ] && [ "${strict_reuse_enabled}" = "true" ] && [ -z "${existing_secret_name}" ]; then
-  error "Existing release ${RELEASE_NAME} detected, but secret not found in namespace ${NAMESPACE}. Refuse to generate new keys when STRICT_SECRET_REUSE=true"
+  error "Existing release ${RELEASE_NAME} detected, but secret not found in namespace ${RELEASE_NAMESPACE}. Refuse to generate new keys when STRICT_SECRET_REUSE=true"
 fi
 
 if [ -n "${existing_secret_name}" ]; then
@@ -147,21 +163,21 @@ fi
 
 info "Secret reuse summary: existing_secret=${existing_secret_name:-none}, jwt_source=${jwt_secret_source}, encrypt_source=${encrypt_key_source}, strict_reuse=${STRICT_SECRET_REUSE}"
 
-helm_set_args=(
+auto_config_args=(
   --set-string "jwtSecret=${jwt_secret}"
   --set-string "encryptKey=${encrypt_key}"
   --set-string "sealos.jwtSecret=${sealos_jwt_secret}"
   --set-string "cloudDomain=${sealos_cloud_domain}"
 )
 
-if [ "${ENABLE_APP}" = "true" ]; then
-  helm_set_args+=(--set "app.enabled=true")
+if [ -n "${ENABLE_APP}" ]; then
+  auto_config_args+=(--set "app.enabled=${ENABLE_APP}")
 fi
 
 node_count="$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')"
 if [ "${node_count}" = "1" ]; then
   warn "Single-node cluster detected, force app/database replicas to 1."
-  helm_set_args+=(
+  auto_config_args+=(
     --set "replicaCount=1"
     --set "db.postgres.native.replicas=1"
   )
@@ -173,8 +189,10 @@ if [ -n "${HELM_OPTS}" ]; then
   helm_opts_arr=(${HELM_OPTS})
 fi
 
-info "Installing chart charts/kite into namespace ${NAMESPACE}"
-helm upgrade -i "${RELEASE_NAME}" -n "${NAMESPACE}" --create-namespace charts/kite \
-  "${helm_set_args[@]}" \
+info "Installing chart ${CHART_PATH} into namespace ${RELEASE_NAMESPACE}"
+helm upgrade -i "${RELEASE_NAME}" -n "${RELEASE_NAMESPACE}" --create-namespace "${CHART_PATH}" \
+  -f "./charts/${SERVICE_NAME}/values.yaml" \
+  -f "${USER_VALUES_PATH}" \
+  "${auto_config_args[@]}" \
   "${helm_opts_arr[@]}" \
   --wait

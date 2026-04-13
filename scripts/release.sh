@@ -1,9 +1,9 @@
 #!/bin/bash
 
-set -x
+set -euo pipefail
 
 version="$1"
-CHART_DIR="charts/kite"
+CHART_DIR="deploy/charts/kite"
 if [ -z "$version" ]; then
   echo "❌ Version argument is required"
   exit 1
@@ -19,8 +19,13 @@ else
 fi
 
 $SED_CMD -i "s/$current_version/$version/g" "$CHART_DIR/Chart.yaml"
-$SED_CMD -i "s/$current_version/$version/g" "$CHART_DIR/README.md"
+if [ -f "$CHART_DIR/README.md" ]; then
+  $SED_CMD -i "s/$current_version/$version/g" "$CHART_DIR/README.md"
+fi
 
-git add "$CHART_DIR/Chart.yaml" "$CHART_DIR/README.md"
+git add "$CHART_DIR/Chart.yaml"
+if [ -f "$CHART_DIR/README.md" ]; then
+  git add "$CHART_DIR/README.md"
+fi
 git commit -m "release v$version"
 git tag -a "v$version" -m "version $version"

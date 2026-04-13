@@ -2,6 +2,17 @@
 
 本文档描述了 Kite Helm Chart 的所有可用配置选项。
 
+## Sealos 部署叠加说明
+
+当通过源码内 `deploy/` 目录进行 Sealos 部署时，`deploy/kite-entrypoint.sh` 会按以下顺序加载配置：
+
+1. `deploy/charts/kite/values.yaml`
+2. `deploy/charts/kite/kite-values.yaml`
+3. 入口脚本自动注入的 Helm 参数
+4. `HELM_OPTS`
+
+在该模式下，`jwtSecret`、`encryptKey`、`cloudDomain` 和 `sealos.jwtSecret` 通常由入口脚本自动处理。下方默认值仍然是 chart 级别的参考值。
+
 ## 基础配置
 
 | 参数               | 描述                                               | 默认值                |
@@ -27,12 +38,19 @@
 | `cloudDomain`          | Sealos 域名，用于渲染 ingress/app 主机名                   | `"127.0.0.1.nip.io"`                                |
 | `sealos.jwtSecret`     | 注入环境变量 `SEALOS_JWT_SECRET` 的值                      | `""`                                                 |
 
+对于 Sealos 打包部署，这几个值通常会被自动注入或复用；只有需要强制覆盖时才建议手动配置。
+
 ## 数据库配置
 
 | 参数      | 描述                                                             | 默认值   |
 | --------- | ---------------------------------------------------------------- | -------- |
 | `db.type` | 数据库类型：`sqlite`、`postgres`、`mysql`                        | `postgres` |
-| `db.dsn`  | MySQL/Postgres 的完整 DSN 字符串。当类型为 mysql/postgres 时必需 | `""`     |
+| `db.dsn`  | MySQL/Postgres 的完整 DSN 字符串。对 postgres 设置后会自动关闭原生 Kubeblocks PostgreSQL | `""` |
+
+兼容性说明：
+- 规范字段仍为 `db.dsn`
+- 同时兼容 `db.dns` 作为外部 DSN 的别名输入
+- 当提供外部 postgres DSN 时，chart 不再渲染 Kubeblocks PostgreSQL 资源，也不再引用其 credential Secret
 
 ### SQLite 配置
 
