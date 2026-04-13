@@ -61,15 +61,30 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{- define "kite.externalDSN" -}}
+{{- $db := default (dict) .Values.db -}}
+{{- $dsn := (default "" $db.dsn) | trim -}}
+{{- $dns := "" -}}
+{{- if hasKey $db "dns" -}}
+{{- $dns = (default "" $db.dns) | trim -}}
+{{- end -}}
+{{- if $dsn -}}
+{{- $dsn -}}
+{{- else -}}
+{{- $dns -}}
+{{- end -}}
+{{- end }}
+
 {{- define "kite.postgresNativeEnabled" -}}
 {{- $dbType := default "sqlite" .Values.db.type -}}
 {{- $postgres := default (dict) .Values.db.postgres -}}
 {{- $native := default (dict) $postgres.native -}}
 {{- $enabled := true -}}
+{{- $externalDSN := include "kite.externalDSN" . | trim -}}
 {{- if hasKey $native "enabled" -}}
 {{- $enabled = $native.enabled -}}
 {{- end -}}
-{{- if and (eq $dbType "postgres") $enabled -}}true{{- else -}}false{{- end -}}
+{{- if and (eq $dbType "postgres") $enabled (eq $externalDSN "") -}}true{{- else -}}false{{- end -}}
 {{- end }}
 
 {{- define "kite.postgresClusterName" -}}

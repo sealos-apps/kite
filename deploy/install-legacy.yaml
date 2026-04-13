@@ -9,13 +9,13 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: kite
-    namespace: kube-system
+    namespace: kite-system
 ---
 kind: ServiceAccount
 apiVersion: v1
 metadata:
   name: kite
-  namespace: kube-system
+  namespace: kite-system
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,7 +23,7 @@ metadata:
   labels:
     app: kite
   name: kite
-  namespace: kube-system
+  namespace: kite-system
 spec:
   replicas: 1
   selector:
@@ -69,7 +69,7 @@ metadata:
   labels:
     app: kite
   name: kite
-  namespace: kube-system
+  namespace: kite-system
 spec:
   ports:
     - name: http

@@ -1,12 +1,26 @@
+{{- define "database-pg.externalDSN" -}}
+{{- $dsn := (default "" .Values.dsn) | trim -}}
+{{- $dns := "" -}}
+{{- if hasKey .Values "dns" -}}
+{{- $dns = (default "" .Values.dns) | trim -}}
+{{- end -}}
+{{- if $dsn -}}
+{{- $dsn -}}
+{{- else -}}
+{{- $dns -}}
+{{- end -}}
+{{- end }}
+
 {{- define "database-pg.nativeEnabled" -}}
 {{- $dbType := default "sqlite" .Values.type -}}
 {{- $postgres := default (dict) .Values.postgres -}}
 {{- $native := default (dict) $postgres.native -}}
 {{- $enabled := true -}}
+{{- $externalDSN := include "database-pg.externalDSN" . | trim -}}
 {{- if hasKey $native "enabled" -}}
 {{- $enabled = $native.enabled -}}
 {{- end -}}
-{{- if and (eq $dbType "postgres") $enabled -}}true{{- else -}}false{{- end -}}
+{{- if and (eq $dbType "postgres") $enabled (eq $externalDSN "") -}}true{{- else -}}false{{- end -}}
 {{- end }}
 
 {{- define "database-pg.clusterName" -}}

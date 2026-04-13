@@ -2,6 +2,17 @@
 
 This document describes all available configuration options for the Kite Helm Chart.
 
+## Sealos Deploy Overlay
+
+When Kite is deployed through the source `deploy/` package, `deploy/kite-entrypoint.sh` loads:
+
+1. `deploy/charts/kite/values.yaml`
+2. `deploy/charts/kite/kite-values.yaml`
+3. auto-injected Helm args
+4. `HELM_OPTS`
+
+In that mode, `jwtSecret`, `encryptKey`, `cloudDomain`, and `sealos.jwtSecret` are typically managed automatically by the entrypoint script. The defaults below remain valid as chart reference values.
+
 ## Basic Configuration
 
 | Parameter          | Description                                                | Default               |
@@ -27,12 +38,19 @@ This document describes all available configuration options for the Kite Helm Ch
 | `cloudDomain`          | Sealos cloud domain. Used to render ingress/app host                                     | `"127.0.0.1.nip.io"`                                |
 | `sealos.jwtSecret`     | Value injected to env `SEALOS_JWT_SECRET`                                                | `""`                                                 |
 
+For Sealos package deployments, these values are usually injected or reused automatically, so manual configuration is optional unless you need to override them.
+
 ## Database Configuration
 
 | Parameter | Description                                                              | Default  |
 | --------- | ------------------------------------------------------------------------ | -------- |
 | `db.type` | Database type: `sqlite`, `postgres`, `mysql`                             | `postgres` |
-| `db.dsn`  | Full DSN string for MySQL/Postgres. Required when type is mysql/postgres | `""`     |
+| `db.dsn`  | Full DSN string for MySQL/Postgres. When set for postgres, native Kubeblocks PostgreSQL is automatically disabled | `""` |
+
+Compatibility note:
+- `db.dsn` is the canonical field.
+- `db.dns` is also accepted as a compatibility alias for external DSN input.
+- When an external postgres DSN is provided, the chart will no longer render Kubeblocks PostgreSQL resources or reference its credential Secret.
 
 ### SQLite Configuration
 
