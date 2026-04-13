@@ -173,6 +173,14 @@ if [ -n "${HELM_OPTS}" ]; then
   helm_opts_arr=(${HELM_OPTS})
 fi
 
+VALUES_FILE="/root/.sealos/cloud/values/apps/kite/kite-values.yaml"
+if [ -f "${VALUES_FILE}" ]; then
+  info "Using additional Helm values from ${VALUES_FILE}"
+  helm_set_args+=(-f "${VALUES_FILE}")
+else
+  warn "Values file ${VALUES_FILE} not found, proceeding without it"
+fi
+
 info "Installing chart charts/kite into namespace ${NAMESPACE}"
 helm upgrade -i "${RELEASE_NAME}" -n "${NAMESPACE}" --create-namespace charts/kite \
   "${helm_set_args[@]}" \
