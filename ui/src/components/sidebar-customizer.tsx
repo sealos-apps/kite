@@ -217,7 +217,7 @@ export function SidebarCustomizer({
                       </h4>
                       {group.isCustom && (
                         <Badge variant="outline" className="text-xs">
-                          Custom
+                          {t('sidebar.custom')}
                         </Badge>
                       )}
                       <Badge variant="outline" className="text-xs">
@@ -245,7 +245,9 @@ export function SidebarCustomizer({
                         size="sm"
                         onClick={() => toggleGroupVisibility(group.id)}
                         className="h-8 w-8 p-0"
-                        title={group.visible ? 'Hide' : 'Show'}
+                        title={
+                          group.visible ? t('sidebar.hide') : t('sidebar.show')
+                        }
                       >
                         {!group.visible ? (
                           <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
@@ -279,7 +281,7 @@ export function SidebarCustomizer({
                           size="sm"
                           onClick={() => removeCustomGroup(group.id)}
                           className="h-8 w-8 p-0"
-                          title="Delete custom group"
+                          title={t('sidebar.deleteCustomGroup')}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -324,7 +326,11 @@ export function SidebarCustomizer({
                               size="sm"
                               onClick={() => toggleItemPin(item.id)}
                               className={`h-8 w-8 p-0 ${isPinned ? 'text-primary' : 'text-muted-foreground'}`}
-                              title={isPinned ? 'Unpin' : 'Pin to top'}
+                              title={
+                                isPinned
+                                  ? t('sidebar.unpin')
+                                  : t('sidebar.pinToTop')
+                              }
                             >
                               {isPinned ? (
                                 <PinOff className="h-3.5 w-3.5" />
@@ -340,7 +346,7 @@ export function SidebarCustomizer({
                                   removeCRDToGroup(group.id, item.id)
                                 }
                                 className="h-8 w-8 p-0"
-                                title="Remove from group"
+                                title={t('sidebar.removeFromGroup')}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -350,7 +356,11 @@ export function SidebarCustomizer({
                                 size="sm"
                                 onClick={() => toggleItemVisibility(item.id)}
                                 className="h-8 w-8 p-0"
-                                title={isHidden ? 'Show' : 'Hide'}
+                                title={
+                                  isHidden
+                                    ? t('sidebar.show')
+                                    : t('sidebar.hide')
+                                }
                               >
                                 {isHidden ? (
                                   <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
@@ -374,17 +384,17 @@ export function SidebarCustomizer({
                               kind: kind,
                             })
                           }
-                          placeholder="Select CRD to add..."
+                          placeholder={t('sidebar.selectCrdToAddPlaceholder')}
                         />
                         <Button
                           onClick={() => handleAddCRDToGroup(group.id)}
                           disabled={!selectedCRD}
                           size="sm"
                           className="gap-2"
-                          title="Add CRD to group"
+                          title={t('sidebar.addCrdToGroup')}
                         >
                           <Plus className="h-4 w-4" />
-                          Add
+                          {t('sidebar.add')}
                         </Button>
                       </div>
                     )}
@@ -405,7 +415,7 @@ export function SidebarCustomizer({
                   </Label>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Group name (e.g., CRDs)"
+                      placeholder={t('sidebar.groupNamePlaceholder')}
                       value={newGroupName}
                       onChange={(e) => setNewGroupName(e.target.value)}
                       onKeyDown={(e) => {

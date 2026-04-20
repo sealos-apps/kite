@@ -114,7 +114,11 @@ export function PodFileBrowser({
         file
       )
       refetch()
-      toast.success(`Uploaded ${file.name} successfully`)
+      toast.success(
+        t('pods.files.uploadSuccess', 'Uploaded {{name}} successfully', {
+          name: file.name,
+        })
+      )
     } catch (error) {
       toast.error(translateError(error, t))
     } finally {
@@ -136,7 +140,7 @@ export function PodFileBrowser({
           <Button
             variant="outline"
             size="icon"
-            aria-label="Go to parent directory"
+            aria-label={t('pods.files.goParent', 'Go to parent directory')}
             onClick={handleGoUp}
             disabled={currentPath === '/'}
           >
@@ -145,7 +149,7 @@ export function PodFileBrowser({
           <Button
             variant="outline"
             size="icon"
-            aria-label="Go to home directory"
+            aria-label={t('pods.files.goHome', 'Go to home directory')}
             onClick={() => handleNavigate('/')}
             disabled={currentPath === '/'}
           >
@@ -153,7 +157,7 @@ export function PodFileBrowser({
           </Button>
           <Input
             value={currentPath}
-            aria-label="Current path"
+            aria-label={t('pods.files.currentPath', 'Current path')}
             onChange={(e) => setCurrentPath(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -163,7 +167,7 @@ export function PodFileBrowser({
             className="font-mono"
           />
           <Button
-            aria-label="Refresh file list"
+            aria-label={t('pods.files.refresh', 'Refresh file list')}
             variant="outline"
             size="icon"
             onClick={() => refetch()}
@@ -190,14 +194,14 @@ export function PodFileBrowser({
             ) : (
               <IconUpload className="w-4 h-4 mr-2" />
             )}
-            Upload
+            {t('pods.files.upload', 'Upload')}
           </Label>
         </div>
       </div>
 
       {error ? (
         <ErrorMessage
-          resourceName={'pod files'}
+          resourceName={t('pods.files.title', 'Pod files')}
           error={error}
           refetch={refetch}
         />
@@ -207,13 +211,21 @@ export function PodFileBrowser({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]"></TableHead>
-                <TableHead>Name</TableHead>
+                <TableHead>{t('common.name')}</TableHead>
                 <TableHead className="w-[100px]">UID</TableHead>
                 <TableHead className="w-[100px]">GID</TableHead>
-                <TableHead className="w-[100px]">Size</TableHead>
-                <TableHead className="w-[150px]">Mode</TableHead>
-                <TableHead className="w-[200px]">Modified</TableHead>
-                <TableHead className="w-[120px]">Actions</TableHead>
+                <TableHead className="w-[100px]">
+                  {t('pods.files.size', 'Size')}
+                </TableHead>
+                <TableHead className="w-[150px]">
+                  {t('pods.files.mode', 'Mode')}
+                </TableHead>
+                <TableHead className="w-[200px]">
+                  {t('pods.files.modified', 'Modified')}
+                </TableHead>
+                <TableHead className="w-[120px]">
+                  {t('common.actions')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -222,14 +234,14 @@ export function PodFileBrowser({
                   <TableCell colSpan={8} className="h-24 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <IconLoader className="animate-spin" />
-                      <span>Loading files...</span>
+                      <span>{t('pods.files.loading', 'Loading files...')}</span>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (files ?? []).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center">
-                    No files found
+                    {t('pods.files.empty', 'No files found')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -249,7 +261,11 @@ export function PodFileBrowser({
                           variant="link"
                           className="text-foreground font-medium hover:underline text-left p-0 h-auto"
                           onClick={() => handleEnterDirectory(file.name)}
-                          aria-label={`Enter directory ${file.name}`}
+                          aria-label={t(
+                            'pods.files.enterDir',
+                            'Enter directory {{name}}',
+                            { name: file.name }
+                          )}
                         >
                           {file.name}
                         </Button>
@@ -278,8 +294,8 @@ export function PodFileBrowser({
                           <Button
                             variant="ghost"
                             size="sm"
-                            title="Preview file"
-                            aria-label="Preview file"
+                            title={t('pods.files.preview', 'Preview file')}
+                            aria-label={t('pods.files.preview', 'Preview file')}
                             onClick={() => handlePreview(file.name)}
                           >
                             <IconEye className="w-4 h-4" />
@@ -290,13 +306,19 @@ export function PodFileBrowser({
                           size="sm"
                           title={
                             file.isDir
-                              ? 'Download directory as .tar archive'
-                              : 'Download file'
+                              ? t(
+                                  'pods.files.downloadDir',
+                                  'Download directory as .tar archive'
+                                )
+                              : t('pods.files.downloadFile', 'Download file')
                           }
                           aria-label={
                             file.isDir
-                              ? 'Download directory as .tar archive'
-                              : 'Download file'
+                              ? t(
+                                  'pods.files.downloadDir',
+                                  'Download directory as .tar archive'
+                                )
+                              : t('pods.files.downloadFile', 'Download file')
                           }
                           onClick={() => handleDownload(file.name)}
                         >

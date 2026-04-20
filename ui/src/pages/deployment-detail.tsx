@@ -58,6 +58,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState<number>(0)
   const { t } = useTranslation()
+  const deploymentLabel = t('deployments.title')
 
   // Fetch deployment data
   const {
@@ -129,14 +130,16 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
         'kite.kubernetes.io/restartedAt'
       ] = new Date().toISOString()
       await updateResource('deployments', name, namespace, updatedDeployment)
-      toast.success('Deployment restart initiated')
+      toast.success(
+        t('detail.status.restartInitiated', { resource: deploymentLabel })
+      )
       setIsRestartPopoverOpen(false)
       setRefreshInterval(1000)
     } catch (error) {
       console.error('Failed to restart deployment:', error)
       toast.error(translateError(error, t))
     }
-  }, [t, deployment, name, namespace])
+  }, [deployment, deploymentLabel, name, namespace, t])
 
   const handleScale = useCallback(async () => {
     if (!deployment) return
@@ -148,20 +151,25 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
         },
       }
       await patchResource('deployments', name, namespace, updatedDeployment)
-      toast.success(`Deployment scaled to ${scaleReplicas} replicas`)
+      toast.success(
+        t('detail.status.scaledTo', {
+          resource: deploymentLabel,
+          replicas: scaleReplicas,
+        })
+      )
       setIsScalePopoverOpen(false)
       setRefreshInterval(1000)
     } catch (error) {
       console.error('Failed to restart deployment:', error)
       toast.error(translateError(error, t))
     }
-  }, [t, deployment, name, namespace, scaleReplicas])
+  }, [deployment, deploymentLabel, name, namespace, scaleReplicas, t])
 
   const handleSaveYaml = async (content: Deployment) => {
     setIsSavingYaml(true)
     try {
       await updateResource('deployments', name, namespace, content)
-      toast.success('YAML saved successfully')
+      toast.success(t('detail.status.yamlSaved'))
       setRefreshInterval(1000)
     } catch (error) {
       console.error('Failed to save YAML:', error)
@@ -231,7 +239,9 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-2">
               <IconLoader className="animate-spin" />
-              <span>Loading deployment details...</span>
+              <span>
+                {t('detail.status.loading', { resource: deploymentLabel })}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -242,7 +252,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
   if (isDeploymentError || !deployment) {
     return (
       <ErrorMessage
-        resourceName={'Deployment'}
+        resourceName={deploymentLabel}
         error={deploymentError}
         refetch={handleRefresh}
       />
@@ -260,13 +270,14 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
         <div>
           <h1 className="text-lg font-bold">{name}</h1>
           <p className="text-muted-foreground">
-            Namespace: <span className="font-medium">{namespace}</span>
+            {t('common.namespace')}:{' '}
+            <span className="font-medium">{namespace}</span>
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <IconRefresh className="w-4 h-4" />
-            Refresh
+            {t('detail.buttons.refresh')}
           </Button>
           <DescribeDialog
             resourceType="deployments"
@@ -280,19 +291,23 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconScale className="w-4 h-4" />
-                Scale
+                {t('detail.buttons.scale')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80" align="end">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <h4 className="font-medium">Scale Deployment</h4>
+                  <h4 className="font-medium">
+                    {t('detail.dialogs.scaleDeployment.title')}
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Adjust the number of replicas for this deployment.
+                    {t('detail.dialogs.scaleDeployment.description')}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="replicas">Replicas</Label>
+                  <Label htmlFor="replicas">
+                    {t('detail.dialogs.scaleDeployment.replicas')}
+                  </Label>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
@@ -327,7 +342,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                 </div>
                 <Button onClick={handleScale} className="w-full">
                   <IconScale className="w-4 h-4 mr-2" />
-                  Scale
+                  {t('detail.dialogs.scaleDeployment.scaleButton')}
                 </Button>
               </div>
             </PopoverContent>
@@ -339,17 +354,17 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconReload className="w-4 h-4" />
-                Restart
+                {t('detail.buttons.restart')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80" align="end">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <h4 className="font-medium">Restart Deployment</h4>
+                  <h4 className="font-medium">
+                    {t('detail.dialogs.restartDeployment.title')}
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    This will restart all pods in the deployment by updating the
-                    deployment's template with a new restart annotation. This
-                    action cannot be undone.
+                    {t('detail.dialogs.restartDeployment.description')}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -358,7 +373,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                     onClick={() => setIsRestartPopoverOpen(false)}
                     className="flex-1"
                   >
-                    Cancel
+                    {t('detail.buttons.cancel')}
                   </Button>
                   <Button
                     onClick={() => {
@@ -368,7 +383,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                     className="flex-1"
                   >
                     <IconReload className="w-4 h-4 mr-2" />
-                    Restart
+                    {t('detail.dialogs.restartDeployment.restartButton')}
                   </Button>
                 </div>
               </div>
@@ -380,7 +395,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
             onClick={() => setIsDeleteDialogOpen(true)}
           >
             <IconTrash className="w-4 h-4" />
-            Delete
+            {t('detail.buttons.delete')}
           </Button>
         </div>
       </div>
@@ -389,13 +404,13 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
         tabs={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: t('nav.overview'),
             content: (
               <div className="space-y-4">
                 {/* Status Overview */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Status Overview</CardTitle>
+                    <CardTitle>{t('detail.sections.statusOverview')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -407,7 +422,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">
-                            Status
+                            {t('common.status')}
                           </p>
                           <p className="text-sm font-medium">
                             {getDeploymentStatus(deployment)}
@@ -417,7 +432,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
 
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          Ready Replicas
+                          {t('detail.fields.readyReplicas')}
                         </p>
                         <p className="text-sm font-medium">
                           {readyReplicas} / {totalReplicas}
@@ -426,7 +441,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
 
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          Updated Replicas
+                          {t('detail.fields.updatedReplicas')}
                         </p>
                         <p className="text-sm font-medium">
                           {status?.updatedReplicas || 0}
@@ -435,7 +450,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
 
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          Available Replicas
+                          {t('detail.fields.availableReplicas')}
                         </p>
                         <p className="text-sm font-medium">
                           {status?.availableReplicas || 0}
@@ -447,13 +462,15 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                 {/* Deployment Info */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Deployment Information</CardTitle>
+                    <CardTitle>
+                      {t('detail.sections.deploymentInformation')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Created
+                          {t('detail.fields.created')}
                         </Label>
                         <p className="text-sm">
                           {formatDate(
@@ -464,7 +481,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Strategy
+                          {t('detail.fields.strategy')}
                         </Label>
                         <p className="text-sm">
                           {deployment.spec?.strategy?.type || 'RollingUpdate'}
@@ -472,7 +489,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Replicas
+                          {t('detail.fields.replicas')}
                         </Label>
                         <p className="text-sm">
                           {deployment.spec?.replicas || 0}
@@ -480,7 +497,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Selector
+                          {t('detail.fields.selector')}
                         </Label>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {Object.entries(
@@ -510,7 +527,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                     <Card>
                       <CardHeader>
                         <CardTitle>
-                          Init Containers (
+                          {t('detail.sections.initContainers')} (
                           {
                             deployment.spec?.template?.spec?.initContainers
                               ?.length
@@ -543,7 +560,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                 <Card>
                   <CardHeader>
                     <CardTitle>
-                      Containers (
+                      {t('detail.sections.containers')} (
                       {deployment.spec?.template?.spec?.containers?.length || 0}
                       )
                     </CardTitle>
@@ -571,7 +588,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                 {status?.conditions && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Conditions</CardTitle>
+                      <CardTitle>{t('detail.sections.conditions')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
@@ -608,12 +625,12 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'yaml',
-            label: 'YAML',
+            label: t('common.yaml'),
             content: (
               <YamlEditor<'deployments'>
                 key={refreshKey}
                 value={yamlContent}
-                title="YAML Configuration"
+                title={t('common.yaml')}
                 onSave={handleSaveYaml}
                 onChange={handleYamlChange}
                 isSaving={isSavingYaml}
@@ -626,7 +643,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                   value: 'pods',
                   label: (
                     <>
-                      Pods{' '}
+                      {t('nav.pods')}{' '}
                       {relatedPods && (
                         <Badge variant="secondary">{relatedPods.length}</Badge>
                       )}
@@ -642,7 +659,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                 },
                 {
                   value: 'logs',
-                  label: 'Logs',
+                  label: t('pods.logs'),
                   content: (
                     <div className="space-y-6">
                       <LogViewer
@@ -659,7 +676,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                 },
                 {
                   value: 'terminal',
-                  label: 'Terminal',
+                  label: t('pods.terminal'),
                   content: (
                     <div className="space-y-6">
                       {relatedPods && relatedPods.length > 0 && (
@@ -730,7 +747,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
             : []),
           {
             value: 'events',
-            label: 'Events',
+            label: t('nav.events'),
             content: (
               <EventTable
                 resource="deployments"

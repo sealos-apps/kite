@@ -54,6 +54,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
   const [refreshInterval, setRefreshInterval] = useState<number>(0)
 
   const { t } = useTranslation()
+  const statefulSetLabel = t('nav.statefulsets')
 
   // Fetch statefulset data
   const {
@@ -244,7 +245,9 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-2">
               <IconLoader className="animate-spin" />
-              <span>Loading StatefulSet details...</span>
+              <span>
+                {t('detail.status.loading', { resource: statefulSetLabel })}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -255,7 +258,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
   if (isStatefulSetError || !statefulset) {
     return (
       <ErrorMessage
-        resourceName={'StatefulSet'}
+        resourceName={statefulSetLabel}
         error={statefulsetError}
         refetch={handleRefresh}
       />
@@ -278,7 +281,8 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
         <div>
           <h1 className="text-lg font-bold">{metadata?.name}</h1>
           <p className="text-muted-foreground">
-            Namespace: <span className="font-medium">{namespace}</span>
+            {t('common.namespace')}:{' '}
+            <span className="font-medium">{namespace}</span>
           </p>
         </div>
         <div className="flex gap-2">
@@ -289,7 +293,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
             onClick={handleRefresh}
           >
             <IconRefresh className="w-4 h-4" />
-            Refresh
+            {t('detail.buttons.refresh')}
           </Button>
           <DescribeDialog
             resourceType="statefulsets"
@@ -303,19 +307,26 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconScale className="w-4 h-4" />
-                Scale
+                {t('detail.buttons.scale')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80" align="end">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <h4 className="font-medium">Scale StatefulSet</h4>
+                  <h4 className="font-medium">
+                    {t('statefulset.scaleTitle', 'Scale StatefulSet')}
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Adjust the number of replicas for this StatefulSet.
+                    {t(
+                      'statefulset.scaleDescription',
+                      'Adjust the number of replicas for this StatefulSet.'
+                    )}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="replicas">Replicas</Label>
+                  <Label htmlFor="replicas">
+                    {t('detail.fields.replicas')}
+                  </Label>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
@@ -349,7 +360,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                   </div>
                 </div>
                 <Button onClick={handleScale} className="w-full">
-                  Scale StatefulSet
+                  {t('statefulset.scaleButton', 'Scale StatefulSet')}
                 </Button>
               </div>
             </PopoverContent>
@@ -361,20 +372,23 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconReload className="w-4 h-4" />
-                Restart
+                {t('detail.buttons.restart')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80">
               <div className="space-y-2">
                 <p className="text-sm">
-                  This will restart all pods managed by this StatefulSet.
+                  {t(
+                    'statefulset.restartDescription',
+                    'This will restart all pods managed by this StatefulSet.'
+                  )}
                 </p>
                 <Button
                   onClick={handleRestart}
                   className="w-full"
                   variant="outline"
                 >
-                  Confirm Restart
+                  {t('statefulset.confirmRestart', 'Confirm Restart')}
                 </Button>
               </div>
             </PopoverContent>
@@ -385,7 +399,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
             onClick={() => setIsDeleteDialogOpen(true)}
           >
             <IconTrash className="w-4 h-4" />
-            Delete
+            {t('detail.buttons.delete')}
           </Button>
         </div>
       </div>
@@ -394,13 +408,13 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
         tabs={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: t('nav.overview'),
             content: (
               <div className="space-y-6">
                 {/* Status Overview */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Status Overview</CardTitle>
+                    <CardTitle>{t('detail.sections.statusOverview')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -416,7 +430,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">
-                            Status
+                            {t('common.status')}
                           </p>
                           <p className="text-sm font-medium">
                             {isPending
@@ -430,7 +444,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
 
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          Ready Replicas
+                          {t('detail.fields.readyReplicas')}
                         </p>
                         <p className="text-sm font-medium">
                           {readyReplicas} / {replicas}
@@ -439,14 +453,14 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
 
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          Current Replicas
+                          {t('common.current')}
                         </p>
                         <p className="text-sm font-medium">{currentReplicas}</p>
                       </div>
 
                       <div>
                         <p className="text-xs text-muted-foreground">
-                          Updated Replicas
+                          {t('detail.fields.updatedReplicas')}
                         </p>
                         <p className="text-sm font-medium">{updatedReplicas}</p>
                       </div>
@@ -457,19 +471,26 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                 {/* StatefulSet Information */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>StatefulSet Information</CardTitle>
+                    <CardTitle>
+                      {t(
+                        'statefulset.informationTitle',
+                        'StatefulSet Information'
+                      )}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-sm font-medium">Created</Label>
+                        <Label className="text-sm font-medium">
+                          {t('detail.fields.created')}
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           {formatDate(metadata?.creationTimestamp || '')}
                         </p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium">
-                          Service Name
+                          {t('services.serviceName')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
                           {spec?.serviceName || 'N/A'}
@@ -477,7 +498,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-sm font-medium">
-                          Update Strategy
+                          {t('statefulset.updateStrategy', 'Update Strategy')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
                           {spec?.updateStrategy?.type || 'RollingUpdate'}
@@ -485,7 +506,10 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-sm font-medium">
-                          Pod Management Policy
+                          {t(
+                            'statefulset.podManagementPolicy',
+                            'Pod Management Policy'
+                          )}
                         </Label>
                         <p className="text-sm text-muted-foreground">
                           {spec?.podManagementPolicy || 'OrderedReady'}
@@ -503,7 +527,9 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                 {spec?.template?.spec?.initContainers && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Init Containers</CardTitle>
+                      <CardTitle>
+                        {t('detail.sections.initContainers')}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
@@ -528,7 +554,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                 {spec?.template?.spec?.containers && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Containers</CardTitle>
+                      <CardTitle>{t('detail.sections.containers')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
@@ -550,13 +576,16 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'yaml',
-            label: 'YAML',
+            label: t('common.yaml'),
             content: (
               <div className="space-y-4">
                 <YamlEditor
                   key={refreshKey}
                   value={yamlContent}
-                  title="StatefulSet Configuration"
+                  title={t(
+                    'statefulset.configurationTitle',
+                    'StatefulSet Configuration'
+                  )}
                   onSave={handleSaveYaml}
                   onChange={handleYamlChange}
                   isSaving={isSavingYaml}
@@ -570,7 +599,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                   value: 'pods',
                   label: (
                     <>
-                      Pods{' '}
+                      {t('nav.pods')}{' '}
                       {relatedPods && (
                         <Badge variant="secondary">{relatedPods.length}</Badge>
                       )}
@@ -586,7 +615,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                 },
                 {
                   value: 'logs',
-                  label: 'Logs',
+                  label: t('pods.logs'),
                   content: (
                     <div className="space-y-6">
                       <LogViewer
@@ -601,7 +630,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                 },
                 {
                   value: 'terminal',
-                  label: 'Terminal',
+                  label: t('pods.terminal'),
                   content: (
                     <div className="space-y-6">
                       {relatedPods && relatedPods.length > 0 && (
@@ -623,7 +652,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
                   value: 'volumes',
                   label: (
                     <>
-                      Volumes
+                      {t('statefulset.volumes', 'Volumes')}
                       {spec.template.spec.volumes && (
                         <Badge variant="secondary">
                           {spec.template.spec.volumes.length}
@@ -657,7 +686,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'events',
-            label: 'Events',
+            label: t('nav.events'),
             content: (
               <EventTable
                 resource="statefulsets"
@@ -680,7 +709,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'monitor',
-            label: 'Monitor',
+            label: t('monitoring.title', 'Monitor'),
             content: (
               <PodMonitoring
                 namespace={namespace}

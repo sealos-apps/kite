@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { Plus, Settings } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -19,6 +20,7 @@ export function SiteHeader() {
   const isMobile = useIsMobile()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   return (
@@ -36,7 +38,7 @@ export function SiteHeader() {
             <Plus
               className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
               onClick={() => setCreateDialogOpen(true)}
-              aria-label="Create new resource"
+              aria-label={t('dialog.createResource')}
             />
             {!isMobile && (
               <>
@@ -52,7 +54,7 @@ export function SiteHeader() {
                     className="hidden sm:flex"
                   >
                     <Settings className="h-5 w-5" />
-                    <span className="sr-only">Settings</span>
+                    <span className="sr-only">{t('settings.nav')}</span>
                   </Button>
                 )}
                 <LanguageToggle />

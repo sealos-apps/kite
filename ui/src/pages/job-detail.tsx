@@ -83,6 +83,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const { t } = useTranslation()
+  const jobLabel = t('nav.jobs')
 
   const {
     data: job,
@@ -114,7 +115,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
     setIsSavingYaml(true)
     try {
       await updateResource('jobs', name, namespace, content)
-      toast.success('Job YAML saved successfully')
+      toast.success(t('detail.status.yamlSaved'))
       await refetchJob()
     } catch (error) {
       toast.error(translateError(error, t))
@@ -134,7 +135,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-2">
               <IconLoader className="animate-spin" />
-              <span>Loading job details...</span>
+              <span>{t('detail.status.loading', { resource: jobLabel })}</span>
             </div>
           </CardContent>
         </Card>
@@ -145,7 +146,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
   if (isError || !job) {
     return (
       <ErrorMessage
-        resourceName={'Job'}
+        resourceName={jobLabel}
         error={jobError}
         refetch={handleManualRefresh}
       />
@@ -163,13 +164,14 @@ export function JobDetail(props: { namespace: string; name: string }) {
         <div>
           <h1 className="text-lg font-bold">{name}</h1>
           <p className="text-muted-foreground">
-            Namespace: <span className="font-medium">{namespace}</span>
+            {t('common.namespace')}:{' '}
+            <span className="font-medium">{namespace}</span>
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleManualRefresh}>
             <IconRefresh className="w-4 h-4" />
-            Refresh
+            {t('detail.buttons.refresh')}
           </Button>
           <DescribeDialog
             resourceType={'jobs'}
@@ -182,7 +184,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
             onClick={() => setIsDeleteDialogOpen(true)}
           >
             <IconTrash className="w-4 h-4" />
-            Delete
+            {t('detail.buttons.delete')}
           </Button>
         </div>
       </div>
@@ -191,18 +193,18 @@ export function JobDetail(props: { namespace: string; name: string }) {
         tabs={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: t('nav.overview'),
             content: (
               <div className="space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Status Overview</CardTitle>
+                    <CardTitle>{t('detail.sections.statusOverview')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Status
+                          {t('common.status')}
                         </Label>
                         <Badge variant={jobStatus.variant}>
                           {jobStatus.label}
@@ -210,7 +212,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Completions
+                          {t('job.completions', 'Completions')}
                         </Label>
                         <p className="text-sm font-medium">
                           {`${job.status?.succeeded || 0}/${job.spec?.completions || 1}`}
@@ -218,7 +220,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Start Time
+                          {t('job.startTime', 'Start Time')}
                         </Label>
                         <p className="text-sm font-medium">
                           {job.status?.startTime
@@ -228,7 +230,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Completion Time
+                          {t('job.completionTime', 'Completion Time')}
                         </Label>
                         <p className="text-sm font-medium">
                           {job.status?.completionTime
@@ -242,13 +244,15 @@ export function JobDetail(props: { namespace: string; name: string }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Job Information</CardTitle>
+                    <CardTitle>
+                      {t('job.informationTitle', 'Job Information')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
                         <Label className="text-xs text-muted-foreground ">
-                          Created
+                          {t('detail.fields.created')}
                         </Label>
                         <p className="text-sm">
                           {formatDate(
@@ -259,36 +263,39 @@ export function JobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Parallelism
+                          {t('job.parallelism', 'Parallelism')}
                         </Label>
                         <p className="text-sm">{job.spec?.parallelism ?? 1}</p>
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Backoff Limit
+                          {t('job.backoffLimit', 'Backoff Limit')}
                         </Label>
                         <p className="text-sm">{job.spec?.backoffLimit ?? 6}</p>
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Active Deadline Seconds
+                          {t(
+                            'job.activeDeadlineSeconds',
+                            'Active Deadline Seconds'
+                          )}
                         </Label>
                         <p className="text-sm">
                           {job.spec?.activeDeadlineSeconds
                             ? `${job.spec.activeDeadlineSeconds} seconds`
-                            : 'Not set'}
+                            : t('job.notSet', 'Not set')}
                         </p>
                       </div>
                       {getOwnerInfo(job.metadata) && (
                         <div>
                           <Label className="text-xs text-muted-foreground">
-                            Owner
+                            {t('detail.fields.owner')}
                           </Label>
                           <p className="text-sm">
                             {(() => {
                               const ownerInfo = getOwnerInfo(job.metadata)
                               if (!ownerInfo) {
-                                return 'No owner'
+                                return t('detail.fields.noOwner')
                               }
                               return (
                                 <Link
@@ -304,12 +311,12 @@ export function JobDetail(props: { namespace: string; name: string }) {
                       )}
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          TTL After Finished
+                          {t('job.ttlAfterFinished', 'TTL After Finished')}
                         </Label>
                         <p className="text-sm">
                           {job.spec?.ttlSecondsAfterFinished
                             ? `${job.spec.ttlSecondsAfterFinished} seconds`
-                            : 'Not set'}
+                            : t('job.notSet', 'Not set')}
                         </p>
                       </div>
                     </div>
@@ -324,7 +331,8 @@ export function JobDetail(props: { namespace: string; name: string }) {
                   <Card>
                     <CardHeader>
                       <CardTitle>
-                        Init Containers ({initContainers.length})
+                        {t('detail.sections.initContainers')} (
+                        {initContainers.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -344,7 +352,9 @@ export function JobDetail(props: { namespace: string; name: string }) {
                 {containers.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Containers ({containers.length})</CardTitle>
+                      <CardTitle>
+                        {t('detail.sections.containers')} ({containers.length})
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
@@ -363,12 +373,12 @@ export function JobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'yaml',
-            label: 'YAML',
+            label: t('common.yaml'),
             content: (
               <YamlEditor<'jobs'>
                 key={refreshKey}
                 value={yamlContent}
-                title="YAML Configuration"
+                title={t('common.yaml')}
                 onSave={handleSaveYaml}
                 onChange={handleYamlChange}
                 isSaving={isSavingYaml}
@@ -381,7 +391,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
                   value: 'pods',
                   label: (
                     <>
-                      Pods{' '}
+                      {t('nav.pods')}{' '}
                       {pods && <Badge variant="secondary">{pods.length}</Badge>}
                     </>
                   ),
@@ -389,7 +399,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
                 },
                 {
                   value: 'logs',
-                  label: 'Logs',
+                  label: t('pods.logs'),
                   content: (
                     <div className="space-y-6">
                       <LogViewer
@@ -404,7 +414,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
                 },
                 {
                   value: 'terminal',
-                  label: 'Terminal',
+                  label: t('pods.terminal'),
                   content: (
                     <div className="space-y-6">
                       <Terminal
@@ -431,7 +441,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'events',
-            label: 'Events',
+            label: t('nav.events'),
             content: (
               <EventTable resource="jobs" name={name} namespace={namespace} />
             ),
@@ -452,7 +462,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
             ? [
                 {
                   value: 'volumes',
-                  label: 'Volumes',
+                  label: t('job.volumes', 'Volumes'),
                   content: (
                     <VolumeTable
                       namespace={namespace}
@@ -465,7 +475,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
             : []),
           {
             value: 'monitor',
-            label: 'Monitor',
+            label: t('monitoring.title', 'Monitor'),
             content: (
               <PodMonitoring
                 namespace={namespace}

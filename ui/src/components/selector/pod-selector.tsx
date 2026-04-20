@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pod } from 'kubernetes-types/core/v1'
 import { Check, ChevronsUpDown } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { cn, getAge } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -33,10 +34,11 @@ export function PodSelector({
   showAllOption = false,
 }: PodSelectorProps) {
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
 
   const allOption: Pod = {
     metadata: {
-      name: 'All Pods',
+      name: t('pods.allPods', 'All Pods'),
       uid: 'all',
       creationTimestamp: undefined,
     },
@@ -56,15 +58,19 @@ export function PodSelector({
           aria-expanded={open}
           className="justify-between"
         >
-          {selectedOption ? selectedOption.metadata?.name : 'All'}
+          {selectedOption
+            ? selectedOption.metadata?.name
+            : t('common.all', 'All')}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="max-w-[300px] p-0">
         <Command>
-          <CommandInput placeholder="Search pods..." />
+          <CommandInput placeholder={t('pods.searchPods', 'Search pods...')} />
           <CommandList>
-            <CommandEmpty>No pods found.</CommandEmpty>
+            <CommandEmpty>
+              {t('pods.noPodsFound', 'No pods found.')}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((pod) => (
                 <CommandItem
@@ -93,8 +99,9 @@ export function PodSelector({
                     <span className="font-medium">{pod.metadata?.name}</span>
                     {pod.metadata?.creationTimestamp && (
                       <span className="text-xs text-muted-foreground">
-                        Age: {getAge(pod.metadata?.creationTimestamp || '')},
-                        Node: {pod.spec?.nodeName}
+                        {t('pods.age')}:{' '}
+                        {getAge(pod.metadata?.creationTimestamp || '')},{' '}
+                        {t('pods.node')}: {pod.spec?.nodeName}
                       </span>
                     )}
                   </div>

@@ -57,7 +57,9 @@ export function CreateResourceDialog({
     )
     if (scopedNamespace) return scopedNamespace
 
-    const selectedNamespace = localStorage.getItem(`${clusterName}selectedNamespace`)
+    const selectedNamespace = localStorage.getItem(
+      `${clusterName}selectedNamespace`
+    )
     if (selectedNamespace && selectedNamespace !== '_all') {
       return selectedNamespace
     }
@@ -123,16 +125,20 @@ export function CreateResourceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-4xl sm:!max-w-4xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Create Resource</DialogTitle>
+          <DialogTitle>{t('dialog.createResource')}</DialogTitle>
           <DialogDescription>
-            Paste any Kubernetes resource YAML configuration and apply it to the
-            cluster
+            {t(
+              'createResource.description',
+              'Paste any Kubernetes resource YAML configuration and apply it to the cluster'
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="template">Template</Label>
+            <Label htmlFor="template">
+              {t('createResource.template', 'Template')}
+            </Label>
             <Select
               value={selectedTemplateId || 'empty'}
               onValueChange={handleTemplateChange}
@@ -158,7 +164,7 @@ export function CreateResourceDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="yaml">YAML Configuration</Label>
+            <Label htmlFor="yaml">{t('common.yaml')}</Label>
             <div className="min-h-[300px] border rounded-md">
               <SimpleYamlEditor
                 value={yamlContent}
@@ -171,7 +177,7 @@ export function CreateResourceDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleApply} disabled={isLoading || !yamlContent}>
             {isLoading ? (

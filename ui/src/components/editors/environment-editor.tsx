@@ -6,6 +6,7 @@ import {
   EnvVarSource,
 } from 'kubernetes-types/core/v1'
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { ConfigMapSelector } from '../selector/configmap-selector'
 import { SecretSelector } from '../selector/secret-selector'
@@ -32,6 +33,7 @@ export function EnvironmentEditor({
   namespace,
   onUpdate,
 }: EnvironmentEditorProps) {
+  const { t } = useTranslation()
   const [envVars, setEnvVars] = useState<EnvVar[]>([])
   const [envFromSources, setEnvFromSources] = useState<EnvFromSource[]>([])
 
@@ -302,10 +304,12 @@ export function EnvironmentEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Environment Variables</Label>
+        <Label className="text-sm font-medium">
+          {t('environmentEditor.environmentVariables')}
+        </Label>
         <Button onClick={addEnvVar} size="sm" variant="outline">
           <Plus className="h-4 w-4 mr-1" />
-          Add Variable
+          {t('environmentEditor.addVariable')}
         </Button>
       </div>
 
@@ -318,9 +322,11 @@ export function EnvironmentEditor({
             <div className="flex-1 space-y-2">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
                 <div className="lg:col-span-1">
-                  <Label className="text-xs text-muted-foreground">Name</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    {t('common.name')}
+                  </Label>
                   <Input
-                    placeholder="Variable name"
+                    placeholder={t('environmentEditor.variableNamePlaceholder')}
                     value={env.name}
                     onChange={(e) =>
                       updateEnvVar(index, 'name', e.target.value)
@@ -329,7 +335,9 @@ export function EnvironmentEditor({
                   />
                 </div>
                 <div className="lg:col-span-1">
-                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    {t('environmentEditor.type')}
+                  </Label>
                   <Select
                     value={env.valueFrom ? 'valueFrom' : 'value'}
                     onValueChange={(value) =>
@@ -340,8 +348,12 @@ export function EnvironmentEditor({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="value">Direct Value</SelectItem>
-                      <SelectItem value="valueFrom">Value From</SelectItem>
+                      <SelectItem value="value">
+                        {t('environmentEditor.directValue')}
+                      </SelectItem>
+                      <SelectItem value="valueFrom">
+                        {t('environmentEditor.valueFrom')}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -349,7 +361,7 @@ export function EnvironmentEditor({
                   {env.valueFrom ? (
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">
-                        Source
+                        {t('environmentEditor.source')}
                       </Label>
                       <Select
                         value={
@@ -375,18 +387,24 @@ export function EnvironmentEditor({
                         }
                       >
                         <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Select source type" />
+                          <SelectValue
+                            placeholder={t(
+                              'environmentEditor.selectSourceType'
+                            )}
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="secretKeyRef">Secret</SelectItem>
+                          <SelectItem value="secretKeyRef">
+                            {t('environmentEditor.secret')}
+                          </SelectItem>
                           <SelectItem value="configMapKeyRef">
-                            ConfigMap
+                            {t('environmentEditor.configMap')}
                           </SelectItem>
                           <SelectItem value="fieldRef">
-                            Field Reference
+                            {t('environmentEditor.fieldReference')}
                           </SelectItem>
                           <SelectItem value="resourceFieldRef">
-                            Resource Field
+                            {t('environmentEditor.resourceField')}
                           </SelectItem>
                         </SelectContent>
                       </Select>
@@ -395,7 +413,7 @@ export function EnvironmentEditor({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           <div className="min-w-0">
                             <Label className="text-xs text-muted-foreground">
-                              Secret Name
+                              {t('environmentEditor.secretName')}
                             </Label>
                             <SecretSelector
                               selectedSecret={
@@ -410,17 +428,19 @@ export function EnvironmentEditor({
                                 )
                               }
                               namespace={namespace}
-                              placeholder="Select secret"
+                              placeholder={t('environmentEditor.selectSecret')}
                               className="text-sm w-full"
                               avoidHelmSecrets
                             />
                           </div>
                           <div className="min-w-0">
                             <Label className="text-xs text-muted-foreground">
-                              Key
+                              {t('environmentEditor.key')}
                             </Label>
                             <Input
-                              placeholder="key"
+                              placeholder={t(
+                                'environmentEditor.keyPlaceholder'
+                              )}
                               value={env.valueFrom.secretKeyRef.key}
                               onChange={(e) =>
                                 updateValueFrom(
@@ -440,7 +460,7 @@ export function EnvironmentEditor({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           <div className="min-w-0">
                             <Label className="text-xs text-muted-foreground">
-                              ConfigMap Name
+                              {t('environmentEditor.configMapName')}
                             </Label>
                             <ConfigMapSelector
                               selectedConfigMap={
@@ -455,16 +475,20 @@ export function EnvironmentEditor({
                                 )
                               }
                               namespace={namespace}
-                              placeholder="Select configmap"
+                              placeholder={t(
+                                'environmentEditor.selectConfigMap'
+                              )}
                               className="text-sm w-full"
                             />
                           </div>
                           <div className="min-w-0">
                             <Label className="text-xs text-muted-foreground">
-                              Key
+                              {t('environmentEditor.key')}
                             </Label>
                             <Input
-                              placeholder="key"
+                              placeholder={t(
+                                'environmentEditor.keyPlaceholder'
+                              )}
                               value={env.valueFrom.configMapKeyRef.key}
                               onChange={(e) =>
                                 updateValueFrom(
@@ -483,10 +507,12 @@ export function EnvironmentEditor({
                       {env.valueFrom.fieldRef && (
                         <div>
                           <Label className="text-xs text-muted-foreground">
-                            Field Path
+                            {t('environmentEditor.fieldPath')}
                           </Label>
                           <Input
-                            placeholder="metadata.name"
+                            placeholder={t(
+                              'environmentEditor.fieldPathPlaceholder'
+                            )}
                             value={env.valueFrom.fieldRef.fieldPath}
                             onChange={(e) =>
                               updateValueFrom(
@@ -505,10 +531,12 @@ export function EnvironmentEditor({
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <Label className="text-xs text-muted-foreground">
-                              Resource
+                              {t('environmentEditor.resource')}
                             </Label>
                             <Input
-                              placeholder="requests.cpu"
+                              placeholder={t(
+                                'environmentEditor.resourcePlaceholder'
+                              )}
                               value={env.valueFrom.resourceFieldRef.resource}
                               onChange={(e) =>
                                 updateValueFrom(
@@ -523,10 +551,12 @@ export function EnvironmentEditor({
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">
-                              Container Name
+                              {t('environmentEditor.containerName')}
                             </Label>
                             <Input
-                              placeholder="container-name"
+                              placeholder={t(
+                                'environmentEditor.containerNamePlaceholder'
+                              )}
                               value={
                                 env.valueFrom.resourceFieldRef.containerName ||
                                 ''
@@ -548,10 +578,12 @@ export function EnvironmentEditor({
                   ) : (
                     <div>
                       <Label className="text-xs text-muted-foreground">
-                        Value
+                        {t('environmentEditor.value')}
                       </Label>
                       <Input
-                        placeholder="Variable value"
+                        placeholder={t(
+                          'environmentEditor.variableValuePlaceholder'
+                        )}
                         value={env.value || ''}
                         onChange={(e) =>
                           updateEnvVar(index, 'value', e.target.value)
@@ -564,7 +596,9 @@ export function EnvironmentEditor({
               </div>
               {env.value && env.value.length > 50 && (
                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded border">
-                  <span className="font-medium">Full value:</span>
+                  <span className="font-medium">
+                    {t('environmentEditor.fullValue')}
+                  </span>
                   <div className="mt-1  break-all">{env.value}</div>
                 </div>
               )}
@@ -582,7 +616,7 @@ export function EnvironmentEditor({
 
         {envVars.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            No environment variables configured
+            {t('environmentEditor.noEnvironmentVariables')}
           </div>
         )}
       </div>
@@ -590,10 +624,12 @@ export function EnvironmentEditor({
       <Separator />
 
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Environment From</Label>
+        <Label className="text-sm font-medium">
+          {t('environmentEditor.environmentFrom')}
+        </Label>
         <Button onClick={addEnvFromSource} size="sm" variant="outline">
           <Plus className="h-4 w-4 mr-1" />
-          Add Source
+          {t('environmentEditor.addSource')}
         </Button>
       </div>
 
@@ -606,7 +642,9 @@ export function EnvironmentEditor({
             <div className="flex-1 space-y-2">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
                 <div className="lg:col-span-1">
-                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    {t('environmentEditor.type')}
+                  </Label>
                   <Select
                     value={source.configMapRef ? 'configMapRef' : 'secretRef'}
                     onValueChange={(value) =>
@@ -620,14 +658,22 @@ export function EnvironmentEditor({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="configMapRef">ConfigMap</SelectItem>
-                      <SelectItem value="secretRef">Secret</SelectItem>
+                      <SelectItem value="configMapRef">
+                        {t('environmentEditor.configMap')}
+                      </SelectItem>
+                      <SelectItem value="secretRef">
+                        {t('environmentEditor.secret')}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="lg:col-span-2 min-w-0">
                   <Label className="text-xs text-muted-foreground">
-                    {source.configMapRef ? 'ConfigMap' : 'Secret'} Name
+                    {t('environmentEditor.sourceName', {
+                      type: source.configMapRef
+                        ? t('environmentEditor.configMap')
+                        : t('environmentEditor.secret'),
+                    })}
                   </Label>
                   {source.configMapRef ? (
                     <ConfigMapSelector
@@ -641,7 +687,7 @@ export function EnvironmentEditor({
                         )
                       }
                       namespace={namespace}
-                      placeholder="Select configmap"
+                      placeholder={t('environmentEditor.selectConfigMap')}
                       className="text-sm w-full"
                     />
                   ) : (
@@ -651,7 +697,7 @@ export function EnvironmentEditor({
                         updateEnvFromSource(index, 'secretRef', 'name', value)
                       }
                       namespace={namespace}
-                      placeholder="Select secret"
+                      placeholder={t('environmentEditor.selectSecret')}
                       className="text-sm w-full"
                       avoidHelmSecrets
                     />
@@ -659,10 +705,10 @@ export function EnvironmentEditor({
                 </div>
                 <div className="lg:col-span-1 min-w-0">
                   <Label className="text-xs text-muted-foreground">
-                    Prefix (Optional)
+                    {t('environmentEditor.prefixOptional')}
                   </Label>
                   <Input
-                    placeholder="PREFIX_"
+                    placeholder={t('environmentEditor.prefixPlaceholder')}
                     value={source.prefix || ''}
                     onChange={(e) =>
                       updateEnvFromSource(
@@ -690,7 +736,7 @@ export function EnvironmentEditor({
 
         {envFromSources.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            No environment sources configured
+            {t('environmentEditor.noEnvironmentSources')}
           </div>
         )}
       </div>
