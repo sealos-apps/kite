@@ -8,14 +8,6 @@ import { formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ResourceTable } from '@/components/resource-table'
 
-function getSuspendBadge(cronjob: CronJob) {
-  const isSuspended = cronjob.spec?.suspend ?? false
-  return {
-    label: isSuspended ? 'Suspended' : 'Active',
-    variant: isSuspended ? ('secondary' as const) : ('default' as const),
-  }
-}
-
 export function CronJobListPage() {
   const { t } = useTranslation()
   const columnHelper = createColumnHelper<CronJob>()
@@ -38,7 +30,7 @@ export function CronJobListPage() {
       }),
       columnHelper.display({
         id: 'schedule',
-        header: 'Schedule',
+        header: t('cronjob.schedule'),
         cell: ({ row }) => (
           <span className="text-sm text-muted-foreground">
             {row.original.spec?.schedule || '-'}
@@ -47,15 +39,19 @@ export function CronJobListPage() {
       }),
       columnHelper.display({
         id: 'suspend',
-        header: 'State',
+        header: t('cronjob.state'),
         cell: ({ row }) => {
-          const badge = getSuspendBadge(row.original)
-          return <Badge variant={badge.variant}>{badge.label}</Badge>
+          const isSuspended = row.original.spec?.suspend ?? false
+          return (
+            <Badge variant={isSuspended ? 'secondary' : 'default'}>
+              {isSuspended ? 'Suspended' : 'Active'}
+            </Badge>
+          )
         },
       }),
       columnHelper.display({
         id: 'active',
-        header: 'Active Jobs',
+        header: t('cronjob.activeJobs'),
         cell: ({ row }) => (
           <span className="text-sm">
             {row.original.status?.active?.length || 0}
@@ -64,7 +60,7 @@ export function CronJobListPage() {
       }),
       columnHelper.display({
         id: 'lastSchedule',
-        header: 'Last Schedule',
+        header: t('cronjob.lastSchedule'),
         cell: ({ row }) => {
           const lastSchedule = row.original.status?.lastScheduleTime
           if (!lastSchedule) {
@@ -79,7 +75,7 @@ export function CronJobListPage() {
       }),
       columnHelper.display({
         id: 'lastSuccess',
-        header: 'Last Success',
+        header: t('cronjob.lastSuccess'),
         cell: ({ row }) => {
           const lastSuccess = row.original.status?.lastSuccessfulTime
           if (!lastSuccess) {
@@ -105,7 +101,7 @@ export function CronJobListPage() {
 
   return (
     <ResourceTable
-      resourceName="CronJobs"
+      resourceName={t('nav.cronjobs')}
       resourceType="cronjobs"
       columns={columns}
       searchQueryFilter={cronJobSearchFilter}

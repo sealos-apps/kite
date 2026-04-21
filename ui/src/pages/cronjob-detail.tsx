@@ -73,6 +73,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
   const [isTogglingSuspend, setIsTogglingSuspend] = useState(false)
   const [isRunningNow, setIsRunningNow] = useState(false)
   const { t } = useTranslation()
+  const cronJobLabel = t('nav.cronjobs')
 
   const {
     data: cronjob,
@@ -102,19 +103,22 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
     }
 
     if (cronjob.spec?.suspend) {
-      return { label: 'Suspended', variant: 'secondary' as const }
+      return {
+        label: t('cronjob.status.suspended'),
+        variant: 'secondary' as const,
+      }
     }
 
     if ((cronjob.status?.active?.length || 0) > 0) {
-      return { label: 'Active', variant: 'default' as const }
+      return { label: t('cronjob.status.active'), variant: 'default' as const }
     }
 
     if (cronjob.status?.lastSuccessfulTime) {
-      return { label: 'Idle', variant: 'outline' as const }
+      return { label: t('cronjob.status.idle'), variant: 'outline' as const }
     }
 
-    return { label: 'Pending', variant: 'outline' as const }
-  }, [cronjob])
+    return { label: t('status.pending'), variant: 'outline' as const }
+  }, [cronjob, t])
 
   const cronJobJobs = useMemo(() => {
     if (!jobs) {
@@ -154,7 +158,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
   const jobColumns = useMemo<Column<Job>[]>(
     () => [
       {
-        header: 'Name',
+        header: t('common.name'),
         accessor: (job) => job,
         align: 'left',
         cell: (value) => {
@@ -170,15 +174,25 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
         },
       },
       {
-        header: 'Status',
+        header: t('common.status'),
         accessor: (job) => getJobStatusBadge(job),
         cell: (value) => {
           const badge = value as JobStatusBadge
-          return <Badge variant={badge.variant}>{badge.label}</Badge>
+          const statusMap: Record<string, string> = {
+            Failed: t('status.failed'),
+            Complete: t('status.succeeded'),
+            Running: t('status.running'),
+            Pending: t('status.pending'),
+          }
+          return (
+            <Badge variant={badge.variant}>
+              {statusMap[badge.label] || badge.label}
+            </Badge>
+          )
         },
       },
       {
-        header: 'Succeeded',
+        header: t('job.completions'),
         accessor: (job) => {
           const succeeded = job.status?.succeeded || 0
           const completions = job.spec?.completions || 1
@@ -187,7 +201,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
         cell: (value) => <span className="text-sm">{value as string}</span>,
       },
       {
-        header: 'Started',
+        header: t('job.startTime'),
         accessor: (job) => job.status?.startTime,
         cell: (value) =>
           value ? (
@@ -199,7 +213,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           ),
       },
       {
-        header: 'Completed',
+        header: t('job.completionTime'),
         accessor: (job) => job.status?.completionTime,
         cell: (value) =>
           value ? (
@@ -211,7 +225,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           ),
       },
     ],
-    []
+    [t]
   )
 
   const handleManualRefresh = async () => {
@@ -301,7 +315,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
       }
 
       await createResource('jobs', namespace, manualJob)
-      toast.success('Job created successfully')
+      toast.success(t('cronjob.jobCreated', 'Job created successfully'))
       await refetchJobs()
     } catch (error) {
       toast.error(translateError(error, t))
@@ -317,7 +331,9 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-2">
               <IconLoader className="animate-spin" />
-              <span>Loading cronjob details...</span>
+              <span>
+                {t('detail.status.loading', { resource: cronJobLabel })}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -328,7 +344,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
   if (isError || !cronjob) {
     return (
       <ErrorMessage
-        resourceName={'CronJob'}
+        resourceName={cronJobLabel}
         error={cronJobError}
         refetch={handleManualRefresh}
       />
@@ -348,13 +364,14 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
         <div>
           <h1 className="text-lg font-bold">{name}</h1>
           <p className="text-muted-foreground">
-            Namespace: <span className="font-medium">{namespace}</span>
+            {t('common.namespace')}:{' '}
+            <span className="font-medium">{namespace}</span>
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleManualRefresh}>
             <IconRefresh className="w-4 h-4" />
-            Refresh
+            {t('detail.buttons.refresh')}
           </Button>
           <DescribeDialog
             resourceType={'cronjobs'}
@@ -368,7 +385,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
             disabled={isRunningNow}
           >
             <IconPlayerPlayFilled className="w-4 h-4" />
-            Run Now
+            {t('cronjob.runNow', 'Run Now')}
           </Button>
           <Button
             variant="outline"
@@ -381,7 +398,9 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
             ) : (
               <IconPlayerPause className="w-4 h-4" />
             )}
-            {cronjob.spec?.suspend ? 'Resume' : 'Suspend'}
+            {cronjob.spec?.suspend
+              ? t('cronjob.resume', 'Resume')
+              : t('cronjob.suspend', 'Suspend')}
           </Button>
           <Button
             variant="destructive"
@@ -389,7 +408,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
             onClick={() => setIsDeleteDialogOpen(true)}
           >
             <IconTrash className="w-4 h-4" />
-            Delete
+            {t('detail.buttons.delete')}
           </Button>
         </div>
       </div>
@@ -398,18 +417,18 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
         tabs={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: t('nav.overview'),
             content: (
               <div className="space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Status Overview</CardTitle>
+                    <CardTitle>{t('detail.sections.statusOverview')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Status
+                          {t('common.status')}
                         </Label>
                         <Badge variant={cronJobStatus.variant}>
                           {cronJobStatus.label}
@@ -417,7 +436,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Schedule
+                          {t('cronjob.schedule', 'Schedule')}
                         </Label>
                         <p className="text-sm font-medium">
                           {cronjob.spec?.schedule || '-'}
@@ -425,7 +444,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Active Jobs
+                          {t('cronjob.activeJobs', 'Active Jobs')}
                         </Label>
                         <p className="text-sm font-medium">
                           {cronjob.status?.active?.length || 0}
@@ -433,7 +452,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Last Schedule
+                          {t('cronjob.lastSchedule', 'Last Schedule')}
                         </Label>
                         <p className="text-sm font-medium">
                           {cronjob.status?.lastScheduleTime
@@ -447,13 +466,15 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>CronJob Information</CardTitle>
+                    <CardTitle>
+                      {t('cronjob.informationTitle', 'CronJob Information')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Created
+                          {t('detail.fields.created')}
                         </Label>
                         <p className="text-sm">
                           {formatDate(
@@ -464,7 +485,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Concurrency Policy
+                          {t('cronjob.concurrencyPolicy', 'Concurrency Policy')}
                         </Label>
                         <p className="text-sm">
                           {cronjob.spec?.concurrencyPolicy || 'Allow'}
@@ -472,17 +493,20 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Starting Deadline
+                          {t('cronjob.startingDeadline', 'Starting Deadline')}
                         </Label>
                         <p className="text-sm">
                           {cronjob.spec?.startingDeadlineSeconds
                             ? `${cronjob.spec.startingDeadlineSeconds} seconds`
-                            : 'Not set'}
+                            : t('cronjob.notSet', 'Not set')}
                         </p>
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Successful Jobs History
+                          {t(
+                            'cronjob.successfulJobsHistory',
+                            'Successful Jobs History'
+                          )}
                         </Label>
                         <p className="text-sm">
                           {cronjob.spec?.successfulJobsHistoryLimit ?? 3}
@@ -490,7 +514,10 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Failed Jobs History
+                          {t(
+                            'cronjob.failedJobsHistory',
+                            'Failed Jobs History'
+                          )}
                         </Label>
                         <p className="text-sm">
                           {cronjob.spec?.failedJobsHistoryLimit ?? 1}
@@ -498,10 +525,11 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                          Time Zone
+                          {t('cronjob.timeZone', 'Time Zone')}
                         </Label>
                         <p className="text-sm">
-                          {cronjob.spec?.timeZone || 'Cluster default'}
+                          {cronjob.spec?.timeZone ||
+                            t('cronjob.clusterDefault', 'Cluster default')}
                         </p>
                       </div>
                     </div>
@@ -514,13 +542,18 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Active Jobs</CardTitle>
+                    <CardTitle>
+                      {t('cronjob.activeJobs', 'Active Jobs')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {isLoadingJobs ? (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <IconLoader className="w-4 h-4 animate-spin" />
-                        Loading active jobs...
+                        {t(
+                          'cronjob.loadingActiveJobs',
+                          'Loading active jobs...'
+                        )}
                       </div>
                     ) : activeJobs.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
@@ -537,7 +570,10 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        No active jobs currently running.
+                        {t(
+                          'cronjob.noActiveJobs',
+                          'No active jobs currently running.'
+                        )}
                       </p>
                     )}
                   </CardContent>
@@ -547,7 +583,8 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                   <Card>
                     <CardHeader>
                       <CardTitle>
-                        Init Containers ({initContainers.length})
+                        {t('detail.sections.initContainers')} (
+                        {initContainers.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -566,7 +603,9 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Containers ({containers.length})</CardTitle>
+                    <CardTitle>
+                      {t('detail.sections.containers')} ({containers.length})
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
@@ -584,12 +623,12 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'yaml',
-            label: 'YAML',
+            label: t('common.yaml'),
             content: (
               <YamlEditor<'cronjobs'>
                 key={refreshKey}
                 value={yamlContent}
-                title="YAML Configuration"
+                title={t('common.yaml')}
                 onSave={handleSaveYaml}
                 onChange={handleYamlChange}
                 isSaving={isSavingYaml}
@@ -600,7 +639,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
             value: 'jobs',
             label: (
               <>
-                Jobs{' '}
+                {t('nav.jobs')}{' '}
                 {cronJobJobs && (
                   <Badge variant="secondary">{cronJobJobs.length}</Badge>
                 )}
@@ -612,7 +651,10 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
                   <SimpleTable<Job>
                     data={sortedJobs}
                     columns={jobColumns}
-                    emptyMessage="No jobs found for this CronJob"
+                    emptyMessage={t(
+                      'cronjob.noJobsFound',
+                      'No jobs found for this CronJob'
+                    )}
                     pagination={{
                       enabled: true,
                       pageSize: 20,
@@ -625,7 +667,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'cronjobs'}
@@ -636,7 +678,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'events',
-            label: 'Events',
+            label: t('nav.events'),
             content: (
               <EventTable
                 resource="cronjobs"
@@ -647,7 +689,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable
                 resourceType="cronjobs"
@@ -661,7 +703,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
             ? [
                 {
                   value: 'volumes',
-                  label: 'Volumes',
+                  label: t('cronjob.volumes', 'Volumes'),
                   content: (
                     <VolumeTable
                       namespace={namespace}

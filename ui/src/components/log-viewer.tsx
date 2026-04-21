@@ -463,11 +463,13 @@ export function LogViewer({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">Logs</CardTitle>
+            <CardTitle className="text-lg">{t('pods.logs')}</CardTitle>
             <CardDescription>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>
-                  {logCount} lines {filterTerm.length > 0 && `(filtered)`}
+                  {logCount} {t('log.lines', 'lines')}{' '}
+                  {filterTerm.length > 0 &&
+                    `(${t('log.filtered', 'filtered')})`}
                 </span>
                 <ConnectionIndicator
                   isConnected={isConnected}
@@ -477,9 +479,11 @@ export function LogViewer({
                   downloadSpeed={downloadSpeed}
                   uploadSpeed={0}
                 />
-                {isLoading && <span>Loading...</span>}
+                {isLoading && <span>{t('common.loading')}</span>}
                 {isReconnecting && (
-                  <span className="text-blue-600">Reconnecting...</span>
+                  <span className="text-blue-600">
+                    {t('log.reconnecting', 'Reconnecting...')}
+                  </span>
                 )}
               </div>
             </CardDescription>
@@ -488,7 +492,7 @@ export function LogViewer({
             <div className="relative">
               <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={'Filter logs...'}
+                placeholder={t('log.filter', 'Filter logs...')}
                 value={filterTerm}
                 onChange={(e) => setFilterTerm(e.target.value)}
                 className="pl-8 w-full pr-8"
@@ -547,7 +551,9 @@ export function LogViewer({
               <PopoverContent className="w-80" align="end">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="tail-lines">Tail Lines</Label>
+                    <Label htmlFor="tail-lines">
+                      {t('log.tailLines', 'Tail Lines')}
+                    </Label>
                     <Select
                       value={tailLines.toString()}
                       onValueChange={(value) =>
@@ -563,13 +569,17 @@ export function LogViewer({
                         <SelectItem value="200">200</SelectItem>
                         <SelectItem value="500">500</SelectItem>
                         <SelectItem value="1000">1000</SelectItem>
-                        <SelectItem value="-1">All</SelectItem>
+                        <SelectItem value="-1">
+                          {t('common.all', 'All')}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="timestamps">Show Timestamps</Label>
+                    <Label htmlFor="timestamps">
+                      {t('log.showTimestamps', 'Show Timestamps')}
+                    </Label>
                     <Switch
                       id="timestamps"
                       checked={timestamps}
@@ -578,7 +588,9 @@ export function LogViewer({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="previous">Previous Container</Label>
+                    <Label htmlFor="previous">
+                      {t('log.previousContainer', 'Previous Container')}
+                    </Label>
                     <Switch
                       id="previous"
                       checked={previous}
@@ -587,7 +599,9 @@ export function LogViewer({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="word-wrap">Word Wrap</Label>
+                    <Label htmlFor="word-wrap">
+                      {t('log.wordWrap', 'Word Wrap')}
+                    </Label>
                     <Switch
                       id="word-wrap"
                       checked={wordWrap}
@@ -596,7 +610,9 @@ export function LogViewer({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="show-line-numbers">Show Line Numbers</Label>
+                    <Label htmlFor="show-line-numbers">
+                      {t('log.showLineNumbers', 'Show Line Numbers')}
+                    </Label>
                     <Switch
                       id="show-line-numbers"
                       checked={showLineNumbers}
@@ -607,7 +623,9 @@ export function LogViewer({
                   {/* Log Theme Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="log-theme">Log Theme</Label>
+                      <Label htmlFor="log-theme">
+                        {t('log.theme', 'Log Theme')}
+                      </Label>
                       <Select
                         value={logTheme}
                         onValueChange={handleThemeChange}
@@ -633,7 +651,9 @@ export function LogViewer({
                   {/* Font Size Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="font-size">Font Size</Label>
+                      <Label htmlFor="font-size">
+                        {t('log.fontSize', 'Font Size')}
+                      </Label>
                       <Select
                         value={fontSize.toString()}
                         onValueChange={(value) =>
@@ -663,41 +683,62 @@ export function LogViewer({
                   {/* Keyboard Shortcuts */}
                   <div className="space-y-2 pt-2 border-t">
                     <Label className="text-xs font-medium text-muted-foreground">
-                      Keyboard Shortcuts
+                      {t('log.shortcuts', 'Keyboard Shortcuts')}
                     </Label>
                     <div className="space-y-1 text-xs text-muted-foreground">
                       <div className="flex justify-between">
-                        <span>Open Search</span>
+                        <span>
+                          {t('log.shortcut.openSearch', 'Open Search')}
+                        </span>
                         <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
                           Ctrl+F
                         </kbd>
                       </div>
                       <div className="flex justify-between">
-                        <span>Toggle Fullscreen</span>
+                        <span>
+                          {t(
+                            'log.shortcut.toggleFullscreen',
+                            'Toggle Fullscreen'
+                          )}
+                        </span>
                         <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
                           Ctrl+Enter
                         </kbd>
                       </div>
                       <div className="flex justify-between">
-                        <span>Toggle Word Wrap</span>
+                        <span>
+                          {t('log.shortcut.toggleWordWrap', 'Toggle Word Wrap')}
+                        </span>
                         <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
                           Alt+Z
                         </kbd>
                       </div>
                       <div className="flex justify-between">
-                        <span>Increase Font Size</span>
+                        <span>
+                          {t(
+                            'log.shortcut.increaseFontSize',
+                            'Increase Font Size'
+                          )}
+                        </span>
                         <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
                           Ctrl++
                         </kbd>
                       </div>
                       <div className="flex justify-between">
-                        <span>Decrease Font Size</span>
+                        <span>
+                          {t(
+                            'log.shortcut.decreaseFontSize',
+                            'Decrease Font Size'
+                          )}
+                        </span>
                         <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
                           Ctrl+-
                         </kbd>
                       </div>
                       <div className="flex justify-between">
-                        <span>Reset Font Size</span>
+                        <span>
+                          {t('log.shortcut.resetFontSize', 'Reset Font Size')}
+                        </span>
                         <kbd className="px-1 py-0.5 bg-muted rounded text-xs">
                           Ctrl+0
                         </kbd>
@@ -713,7 +754,7 @@ export function LogViewer({
               variant="outline"
               size="sm"
               onClick={clearLogs}
-              title="Clear logs"
+              title={t('log.clear', 'Clear logs')}
             >
               <IconClearAll className="h-4 w-4" />
             </Button>
@@ -807,7 +848,9 @@ export function LogViewer({
           }}
           loading={
             <div className="flex items-center justify-center h-full">
-              <div className="text-center opacity-60">Loading editor...</div>
+              <div className="text-center opacity-60">
+                {t('log.loadingEditor', 'Loading editor...')}
+              </div>
             </div>
           }
         />

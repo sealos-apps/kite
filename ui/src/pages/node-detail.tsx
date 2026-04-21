@@ -181,13 +181,13 @@ export function NodeDetail(props: { name: string }) {
   const handleUntaint = async (key?: string) => {
     const taintKey = key || untaintKey
     if (!taintKey.trim()) {
-      toast.error('Taint key is required')
+      toast.error(t('detail.status.taintKeyRequired'))
       return
     }
 
     try {
       await untaintNode(name, taintKey)
-      toast.success(`Taint removed from node ${name} successfully`)
+      toast.success(t('detail.status.taintRemoved', { resource: name }))
       if (!key) setUntaintKey('')
       handleRefresh()
     } catch (error) {
@@ -213,7 +213,9 @@ export function NodeDetail(props: { name: string }) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-2">
               <IconLoader className="animate-spin" />
-              <span>Loading node details...</span>
+              <span>
+                {t('detail.status.loading', { resource: t('nav.nodes') })}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -223,7 +225,11 @@ export function NodeDetail(props: { name: string }) {
 
   if (isError || !data) {
     return (
-      <ErrorMessage resourceName="Node" error={error} refetch={handleRefresh} />
+      <ErrorMessage
+        resourceName={t('nav.nodes')}
+        error={error}
+        refetch={handleRefresh}
+      />
     )
   }
 
@@ -242,7 +248,7 @@ export function NodeDetail(props: { name: string }) {
             onClick={handleManualRefresh}
           >
             <IconRefresh className="w-4 h-4" />
-            Refresh
+            {t('detail.buttons.refresh')}
           </Button>
           <DescribeDialog resourceType="nodes" name={name} />
           {/* Drain Node Popover */}
@@ -253,15 +259,17 @@ export function NodeDetail(props: { name: string }) {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconDroplet className="w-4 h-4" />
-                Drain
+                {t('detail.buttons.drain')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80">
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium">Drain Node</h4>
+                  <h4 className="font-medium">
+                    {t('detail.dialogs.drainNode.title')}
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Safely evict all pods from this node.
+                    {t('detail.dialogs.drainNode.description')}
                   </p>
                 </div>
                 <div className="space-y-3">
@@ -278,7 +286,7 @@ export function NodeDetail(props: { name: string }) {
                       }
                     />
                     <Label htmlFor="force" className="text-sm">
-                      Force drain
+                      {t('detail.dialogs.drainNode.forceDrain')}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -294,7 +302,7 @@ export function NodeDetail(props: { name: string }) {
                       }
                     />
                     <Label htmlFor="deleteLocalData" className="text-sm">
-                      Delete local data
+                      {t('detail.dialogs.drainNode.deleteLocalData')}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -310,12 +318,12 @@ export function NodeDetail(props: { name: string }) {
                       }
                     />
                     <Label htmlFor="ignoreDaemonsets" className="text-sm">
-                      Ignore DaemonSets
+                      {t('detail.dialogs.drainNode.ignoreDaemonSets')}
                     </Label>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="gracePeriod" className="text-sm">
-                      Grace Period (seconds)
+                      {t('detail.dialogs.drainNode.gracePeriod')}
                     </Label>
                     <Input
                       id="gracePeriod"
@@ -333,14 +341,14 @@ export function NodeDetail(props: { name: string }) {
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleDrain} size="sm" variant="destructive">
-                    Drain Node
+                    {t('detail.dialogs.drainNode.drainButton')}
                   </Button>
                   <Button
                     onClick={() => setIsDrainPopoverOpen(false)}
                     size="sm"
                     variant="outline"
                   >
-                    Cancel
+                    {t('detail.buttons.cancel')}
                   </Button>
                 </div>
               </div>
@@ -361,15 +369,17 @@ export function NodeDetail(props: { name: string }) {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm">
                   <IconBan className="w-4 h-4" />
-                  Cordon
+                  {t('detail.buttons.cordon')}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64">
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium">Cordon Node</h4>
+                    <h4 className="font-medium">
+                      {t('detail.dialogs.cordonNode.title')}
+                    </h4>
                     <p className="text-sm text-muted-foreground">
-                      Mark this node as unschedulable.
+                      {t('detail.dialogs.cordonNode.description')}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -378,14 +388,14 @@ export function NodeDetail(props: { name: string }) {
                       size="sm"
                       variant="destructive"
                     >
-                      Cordon Node
+                      {t('detail.dialogs.cordonNode.cordonButton')}
                     </Button>
                     <Button
                       onClick={() => setIsCordonPopoverOpen(false)}
                       size="sm"
                       variant="outline"
                     >
-                      Cancel
+                      {t('detail.buttons.cancel')}
                     </Button>
                   </div>
                 </div>
@@ -401,21 +411,23 @@ export function NodeDetail(props: { name: string }) {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconLock className="w-4 h-4" />
-                Taint
+                {t('detail.buttons.taint')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80">
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium">Taint Node</h4>
+                  <h4 className="font-medium">
+                    {t('detail.dialogs.taintNode.title')}
+                  </h4>
                   <p className="text-sm text-muted-foreground">
-                    Add a taint to prevent pods from being scheduled.
+                    {t('detail.dialogs.taintNode.description')}
                   </p>
                 </div>
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="taintKey" className="text-sm">
-                      Key *
+                      {t('detail.dialogs.taintNode.key')}
                     </Label>
                     <Input
                       id="taintKey"
@@ -423,12 +435,12 @@ export function NodeDetail(props: { name: string }) {
                       onChange={(e) =>
                         setTaintData({ ...taintData, key: e.target.value })
                       }
-                      placeholder="e.g., node.kubernetes.io/maintenance"
+                      placeholder={t('detail.dialogs.taintNode.keyPlaceholder')}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="taintValue" className="text-sm">
-                      Value
+                      {t('detail.dialogs.taintNode.value')}
                     </Label>
                     <Input
                       id="taintValue"
@@ -436,12 +448,14 @@ export function NodeDetail(props: { name: string }) {
                       onChange={(e) =>
                         setTaintData({ ...taintData, value: e.target.value })
                       }
-                      placeholder="Optional value"
+                      placeholder={t(
+                        'detail.dialogs.taintNode.valuePlaceholder'
+                      )}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="taintEffect" className="text-sm">
-                      Effect
+                      {t('detail.dialogs.taintNode.effect')}
                     </Label>
                     <Select
                       value={taintData.effect}
@@ -464,14 +478,14 @@ export function NodeDetail(props: { name: string }) {
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleTaint} size="sm" variant="destructive">
-                    Add Taint
+                    {t('detail.dialogs.taintNode.addTaintButton')}
                   </Button>
                   <Button
                     onClick={() => setIsTaintPopoverOpen(false)}
                     size="sm"
                     variant="outline"
                   >
-                    Cancel
+                    {t('detail.buttons.cancel')}
                   </Button>
                 </div>
               </div>
@@ -484,13 +498,13 @@ export function NodeDetail(props: { name: string }) {
         tabs={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: t('nav.overview'),
             content: (
               <div className="space-y-6">
                 {/* Status Overview */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Status Overview</CardTitle>
+                    <CardTitle>{t('detail.sections.statusOverview')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -506,23 +520,25 @@ export function NodeDetail(props: { name: string }) {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">
-                            Status
+                            {t('common.status')}
                           </p>
                           <p className="text-sm font-medium">
                             {data.status?.conditions?.find(
                               (c) => c.type === 'Ready' && c.status === 'True'
                             )
-                              ? 'Ready'
-                              : 'Not Ready'}
+                              ? t('detail.fields.ready')
+                              : t('detail.fields.notReady')}
                             {data.spec?.unschedulable
-                              ? ' (SchedulingDisabled)'
+                              ? ` ${t('detail.fields.schedulingDisabled')}`
                               : ''}
                           </p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-xs text-muted-foreground">Role</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t('detail.fields.role')}
+                        </p>
                         <p className="text-sm">
                           {Object.keys(data.metadata?.labels || {})
                             .find((key) =>
@@ -558,13 +574,15 @@ export function NodeDetail(props: { name: string }) {
                 {/* Node Information */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Node Information</CardTitle>
+                    <CardTitle>
+                      {t('detail.sections.nodeInformation')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Created
+                          {t('detail.fields.created')}
                         </Label>
                         <p className="text-sm">
                           {formatDate(
@@ -575,7 +593,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Kubelet Version
+                          {t('detail.fields.kubeletVersion')}
                         </Label>
                         <p className="text-sm">
                           {data.status?.nodeInfo?.kubeletVersion || 'N/A'}
@@ -583,7 +601,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Hostname
+                          {t('detail.fields.hostname')}
                         </Label>
                         <p className="text-sm font-mono">
                           {data.status?.addresses?.find(
@@ -593,7 +611,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          External IP
+                          {t('detail.fields.externalIP')}
                         </Label>
                         <p className="text-sm font-mono">
                           {data.status?.addresses?.find(
@@ -603,7 +621,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          OS Image
+                          {t('detail.fields.osImage')}
                         </Label>
                         <p className="text-sm">
                           {data.status?.nodeInfo?.osImage || 'N/A'}
@@ -611,7 +629,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Kernel Version
+                          {t('detail.fields.kernelVersion')}
                         </Label>
                         <p className="text-sm">
                           {data.status?.nodeInfo?.kernelVersion || 'N/A'}
@@ -619,7 +637,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Architecture
+                          {t('detail.fields.architecture')}
                         </Label>
                         <p className="text-sm">
                           {data.status?.nodeInfo?.architecture || 'N/A'}
@@ -627,7 +645,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Container Runtime
+                          {t('detail.fields.containerRuntime')}
                         </Label>
                         <p className="text-sm">
                           {data.status?.nodeInfo?.containerRuntimeVersion ||
@@ -636,7 +654,7 @@ export function NodeDetail(props: { name: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">
-                          Kube Proxy Version
+                          {t('detail.fields.kubeProxyVersion')}
                         </Label>
                         <p className="text-sm">
                           {data.status?.nodeInfo?.kubeProxyVersion || 'N/A'}
@@ -653,7 +671,9 @@ export function NodeDetail(props: { name: string }) {
                 {/* Resource Capacity & Allocation */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Resource Capacity</CardTitle>
+                    <CardTitle>
+                      {t('detail.sections.resourceCapacity')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -664,7 +684,9 @@ export function NodeDetail(props: { name: string }) {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center p-3 border rounded-lg">
                             <div>
-                              <p className="text-sm font-medium">CPU</p>
+                              <p className="text-sm font-medium">
+                                {t('detail.fields.cpu')}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 Capacity:{' '}
                                 {data.status?.capacity?.cpu
@@ -679,13 +701,15 @@ export function NodeDetail(props: { name: string }) {
                                   : 'N/A'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Allocatable
+                                {t('detail.fields.allocatable')}
                               </p>
                             </div>
                           </div>
                           <div className="flex justify-between items-center p-3 border rounded-lg">
                             <div>
-                              <p className="text-sm font-medium">Memory</p>
+                              <p className="text-sm font-medium">
+                                {t('detail.fields.memory')}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 Capacity:{' '}
                                 {data.status?.capacity?.memory
@@ -700,7 +724,7 @@ export function NodeDetail(props: { name: string }) {
                                   : 'N/A'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Allocatable
+                                {t('detail.fields.allocatable')}
                               </p>
                             </div>
                           </div>
@@ -714,7 +738,9 @@ export function NodeDetail(props: { name: string }) {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center p-3 border rounded-lg">
                             <div>
-                              <p className="text-sm font-medium">Pods</p>
+                              <p className="text-sm font-medium">
+                                {t('detail.fields.pods')}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 Capacity: {data.status?.capacity?.pods || 'N/A'}
                               </p>
@@ -724,13 +750,15 @@ export function NodeDetail(props: { name: string }) {
                                 {data.status?.allocatable?.pods || 'N/A'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Allocatable
+                                {t('detail.fields.allocatable')}
                               </p>
                             </div>
                           </div>
                           <div className="flex justify-between items-center p-3 border rounded-lg">
                             <div>
-                              <p className="text-sm font-medium">Storage</p>
+                              <p className="text-sm font-medium">
+                                {t('detail.fields.storage')}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 Capacity:{' '}
                                 {data.status?.capacity?.['ephemeral-storage']
@@ -751,7 +779,7 @@ export function NodeDetail(props: { name: string }) {
                                   : 'N/A'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Allocatable
+                                {t('detail.fields.allocatable')}
                               </p>
                             </div>
                           </div>
@@ -765,7 +793,7 @@ export function NodeDetail(props: { name: string }) {
                 {data.spec?.taints && data.spec.taints.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Node Taints</CardTitle>
+                      <CardTitle>{t('detail.sections.nodeTaints')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 gap-2">
@@ -793,7 +821,7 @@ export function NodeDetail(props: { name: string }) {
                               size="sm"
                               onClick={() => handleUntaint(taint.key)}
                             >
-                              Remove
+                              {t('detail.buttons.remove')}
                             </Button>
                           </div>
                         ))}
@@ -807,7 +835,9 @@ export function NodeDetail(props: { name: string }) {
                   data.status.conditions.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle>Node Conditions</CardTitle>
+                        <CardTitle>
+                          {t('detail.sections.nodeConditions')}
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -843,7 +873,7 @@ export function NodeDetail(props: { name: string }) {
                                 <p className="text-xs text-muted-foreground truncate">
                                   {condition.message ||
                                     condition.reason ||
-                                    'No message'}
+                                    t('detail.fields.message')}
                                 </p>
                               </div>
                               <Badge variant="outline" className="text-xs">
@@ -860,13 +890,13 @@ export function NodeDetail(props: { name: string }) {
           },
           {
             value: 'yaml',
-            label: 'YAML',
+            label: t('common.yaml'),
             content: (
               <div className="space-y-4">
                 <YamlEditor<'nodes'>
                   key={refreshKey}
                   value={yamlContent}
-                  title="YAML Configuration"
+                  title={t('common.yaml')}
                   onSave={handleSaveYaml}
                   onChange={handleYamlChange}
                   isSaving={isSavingYaml}
@@ -880,7 +910,7 @@ export function NodeDetail(props: { name: string }) {
                   value: 'pods',
                   label: (
                     <>
-                      Pods{' '}
+                      {t('nav.pods')}{' '}
                       {relatedPods && (
                         <Badge variant="secondary">{relatedPods.length}</Badge>
                       )}
@@ -898,12 +928,12 @@ export function NodeDetail(props: { name: string }) {
             : []),
           {
             value: 'monitor',
-            label: 'Monitor',
+            label: t('monitoring.title', 'Monitor'),
             content: <NodeMonitoring name={name} />,
           },
           {
             value: 'Terminal',
-            label: 'Terminal',
+            label: t('pods.terminal'),
             content: (
               <div className="space-y-6">
                 <Terminal type="node" nodeName={name} />
@@ -912,7 +942,7 @@ export function NodeDetail(props: { name: string }) {
           },
           {
             value: 'events',
-            label: 'Events',
+            label: t('nav.events'),
             content: (
               <EventTable
                 resource={'nodes'}

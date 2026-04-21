@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { IconExternalLink, IconLoader } from '@tabler/icons-react'
+import { useTranslation } from 'react-i18next'
 
 import { RelatedResources, ResourceType } from '@/types/api'
 import { useRelatedResources } from '@/lib/api'
@@ -23,6 +24,7 @@ export function RelatedResourcesTable(props: {
   name: string
   namespace?: string
 }) {
+  const { t } = useTranslation()
   const { resource, name, namespace } = props
 
   const { data: relatedResources, isLoading } = useRelatedResources(
@@ -34,7 +36,7 @@ export function RelatedResourcesTable(props: {
   const relatedColumns = useMemo(
     (): Column<RelatedResources>[] => [
       {
-        header: 'Kind',
+        header: t('related.kind'),
         accessor: (rs: RelatedResources) => rs.type,
         align: 'left',
         cell: (value: unknown) => (
@@ -42,7 +44,7 @@ export function RelatedResourcesTable(props: {
         ),
       },
       {
-        header: 'Name',
+        header: t('common.name'),
         accessor: (rs: RelatedResources) => rs,
         cell: (value: unknown) => {
           const rs = value as RelatedResources
@@ -50,27 +52,27 @@ export function RelatedResourcesTable(props: {
         },
       },
     ],
-    []
+    [t]
   )
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <IconLoader className="animate-spin mr-2" />
-        Loading related...
+        {t('common.loading')}
       </div>
     )
   }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Related</CardTitle>
+        <CardTitle>{t('related.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <SimpleTable
           data={relatedResources || []}
           columns={relatedColumns}
-          emptyMessage="No related found"
+          emptyMessage={t('related.empty')}
         />
       </CardContent>
     </Card>

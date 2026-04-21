@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Secret } from 'kubernetes-types/core/v1'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { formatDate } from '@/lib/utils'
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ResourceTable } from '@/components/resource-table'
 
 export function SecretListPage() {
+  const { t } = useTranslation()
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<Secret>()
 
@@ -15,7 +17,7 @@ export function SecretListPage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor('metadata.name', {
-        header: 'Name',
+        header: t('common.name'),
         cell: ({ row }) => (
           <div className="font-medium text-blue-500 hover:underline">
             <Link
@@ -29,14 +31,14 @@ export function SecretListPage() {
         ),
       }),
       columnHelper.accessor('type', {
-        header: 'Type',
+        header: t('common.type'),
         cell: ({ getValue }) => {
           const type = getValue() || 'Opaque'
           return <Badge variant="outline">{type}</Badge>
         },
       }),
       columnHelper.accessor('data', {
-        header: 'Data Keys',
+        header: t('common.dataKeys'),
         cell: ({ getValue }) => {
           const data = getValue() || {}
           const keys = Object.keys(data)
@@ -54,7 +56,7 @@ export function SecretListPage() {
         },
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
-        header: 'Created',
+        header: t('common.created'),
         cell: ({ getValue }) => {
           const dateStr = formatDate(getValue() || '')
 
@@ -64,7 +66,7 @@ export function SecretListPage() {
         },
       }),
     ],
-    [columnHelper]
+    [columnHelper, t]
   )
 
   // Custom filter for secret search
@@ -82,7 +84,8 @@ export function SecretListPage() {
 
   return (
     <ResourceTable
-      resourceName="Secrets"
+      resourceName={t('nav.secrets')}
+      resourceType="secrets"
       columns={columns}
       clusterScope={false} // Secrets are namespace-scoped
       searchQueryFilter={secretSearchFilter}

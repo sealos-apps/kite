@@ -1,19 +1,22 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { ResourceType } from '@/types/api'
 import { HTTPRoute } from '@/types/gateway'
 import { formatDate } from '@/lib/utils'
 import { ResourceTable } from '@/components/resource-table'
 
 export function HTTPRouteListPage() {
+  const { t } = useTranslation()
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<HTTPRoute>()
 
   const columns = useMemo(
     () => [
       columnHelper.accessor('metadata.name', {
-        header: 'Name',
+        header: t('common.name'),
         cell: ({ row }) => (
           <div className="font-medium text-blue-500 hover:underline">
             <Link
@@ -25,11 +28,11 @@ export function HTTPRouteListPage() {
         ),
       }),
       columnHelper.accessor('spec.hostnames', {
-        header: 'Hostnames',
-        cell: ({ row }) => row.original.spec?.hostnames?.join(', ') || 'N/A',
+        header: t('httproute.hostnames'),
+        cell: ({ row }) => row.original.spec?.hostnames?.join(', ') || '-',
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
-        header: 'Created',
+        header: t('common.created'),
         cell: ({ getValue }) => {
           const dateStr = formatDate(getValue() || '')
 
@@ -39,7 +42,7 @@ export function HTTPRouteListPage() {
         },
       }),
     ],
-    [columnHelper]
+    [columnHelper, t]
   )
 
   const filter = useCallback((ns: HTTPRoute, query: string) => {
@@ -48,7 +51,8 @@ export function HTTPRouteListPage() {
 
   return (
     <ResourceTable
-      resourceName="HTTPRoutes"
+      resourceName={t('nav.httproutes')}
+      resourceType={'httproutes' as ResourceType}
       columns={columns}
       searchQueryFilter={filter}
     />

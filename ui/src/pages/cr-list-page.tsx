@@ -5,6 +5,7 @@ import * as yaml from 'js-yaml'
 import { CustomResourceDefinition } from 'kubernetes-types/apiextensions/v1'
 import { get } from 'lodash'
 import { Eye } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -23,6 +24,7 @@ import { ResourceTable } from '@/components/resource-table'
 import { YamlEditor } from '@/components/yaml-editor'
 
 export function CRListPage() {
+  const { t } = useTranslation()
   const [isYamlDialogOpen, setIsYamlDialogOpen] = useState(false)
   const [yamlContent, setYamlContent] = useState('')
   const { crd } = useParams<{ crd: string }>()
@@ -60,14 +62,14 @@ export function CRListPage() {
         }}
       >
         <Eye className="h-4 w-4 mr-1" />
-        View YAML
+        {t('common.yaml')}
       </Button>,
     ]
-  }, [crdData, handleViewYaml])
+  }, [crdData, handleViewYaml, t])
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor('metadata.name', {
-        header: 'Name',
+        header: t('common.name'),
         cell: ({ row }) => {
           const resource = row.original
           const namespace = resource.metadata?.namespace
@@ -114,7 +116,7 @@ export function CRListPage() {
         }
       )
     return [...baseColumns, ...(additionalColumns ?? [])]
-  }, [columnHelper, crd, crdData?.spec.versions])
+  }, [columnHelper, crd, crdData?.spec.versions, t])
 
   const searchQueryFilter = useCallback((cr: CustomResource, query: string) => {
     const searchFields = [
@@ -136,7 +138,7 @@ export function CRListPage() {
   }
 
   if (isLoadingCRD) {
-    return <div>Loading...</div>
+    return <div>{t('common.loading')}</div>
   }
 
   if (!crdData) {

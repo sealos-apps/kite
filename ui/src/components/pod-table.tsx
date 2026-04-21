@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { IconLoader } from '@tabler/icons-react'
 import { Pod } from 'kubernetes-types/core/v1'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { MetricsData, PodWithMetrics } from '@/types/api'
@@ -19,13 +20,14 @@ export function PodTable(props: {
   isLoading?: boolean
   hiddenNode?: boolean
 }) {
+  const { t } = useTranslation()
   const { pods, isLoading } = props
 
   // Pod table columns
   const podColumns = useMemo(
     (): Column<PodWithMetrics>[] => [
       {
-        header: 'Name',
+        header: t('common.name'),
         accessor: (pod: Pod) => pod.metadata,
         cell: (value: unknown) => {
           const meta = value as Pod['metadata']
@@ -40,7 +42,7 @@ export function PodTable(props: {
         align: 'left' as const,
       },
       {
-        header: 'Ready',
+        header: t('pods.ready'),
         accessor: (pod: Pod) => {
           const status = getPodStatus(pod)
           return `${status.readyContainers} / ${status.totalContainers}`
@@ -48,7 +50,7 @@ export function PodTable(props: {
         cell: (value: unknown) => value as string,
       },
       {
-        header: 'Restart',
+        header: t('pods.restarts'),
         accessor: (pod: Pod) => {
           const status = getPodStatus(pod)
           return status.restartString || '0'
@@ -62,7 +64,7 @@ export function PodTable(props: {
         },
       },
       {
-        header: 'Status',
+        header: t('common.status'),
         accessor: (pod: Pod) => pod,
         cell: (value: unknown) => {
           const status = getPodStatus(value as Pod)
@@ -75,7 +77,7 @@ export function PodTable(props: {
         },
       },
       {
-        header: 'CPU',
+        header: t('monitoring.cpu'),
         accessor: (pod: PodWithMetrics) => {
           return pod.metrics
         },
@@ -84,7 +86,7 @@ export function PodTable(props: {
         },
       },
       {
-        header: 'Memory',
+        header: t('monitoring.memory'),
         accessor: (pod: PodWithMetrics) => {
           return pod.metrics
         },
@@ -93,7 +95,7 @@ export function PodTable(props: {
         },
       },
       {
-        header: 'IP',
+        header: t('common.ip'),
         accessor: (pod: Pod) => pod.status?.podIP || '-',
         cell: (value: unknown) => (
           <span className="text-sm text-muted-foreground font-mono">
@@ -105,7 +107,7 @@ export function PodTable(props: {
         ? []
         : [
             {
-              header: 'Node',
+              header: t('pods.node'),
               accessor: (pod: Pod) => pod.spec?.nodeName || '-',
               cell: (value: unknown) => (
                 <Link
@@ -118,7 +120,7 @@ export function PodTable(props: {
             },
           ]),
       {
-        header: 'Created',
+        header: t('common.created'),
         accessor: (pod: Pod) => pod.metadata?.creationTimestamp || '',
         cell: (value: unknown) => {
           return (
@@ -129,27 +131,27 @@ export function PodTable(props: {
         },
       },
     ],
-    [props.hiddenNode]
+    [props.hiddenNode, t]
   )
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <IconLoader className="animate-spin mr-2" />
-        Loading pods...
+        {t('common.loading')}
       </div>
     )
   }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pods</CardTitle>
+        <CardTitle>{t('nav.pods')}</CardTitle>
       </CardHeader>
       <CardContent>
         <SimpleTable
           data={pods || []}
           columns={podColumns}
-          emptyMessage="No pods found"
+          emptyMessage={t('pods.noPodsFound')}
           pagination={{
             enabled: true,
             pageSize: 20,

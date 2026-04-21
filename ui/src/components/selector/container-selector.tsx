@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { SimpleContainer } from '@/types/k8s'
 import { cn } from '@/lib/utils'
@@ -34,8 +35,13 @@ export function ContainerSelector({
   placeholder = 'Select container...',
 }: ContainerSelectorProps) {
   const [open, setOpen] = useState(false)
+  const { t } = useTranslation()
 
-  const allOption = { name: 'All Containers', image: '', init: false }
+  const allOption = {
+    name: t('pods.allContainers', 'All Containers'),
+    image: '',
+    init: false,
+  }
   const options = showAllOption ? [allOption, ...containers] : containers
 
   const selectedOption = selectedContainer
@@ -57,9 +63,13 @@ export function ContainerSelector({
       </PopoverTrigger>
       <PopoverContent className="max-w-[300px] p-0">
         <Command>
-          <CommandInput placeholder="Search containers..." />
+          <CommandInput
+            placeholder={t('pods.searchContainers', 'Search containers...')}
+          />
           <CommandList>
-            <CommandEmpty>No containers found.</CommandEmpty>
+            <CommandEmpty>
+              {t('pods.noContainersFound', 'No containers found.')}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((container) => (
                 <CommandItem
@@ -87,7 +97,7 @@ export function ContainerSelector({
                       {container.name}
                       {container.init && (
                         <span className="text-xs text-muted-foreground ml-1">
-                          (init)
+                          ({t('pods.initContainer', 'init')})
                         </span>
                       )}
                     </span>

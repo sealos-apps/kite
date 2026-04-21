@@ -107,7 +107,8 @@ export function ServiceListPage() {
 
   return (
     <ResourceTable
-      resourceName="Services"
+      resourceName={t('nav.services')}
+      resourceType="services"
       columns={columns}
       clusterScope={false} // Services are namespace-scoped
       searchQueryFilter={serviceSearchFilter}

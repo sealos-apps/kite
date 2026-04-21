@@ -109,7 +109,7 @@ function getNodeIP(node: NodeWithMetrics): string {
     return hostname.address
   }
 
-  return 'N/A'
+  return '-'
 }
 
 export function NodeListPage() {
@@ -146,7 +146,7 @@ export function NodeListPage() {
       }),
       columnHelper.accessor((row) => getNodeRoles(row), {
         id: 'roles',
-        header: 'Roles',
+        header: t('nodes.roles'),
         cell: ({ getValue }) => {
           const roles = getValue()
           return (
@@ -166,7 +166,7 @@ export function NodeListPage() {
       }),
       columnHelper.accessor((row) => row.metrics, {
         id: 'pods',
-        header: 'Pods',
+        header: t('details.fields.pods'),
         cell: ({ row }) => (
           <Link
             to={`/nodes/${row.original.metadata!.name}?tab=pods`}
@@ -179,7 +179,7 @@ export function NodeListPage() {
       }),
       columnHelper.accessor((row) => row.metrics?.cpuUsage || 0, {
         id: 'cpu',
-        header: 'CPU',
+        header: t('monitoring.cpu'),
         cell: ({ row }) => (
           <MetricCell
             metrics={row.original.metrics}
@@ -191,7 +191,7 @@ export function NodeListPage() {
       }),
       columnHelper.accessor((row) => row.metrics?.memoryUsage || 0, {
         id: 'memory',
-        header: 'Memory',
+        header: t('monitoring.memory'),
         cell: ({ row }) => (
           <MetricCell
             metrics={row.original.metrics}
@@ -203,7 +203,7 @@ export function NodeListPage() {
       }),
       columnHelper.accessor((row) => getNodeIP(row), {
         id: 'ip',
-        header: 'IP Address',
+        header: t('common.ipAddress'),
         cell: ({ getValue }) => {
           const ip = getValue()
           return (
@@ -214,35 +214,35 @@ export function NodeListPage() {
         },
       }),
       columnHelper.accessor('status.nodeInfo.kubeletVersion', {
-        header: 'Version',
+        header: t('common.version'),
         cell: ({ getValue }) => {
           const version = getValue()
           return version ? (
             <span className="text-sm">{version}</span>
           ) : (
-            <span className="text-muted-foreground">N/A</span>
+            <span className="text-muted-foreground">-</span>
           )
         },
       }),
       columnHelper.accessor('status.nodeInfo.kernelVersion', {
-        header: 'Kernel Version',
+        header: t('nodes.kernelVersion'),
         cell: ({ getValue }) => {
           const kernelVersion = getValue()
           return kernelVersion ? (
             <span className="text-sm">{kernelVersion}</span>
           ) : (
-            <span className="text-muted-foreground">N/A</span>
+            <span className="text-muted-foreground">-</span>
           )
         },
       }),
       columnHelper.accessor('status.nodeInfo.osImage', {
-        header: 'OS Image',
+        header: t('details.fields.osImage'),
         cell: ({ getValue }) => {
           const osImage = getValue()
           return osImage ? (
             <span className="text-sm">{osImage}</span>
           ) : (
-            <span className="text-muted-foreground">N/A</span>
+            <span className="text-muted-foreground">-</span>
           )
         },
       }),
@@ -280,7 +280,7 @@ export function NodeListPage() {
 
   return (
     <ResourceTable
-      resourceName="Nodes"
+      resourceName={t('nav.nodes')}
       resourceType="nodes"
       columns={columns}
       clusterScope={true}

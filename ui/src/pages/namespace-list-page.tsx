@@ -44,7 +44,8 @@ export function NamespaceListPage() {
 
   return (
     <ResourceTable
-      resourceName="Namespaces"
+      resourceName={t('nav.namespaces')}
+      resourceType="namespaces"
       columns={columns}
       clusterScope={true}
       searchQueryFilter={filter}

@@ -15,14 +15,40 @@
     "namespace": "Namespace",
     "status": "Status",
     "created": "Created",
+    "age": "Age",
+    "type": "Type",
+    "dataKeys": "Data Keys",
+    "ip": "IP",
+    "ipAddress": "IP Address",
     "actions": "Actions",
     "refresh": "Refresh",
     "language": "Language",
     "close": "Close",
+    "selectTab": "Select tab",
     "done": "Done",
     "desired": "Desired",
     "current": "Current",
-    "available": "Available"
+    "available": "Available",
+    "assign": "Assign",
+    "creating": "Creating...",
+    "description": "Description",
+    "details": "Details",
+    "disable": "Disable",
+    "enable": "Enable",
+    "password": "Password",
+    "required": "This field is required",
+    "resetPassword": "Reset Password",
+    "version": "Version",
+    "yaml": "YAML",
+    "apply": "Apply",
+    "applying": "Applying...",
+    "assignRoles": "Assign Roles",
+    "copied": "Copied to clipboard",
+    "createdAt": "Created At",
+    "disabled": "Disabled",
+    "enabled": "Enabled",
+    "update": "Update",
+    "all": "All"
   },
   "globalSearch": {
     "title": "Global Search",
@@ -59,7 +85,28 @@
     "pinnedItems": "Pinned Items",
     "pinned": "Pinned",
     "menuGroups": "Menu Groups",
-    "resetToDefault": "Reset to Default"
+    "resetToDefault": "Reset to Default",
+    "collapse": "Collapse",
+    "customize": "Customize Sidebar",
+    "customizeTitle": "Customize Sidebar",
+    "expand": "Expand",
+    "createGroup": "Create New CRD Group",
+    "moveDown": "Move down",
+    "moveUp": "Move up",
+    "custom": "Custom",
+    "hide": "Hide",
+    "show": "Show",
+    "deleteCustomGroup": "Delete custom group",
+    "unpin": "Unpin",
+    "pinToTop": "Pin to top",
+    "removeFromGroup": "Remove from group",
+    "selectCrdToAddPlaceholder": "Select CRD to add...",
+    "addCrdToGroup": "Add CRD to group",
+    "add": "Add",
+    "groupNamePlaceholder": "Group name (e.g., CRDs)",
+    "mobileTitle": "Sidebar",
+    "mobileDescription": "Displays the mobile sidebar.",
+    "toggleSidebar": "Toggle Sidebar"
   },
   "nav": {
     "overview": "Overview",
@@ -90,7 +137,9 @@
     "rolebindings": "Role Bindings",
     "clusterroles": "Cluster Roles",
     "clusterrolebindings": "Cluster Role Bindings",
-    "horizontalpodautoscalers": "HPA"
+    "horizontalpodautoscalers": "HPA",
+    "settings": "Settings",
+    "workloads": "Workloads"
   },
   "overview": {
     "title": "Overview",
@@ -98,7 +147,9 @@
     "recentEvents": "Recent Events",
     "resourceCharts": "Resource Charts",
     "failedToLoad": "Failed to load overview data",
-    "unknownError": "Unknown error occurred"
+    "unknownError": "Unknown error occurred",
+    "latestClusterEvents": "Latest cluster events",
+    "noRecentEvents": "No recent events"
   },
   "pods": {
     "title": "Pods",
@@ -114,7 +165,32 @@
     "resizeResourcesDescription": "Adjust container CPU and memory requests/limits in-place.",
     "resizeResourcesSuccess": "Pod resource resize submitted",
     "container": "Container",
-    "selectContainer": "Select a container"
+    "selectContainer": "Select a container",
+    "allContainers": "All Containers",
+    "allPods": "All Pods",
+    "files": {
+      "currentPath": "Current path",
+      "downloadDir": "Download directory as .tar archive",
+      "downloadFile": "Download file",
+      "empty": "No files found",
+      "enterDir": "Enter directory {{name}}",
+      "goHome": "Go to home directory",
+      "goParent": "Go to parent directory",
+      "loading": "Loading files...",
+      "mode": "Mode",
+      "modified": "Modified",
+      "preview": "Preview file",
+      "refresh": "Refresh file list",
+      "size": "Size",
+      "title": "Pod files",
+      "upload": "Upload",
+      "uploadSuccess": "Uploaded {{name}} successfully"
+    },
+    "initContainer": "init",
+    "noContainersFound": "No containers found.",
+    "noPodsFound": "No pods found.",
+    "searchContainers": "Search containers...",
+    "searchPods": "Search pods..."
   },
   "deployments": {
     "title": "Deployments",
@@ -130,7 +206,48 @@
     "clusterIP": "Cluster IP",
     "externalIP": "External IP",
     "ports": "Ports",
-    "age": "Age"
+    "age": "Age",
+    "serviceName": "Service Name",
+    "noServicesFound": "No services found"
+  },
+  "related": {
+    "title": "Related",
+    "kind": "Kind",
+    "empty": "No related resources found"
+  },
+  "volumeTable": {
+    "title": "Volumes",
+    "loading": "Loading volumes...",
+    "defaultMedium": "Default",
+    "sizeLabel": "Size",
+    "noMounts": "No mounts",
+    "volumeMounts": "Volume Mounts",
+    "empty": "No volumes configured for this resource."
+  },
+  "ingresses": {
+    "ingressClass": "Ingress Class",
+    "hosts": "Hosts",
+    "loadBalancer": "Load Balancer"
+  },
+  "gateway": {
+    "gatewayClass": "Gateway Class"
+  },
+  "httproute": {
+    "hostnames": "Hostnames"
+  },
+  "hpa": {
+    "target": "Target",
+    "minPods": "Min Pods",
+    "maxPods": "Max Pods",
+    "currentPods": "Current Pods",
+    "metrics": "Metrics"
+  },
+  "crd": {
+    "group": "Group",
+    "versions": "Versions",
+    "scope": "Scope",
+    "established": "Established",
+    "notReady": "Not Ready"
   },
   "nodes": {
     "title": "Nodes",
@@ -152,7 +269,9 @@
     "lastSeen": "Last Seen",
     "count": "Count",
     "source": "Source",
-    "noEventsFound": "No events found"
+    "noEventsFound": "No events found",
+    "involvedObject": "Involved Object",
+    "reporter": "Reporter"
   },
   "dialog": {
     "createResource": "Create Resource",
@@ -177,10 +296,26 @@
     "memoryUsage": "Memory Usage",
     "networkUsage": "Network Usage",
     "diskUsage": "Disk Usage",
+    "diskIOUsage": "Disk I/O Usage",
     "resourceUtilization": "Resource Utilization",
     "requests": "Requests",
     "limits": "Limits",
-    "total": "Total"
+    "total": "Total",
+    "title": "Monitor",
+    "cpuCores": "CPU (cores)",
+    "memoryWithUnit": "Memory ({{unit}})",
+    "incoming": "Incoming",
+    "outgoing": "Outgoing",
+    "read": "Read",
+    "write": "Write",
+    "usage": "Usage",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "noCpuUsageData": "No CPU usage data available",
+    "noMemoryUsageData": "No memory usage data available",
+    "noNetworkUsageData": "No network usage data available",
+    "noDiskIOUsageData": "No disk I/O usage data available",
+    "noResourceUtilizationData": "No resource utilization data available"
   },
   "login": {
     "title": "Sign In",
@@ -248,7 +383,183 @@
     "deleteSuccess": "Deleted {{name}} successfully",
     "deleteFailed": "Failed to delete {{name}}: {{error}}",
     "watch": "Watch",
-    "namespace": "Namespace"
+    "namespace": "Namespace",
+    "selectAllAria": "Select all",
+    "selectRowAria": "Select row",
+    "loadingResource": "Loading {{resource}}...",
+    "retrievingData": "Retrieving data",
+    "fromAllNamespaces": "from all namespaces",
+    "fromNamespace": "from namespace {{namespace}}",
+    "noResourceFound": "No {{resource}} found",
+    "noResultsMatchQuery": "No results match your search query: \"{{query}}\"",
+    "noResourceInCluster": "There are no {{resource}} found",
+    "noResourceInNamespace": "There are no {{resource}} in the {{namespace}} namespace",
+    "clearSearch": "Clear Search",
+    "namespaceLabel": "Namespace:",
+    "off": "Off",
+    "filterByColumn": "Filter {{column}}",
+    "column": "Column",
+    "allColumnValues": "All {{column}}",
+    "values": "Values",
+    "searchResource": "Search {{resource}}...",
+    "new": "New",
+    "toggleColumns": "Toggle columns",
+    "noResults": "No results.",
+    "showingFilteredRows": "Showing {{filtered}} of {{total}} row(s)",
+    "filteredByQuery": "(filtered by \"{{query}}\")",
+    "rowsTotal": "{{count}} row(s) total.",
+    "rowsPerPage": "Rows per page:",
+    "pageOf": "Page {{page}} of {{total}}",
+    "goToPreviousPage": "Go to previous page",
+    "goToNextPage": "Go to next page"
+  },
+  "deploymentCreateDialog": {
+    "atLeastOneContainerRequired": "At least one container is required",
+    "invalidYamlFormat": "Invalid YAML format",
+    "unknownError": "Unknown error",
+    "missingNameOrNamespace": "Deployment must have a name and namespace",
+    "createSuccess": "Deployment \"{{name}}\" created successfully in namespace \"{{namespace}}\"",
+    "deploymentNameRequired": "Deployment Name *",
+    "deploymentNamePlaceholder": "my-app",
+    "namespaceRequired": "Namespace *",
+    "labelsRequired": "Labels *",
+    "addLabel": "Add Label",
+    "labelKeyPlaceholder": "key",
+    "labelValuePlaceholder": "value",
+    "replicasRequired": "Replicas *",
+    "volume": "Volume",
+    "addVolume": "Add Volume",
+    "volumeNamePlaceholder": "name",
+    "selectVolumeType": "Select Volume Type",
+    "hostPathPlaceholder": "host path",
+    "selectConfigMap": "Select configmap",
+    "selectSecret": "Select secret",
+    "selectPvc": "Select PVC",
+    "containers": "Containers",
+    "addContainer": "Add Container",
+    "containerNumber": "Container {{number}}",
+    "containerNameRequired": "Container Name *",
+    "containerNamePlaceholder": "container-name",
+    "resourcesOptional": "Resources (optional)",
+    "requests": "Requests",
+    "limits": "Limits",
+    "cpuRequestPlaceholder": "CPU (e.g., 100m)",
+    "memoryRequestPlaceholder": "Memory (e.g., 128Mi)",
+    "cpuLimitPlaceholder": "CPU (e.g., 500m)",
+    "memoryLimitPlaceholder": "Memory (e.g., 256Mi)",
+    "containerPortOptional": "Container Port (optional)",
+    "imagePullPolicy": "Image Pull Policy",
+    "volumeMounts": "Volume Mounts",
+    "addVolumeMount": "Add Volume Mount",
+    "volumeName": "Volume name",
+    "mountPathPlaceholder": "/mount/path",
+    "subPathPlaceholder": "subpath",
+    "readOnly": "ReadOnly",
+    "writable": "Writable",
+    "reviewAndEditConfiguration": "Review & Edit Configuration",
+    "reviewAndEditDescription": "Review and edit the generated YAML configuration before creating the deployment. You can modify any part of the configuration directly in the editor below.",
+    "stepTitles": {
+      "basicConfiguration": "Basic Configuration",
+      "podConfiguration": "Pod Configuration",
+      "containersAndResources": "Containers & Resources",
+      "editYamlAndCreate": "Edit YAML & Create"
+    },
+    "stepDescription": "Step {{step}} of {{totalSteps}}: {{title}}",
+    "createDeployment": "Create Deployment",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "environmentEditor": {
+    "environmentVariables": "Environment Variables",
+    "addVariable": "Add Variable",
+    "variableNamePlaceholder": "Variable name",
+    "type": "Type",
+    "directValue": "Direct Value",
+    "valueFrom": "Value From",
+    "source": "Source",
+    "selectSourceType": "Select source type",
+    "secret": "Secret",
+    "configMap": "ConfigMap",
+    "fieldReference": "Field Reference",
+    "resourceField": "Resource Field",
+    "secretName": "Secret Name",
+    "key": "Key",
+    "keyPlaceholder": "key",
+    "configMapName": "ConfigMap Name",
+    "selectSecret": "Select secret",
+    "selectConfigMap": "Select configmap",
+    "fieldPath": "Field Path",
+    "fieldPathPlaceholder": "metadata.name",
+    "resource": "Resource",
+    "resourcePlaceholder": "requests.cpu",
+    "containerName": "Container Name",
+    "containerNamePlaceholder": "container-name",
+    "value": "Value",
+    "variableValuePlaceholder": "Variable value",
+    "fullValue": "Full value:",
+    "noEnvironmentVariables": "No environment variables configured",
+    "environmentFrom": "Environment From",
+    "addSource": "Add Source",
+    "sourceName": "{{type}} Name",
+    "prefixOptional": "Prefix (Optional)",
+    "prefixPlaceholder": "PREFIX_",
+    "noEnvironmentSources": "No environment sources configured"
+  },
+  "imageEditor": {
+    "containerImage": "Container Image",
+    "containerImagePlaceholder": "nginx:latest",
+    "imageHint": "Specify the container image including tag (e.g., nginx:1.21, node:16-alpine)",
+    "pullPolicy": "Image Pull Policy",
+    "selectPullPolicy": "Select pull policy",
+    "default": "Default",
+    "ifNotPresentHint": "Pull image only if not present locally",
+    "alwaysHint": "Always pull the latest image",
+    "neverHint": "Never pull, use local image only"
+  },
+  "terminalPanel": {
+    "title": "Terminal",
+    "currentThemeTooltip": "Current theme: {{theme}} (Ctrl+T to cycle)",
+    "terminalTheme": "Terminal Theme",
+    "fontSize": "Font Size",
+    "cursorStyle": "Cursor Style",
+    "cursorStyles": {
+      "block": "Block",
+      "underline": "Underline",
+      "bar": "Bar"
+    },
+    "connectedToTypeTerminal": "Connected to {{type}} terminal!",
+    "type": {
+      "pod": "Pod",
+      "node": "Node"
+    },
+    "errorPrefix": "Error",
+    "websocketError": "WebSocket connection error",
+    "connectionClosedUnexpectedly": "Connection closed unexpectedly",
+    "connectionClosed": "Connection closed"
+  },
+  "resourceEditor": {
+    "resourceRequests": "Resource Requests",
+    "cpuRequest": "CPU Request",
+    "cpuRequestPlaceholder": "100m",
+    "cpuRequestHint": "e.g., 100m (0.1 CPU), 1 (1 CPU)",
+    "memoryRequest": "Memory Request",
+    "memoryRequestPlaceholder": "128Mi",
+    "memoryRequestHint": "e.g., 128Mi, 1Gi, 512M",
+    "resourceLimits": "Resource Limits",
+    "cpuLimit": "CPU Limit",
+    "cpuLimitPlaceholder": "500m",
+    "cpuLimitHint": "e.g., 500m (0.5 CPU), 2 (2 CPUs)",
+    "memoryLimit": "Memory Limit",
+    "memoryLimitPlaceholder": "512Mi",
+    "memoryLimitHint": "e.g., 512Mi, 2Gi, 1G"
+  },
+  "userMenu": {
+    "viaProvider": "via {{provider}}",
+    "roleLabel": "Role:",
+    "colorTheme": "Color Theme",
+    "font": "Font",
+    "system": "System",
+    "logOut": "Log out"
   },
   "rbac": {
     "noPermissionCluster": "User {{user}} does not have permission to {{verb}} {{resource}} on cluster {{cluster}}",
@@ -263,6 +574,77 @@
       "delete": "Delete",
       "log": "View Logs",
       "exec": "Execute"
+    },
+    "actions": {
+      "add": "Add Role",
+      "assign": "Assign"
+    },
+    "get": "Get",
+    "title": "Role Management",
+    "assign": {
+      "confirmRemoveSelf": "You are removing your own role assignment. This may affect your permissions. Are you sure?",
+      "current": "Current Assignments",
+      "group": "OIDC Group",
+      "groups": "OIDC Groups",
+      "subject": "Subject",
+      "subjectPlaceholder": "username or group name",
+      "subjectType": "Subject Type",
+      "title": "Assign Role",
+      "user": "User",
+      "users": "Users"
+    },
+    "dialog": {
+      "add": {
+        "title": "Add Role"
+      },
+      "edit": {
+        "title": "Edit Role"
+      }
+    },
+    "empty": {
+      "description": "Create roles to grant permissions",
+      "title": "No roles configured"
+    },
+    "errors": {
+      "loadFailed": "Failed to load roles"
+    },
+    "form": {
+      "clusters": {
+        "label": "Clusters"
+      },
+      "description": {
+        "label": "Description"
+      },
+      "name": {
+        "label": "Role Name"
+      },
+      "namespaces": {
+        "label": "Namespaces"
+      },
+      "permissions": {
+        "label": "Permissions"
+      },
+      "resources": {
+        "label": "Resources"
+      },
+      "verbs": {
+        "label": "Verbs"
+      }
+    },
+    "messages": {
+      "assignError": "Failed to assign",
+      "assigned": "Assigned",
+      "createError": "Failed to create role",
+      "created": "Role created",
+      "deleteError": "Failed to delete role",
+      "deleted": "Role deleted",
+      "unassignError": "Failed to unassign",
+      "unassigned": "Unassigned",
+      "updateError": "Failed to update role",
+      "updated": "Role updated"
+    },
+    "table": {
+      "assignments": "Assignments"
     }
   },
   "settings": {
@@ -272,8 +654,13 @@
       "clusters": "Cluster",
       "oauth": "OAuth",
       "rbac": "RBAC",
-      "users": "User"
-    }
+      "users": "User",
+      "apikeys": "API Keys",
+      "audit": "Audit Logs",
+      "p8s": "Prometheus",
+      "templates": "Templates"
+    },
+    "nav": "Settings"
   },
   "settingsHint": {
     "title": "Complete Your Setup",
@@ -294,14 +681,16 @@
     "actions": {
       "add": "Add Cluster",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "save": "Save Changes"
     },
     "table": {
       "name": "Name",
       "type": "Type",
       "status": "Status",
       "prometheus": "Prometheus",
-      "actions": "Actions"
+      "actions": "Actions",
+      "Prometheus": "Prometheus"
     },
     "type": {
       "inCluster": "In-Cluster",
@@ -340,7 +729,49 @@
       "prometheusUrl": "Prometheus URL",
       "prometheusUrlPlaceholder": "https://prometheus.example.com",
       "enabled": "Enabled",
-      "isDefault": "Set as Default"
+      "isDefault": "Set as Default",
+      "add": {
+        "title": "Add New Cluster"
+      },
+      "edit": {
+        "title": "Edit Cluster"
+      }
+    },
+    "form": {
+      "config": {
+        "editNote": "Leave empty to keep current configuration",
+        "label": "Kubeconfig"
+      },
+      "description": {
+        "label": "Description",
+        "placeholder": "Brief description of this cluster"
+      },
+      "enabled": {
+        "label": "Enable Cluster"
+      },
+      "inCluster": {
+        "note": "This cluster uses the in-cluster service account configuration. No additional kubeconfig is required."
+      },
+      "isDefault": {
+        "help": "Use this cluster as the default for new operations",
+        "label": "Set as Default"
+      },
+      "kubeconfig": {
+        "placeholder": "Paste your kubeconfig content here..."
+      },
+      "name": {
+        "asciiOnly": "Cluster name must use English/ASCII characters only. Do not use Chinese names.",
+        "label": "Cluster Name",
+        "placeholder": "e.g., production, staging"
+      },
+      "prometheusURL": {
+        "label": "Prometheus URL"
+      },
+      "type": {
+        "external": "External Cluster",
+        "inCluster": "In-Cluster",
+        "label": "Cluster Type"
+      }
     }
   },
   "oauthManagement": {
@@ -384,6 +815,28 @@
       "userInfoUrl": "User Info URL",
       "scopes": "Scopes",
       "issuer": "Issuer",
+      "enabled": "Enabled",
+      "authUrlPlaceholder": "https://provider.com/oauth/authorize",
+      "issuerPlaceholder": "https://provider.com (auto discovery)",
+      "or": "or",
+      "scopesPlaceholder": "openid,profile,email",
+      "section": {
+        "basic": "Basic Information",
+        "endpoint": "OAuth Endpoints",
+        "status": "Status"
+      },
+      "tokenUrlPlaceholder": "https://provider.com/oauth/token",
+      "userInfoUrlPlaceholder": "https://provider.com/oauth/userinfo",
+      "validation": {
+        "issuerOrUrl": "Please fill in either Issuer or OAuth URL (Authorization, Token, User Info)"
+      }
+    },
+    "empty": {
+      "description": "Add your first OAuth provider",
+      "title": "No OAuth providers configured"
+    },
+    "status": {
+      "disabled": "Disabled",
       "enabled": "Enabled"
     }
   },
@@ -426,7 +879,9 @@
       "importButton": "Import Clusters",
       "importSuccess": "Clusters imported successfully",
       "importError": "Failed to import clusters",
-      "configRequired": "Please provide a kubeconfig file"
+      "configRequired": "Please provide a kubeconfig file",
+      "inClusterHint": "In Cluster Hint",
+      "inClusterMode": "In Cluster Mode"
     },
     "completion": {
       "title": "Setup Complete!",
@@ -435,6 +890,7 @@
   },
   "resourceHistory": {
     "title": "Resource History",
+    "id": "ID",
     "operator": "Operator",
     "operationTime": "Time",
     "operationType": "Type",
@@ -460,7 +916,10 @@
       "rollingBack": "Rolling back...",
       "success": "Successfully rolled back resource",
       "error": "Failed to rollback resource"
-    }
+    },
+    "errorDetails": "error details",
+    "noErrorMessage": "no error message available",
+    "viewError": "view error"
   },
   "pvcs": {
     "volume": "Volume",
@@ -621,5 +1080,255 @@
     "forceDelete": "Force delete (set grace period to 0)",
     "finalizerNote": "If finalizers exist and resource is not deleted after 3 seconds, finalizers will be removed automatically",
     "deleting": "Deleting..."
+  },
+  "apikeyManagement": {
+    "actions": {
+      "add": "Add API Key",
+      "copy": "Copy",
+      "delete": "Delete"
+    },
+    "deleteConfirmation": "Are you sure you want to delete this API key? This action cannot be undone.",
+    "description": "Manage API keys for programmatic access",
+    "dialog": {
+      "assignRoles": "Assign Roles",
+      "createButton": "Create",
+      "createTitle": "Create API Key",
+      "creating": "Creating...",
+      "description": "Create a new API key for programmatic access.",
+      "editTitle": "Edit API Key",
+      "keyLabel": "API Key",
+      "name": "Name",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g., Production API key",
+      "nameRequired": "Name is required",
+      "title": "Create API Key"
+    },
+    "empty": {
+      "description": "Create an API key to get started with programmatic access.",
+      "title": "No API keys configured"
+    },
+    "errors": {
+      "loadFailed": "Failed to load API keys"
+    },
+    "messages": {
+      "copied": "API key copied to clipboard",
+      "copyError": "Failed to copy API key",
+      "createError": "Failed to create API key",
+      "created": "API key created successfully",
+      "deleteError": "Failed to delete API key",
+      "deleted": "API key deleted successfully"
+    },
+    "neverUsed": "Never",
+    "table": {
+      "actions": "Actions",
+      "createdAt": "Created At",
+      "key": "API Key",
+      "lastUsed": "Last Used",
+      "name": "Name",
+      "roles": "Roles"
+    },
+    "title": "API Key Management"
+  },
+  "log": {
+    "jumpToBottom": "Jump to bottom",
+    "clear": "Clear logs",
+    "filter": "Filter logs...",
+    "filtered": "filtered",
+    "fontSize": "Font Size",
+    "lines": "lines",
+    "loadingEditor": "Loading editor...",
+    "previousContainer": "Previous Container",
+    "reconnecting": "Reconnecting...",
+    "shortcut": {
+      "decreaseFontSize": "Decrease Font Size",
+      "increaseFontSize": "Increase Font Size",
+      "openSearch": "Open Search",
+      "resetFontSize": "Reset Font Size",
+      "toggleFullscreen": "Toggle Fullscreen",
+      "toggleWordWrap": "Toggle Word Wrap"
+    },
+    "shortcuts": "Keyboard Shortcuts",
+    "showLineNumbers": "Show Line Numbers",
+    "showTimestamps": "Show Timestamps",
+    "tailLines": "Tail Lines",
+    "theme": "Log Theme",
+    "wordWrap": "Word Wrap"
+  },
+  "templateManagement": {
+    "actions": {
+      "add": "Add Template"
+    },
+    "description": "Manage resource templates for creating new resources.",
+    "dialog": {
+      "createDescription": "Add a new resource template",
+      "createTitle": "Create Template",
+      "editTitle": "Edit Template",
+      "updateDescription": "Update existing template"
+    },
+    "empty": {
+      "description": "No templates found"
+    },
+    "errors": {
+      "required": "Name and YAML are required"
+    },
+    "hints": {
+      "nameImmutable": "Name cannot be changed after creation"
+    },
+    "messages": {
+      "created": "Template created successfully",
+      "deleted": "Template deleted successfully",
+      "updated": "Template updated successfully"
+    },
+    "title": "Template Management"
+  },
+  "userManagement": {
+    "actions": {
+      "add": "Add Password User",
+      "editUser": "Edit user",
+      "search": "Search users..."
+    },
+    "dialog": {
+      "assignRoles": "Assign Roles",
+      "editTitle": "Edit User",
+      "resetPassword": "Reset Password",
+      "addTitle": "Add Password User"
+    },
+    "empty": {
+      "description": "No users found",
+      "title": "No users"
+    },
+    "table": {
+      "avatar": "Avatar",
+      "createdAt": "Created At",
+      "id": "ID",
+      "lastLoginAt": "Last Login",
+      "name": "Name",
+      "provider": "Provider",
+      "roles": "Roles",
+      "status": "Status",
+      "username": "Username"
+    },
+    "title": "User Management",
+    "errors": {
+      "loadFailed": "Failed to load users"
+    },
+    "filters": {
+      "allRoles": "All roles",
+      "role": "All roles"
+    },
+    "messages": {
+      "createError": "Failed to create user",
+      "created": "User created",
+      "deleteError": "Failed to delete user",
+      "deleted": "User deleted",
+      "resetPassword": "Password reset",
+      "resetPasswordError": "Failed to reset password",
+      "updateError": "Failed to update user",
+      "updated": "User updated"
+    }
+  },
+  "username": "Username",
+  "auditLog": {
+    "actions": {
+      "viewDiff": "View Diff",
+      "viewError": "View Error"
+    },
+    "description": "Track who changed resources and review YAML diffs",
+    "diffTitle": "YAML Diff",
+    "empty": "No audit logs found",
+    "errorTitle": "Error Details",
+    "filters": {
+      "allClusters": "All clusters",
+      "allOperations": "All operations",
+      "allUsers": "All users",
+      "cluster": "All clusters",
+      "operation": "All operations",
+      "search": "Search resource name...",
+      "user": "All users"
+    },
+    "loadFailed": "Failed to load audit logs",
+    "loading": "Loading audit logs...",
+    "noErrorMessage": "No error message",
+    "status": {
+      "failed": "Failed",
+      "success": "Success"
+    },
+    "table": {
+      "actions": "Actions",
+      "cluster": "Cluster",
+      "operation": "Operation",
+      "operator": "Operator",
+      "resource": "Resource",
+      "status": "Status",
+      "time": "Time"
+    },
+    "title": "Audit Logs"
+  },
+  "createResource": {
+    "emptyTemplate": "Empty Template",
+    "selectTemplate": "Select a template",
+    "success": "Resource created successfully",
+    "description": "Paste any Kubernetes resource YAML configuration and apply it to the cluster",
+    "template": "Template"
+  },
+  "cronjob": {
+    "activeJobs": "Active Jobs",
+    "clusterDefault": "Cluster default",
+    "concurrencyPolicy": "Concurrency Policy",
+    "failedJobsHistory": "Failed Jobs History",
+    "informationTitle": "CronJob Information",
+    "jobCreated": "Job created successfully",
+    "lastSchedule": "Last Schedule",
+    "lastSuccess": "Last Success",
+    "loadingActiveJobs": "Loading active jobs...",
+    "noActiveJobs": "No active jobs currently running.",
+    "noJobsFound": "No jobs found for this CronJob",
+    "notSet": "Not set",
+    "resume": "Resume",
+    "runNow": "Run Now",
+    "schedule": "Schedule",
+    "state": "State",
+    "startingDeadline": "Starting Deadline",
+    "successfulJobsHistory": "Successful Jobs History",
+    "suspend": "Suspend",
+    "status": {
+      "active": "Active",
+      "idle": "Idle",
+      "suspended": "Suspended"
+    },
+    "timeZone": "Time Zone",
+    "volumes": "Volumes"
+  },
+  "daemonset": {
+    "configurationTitle": "DaemonSet Configuration",
+    "volumes": "Volumes"
+  },
+  "job": {
+    "activeDeadlineSeconds": "Active Deadline Seconds",
+    "backoffLimit": "Backoff Limit",
+    "completionTime": "Completion Time",
+    "completions": "Completions",
+    "informationTitle": "Job Information",
+    "notSet": "Not set",
+    "parallelism": "Parallelism",
+    "startTime": "Start Time",
+    "ttlAfterFinished": "TTL After Finished",
+    "volumes": "Volumes"
+  },
+  "pod": {
+    "noPortsDefined": "No ports defined",
+    "volumes": "Volumes"
+  },
+  "statefulset": {
+    "configurationTitle": "StatefulSet Configuration",
+    "confirmRestart": "Confirm Restart",
+    "informationTitle": "StatefulSet Information",
+    "podManagementPolicy": "Pod Management Policy",
+    "restartDescription": "This will restart all pods managed by this StatefulSet.",
+    "scaleButton": "Scale StatefulSet",
+    "scaleDescription": "Adjust the number of replicas for this StatefulSet.",
+    "scaleTitle": "Scale StatefulSet",
+    "updateStrategy": "Update Strategy",
+    "volumes": "Volumes"
   }
 }

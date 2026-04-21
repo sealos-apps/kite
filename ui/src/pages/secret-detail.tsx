@@ -105,7 +105,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
     return (
       <ErrorMessage
         error={error}
-        resourceName="Secret"
+        resourceName={t('nav.secrets')}
         refetch={handleRefresh}
       />
     )
@@ -127,14 +127,14 @@ export function SecretDetail(props: { namespace: string; name: string }) {
         <div>
           <h1 className="text-lg font-bold">{secret.metadata!.name}</h1>
           <p className="text-muted-foreground">
-            Namespace:{' '}
+            {t('common.namespace')}:{' '}
             <span className="font-medium">{secret.metadata!.namespace}</span>
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleManualRefresh}>
             <IconRefresh className="w-4 h-4" />
-            Refresh
+            {t('common.refresh')}
           </Button>
           <Button
             variant="destructive"
@@ -142,7 +142,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
             onClick={() => setIsDeleteDialogOpen(true)}
           >
             <IconTrash className="w-4 h-4" />
-            Delete
+            {t('common.delete')}
           </Button>
         </div>
       </div>
@@ -151,7 +151,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
         tabs={[
           {
             value: 'overview',
-            label: 'Overview',
+            label: t('overview.title'),
             content: (
               <div className="space-y-4">
                 {/* Secret Information */}
@@ -245,7 +245,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'yaml',
-            label: 'YAML',
+            label: t('common.yaml'),
             content: (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -271,7 +271,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource="secrets"
@@ -282,7 +282,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'events',
-            label: 'Events',
+            label: t('nav.events'),
             content: (
               <EventTable
                 resource="secrets"
@@ -293,7 +293,7 @@ export function SecretDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable
                 resourceType="secrets"

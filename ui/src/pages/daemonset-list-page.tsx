@@ -53,9 +53,7 @@ export function DaemonSetListPage() {
           const readyReplicas = row.original.status?.numberReady || 0
           const replicas = row.original.status?.desiredNumberScheduled || 0
           const isAvailable = readyReplicas === replicas
-          const status = isAvailable
-            ? t('deployments.available')
-            : t('common.loading')
+          const status = isAvailable ? 'Available' : 'Progressing'
           if (replicas === 0) {
             return (
               <Badge
@@ -106,7 +104,8 @@ export function DaemonSetListPage() {
 
   return (
     <ResourceTable
-      resourceName={'DaemonSets'}
+      resourceName={t('nav.daemonsets')}
+      resourceType="daemonsets"
       columns={columns}
       searchQueryFilter={daemonSetSearchFilter}
     />

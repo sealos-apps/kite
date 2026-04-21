@@ -123,7 +123,8 @@ export function EventListPage() {
 
   return (
     <ResourceTable<Event>
-      resourceName="Events"
+      resourceName={t('nav.events')}
+      resourceType="events"
       columns={columns}
       clusterScope={false}
       searchQueryFilter={eventSearchFilter}

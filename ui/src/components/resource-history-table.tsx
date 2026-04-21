@@ -138,7 +138,7 @@ export function ResourceHistoryTable<T extends ResourceType>({
   const historyColumns = useMemo(
     (): Column<ResourceHistory>[] => [
       {
-        header: 'ID',
+        header: t('resourceHistory.id'),
         accessor: (item: ResourceHistory) => item.id,
         cell: (value: unknown) => (
           <div className="font-mono text-sm">{value as number}</div>

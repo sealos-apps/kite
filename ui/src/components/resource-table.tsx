@@ -157,21 +157,19 @@ export function ResourceTable<T>({
     ? undefined
     : fixedNamespace || selectedNamespace
   const [useSSE, setUseSSE] = useState(false)
+  const resolvedResourceType = (resourceType ??
+    (resourceName.toLowerCase() as ResourceType)) as ResourceType
   const {
     isLoading: queryLoading,
     data: queryData,
     isError: queryIsError,
     error: queryError,
     refetch: queryRefetch,
-  } = useResources(
-    resourceType ?? (resourceName.toLowerCase() as ResourceType),
-    requestNamespace,
-    {
-      refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
-      reduce: true, // Fetch reduced data for performance
-      disable: useSSE, // do not query when using SSE
-    }
-  )
+  } = useResources(resolvedResourceType, requestNamespace, {
+    refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
+    reduce: true, // Fetch reduced data for performance
+    disable: useSSE, // do not query when using SSE
+  })
 
   // SSE state (when enabled)
   // SSE watch hook
@@ -181,12 +179,10 @@ export function ResourceTable<T>({
     error: watchError,
     isConnected,
     refetch: reconnectSSE,
-  } = useResourcesWatch(
-    (resourceType ??
-      (resourceName.toLowerCase() as ResourceType)) as ResourceType,
-    requestNamespace,
-    { reduce: true, enabled: useSSE }
-  )
+  } = useResourcesWatch(resolvedResourceType, requestNamespace, {
+    reduce: true,
+    enabled: useSSE,
+  })
 
   // (moved below after error is defined)
 
@@ -285,14 +281,14 @@ export function ResourceTable<T>({
             (table.getIsSomePageRowsSelected() && 'indeterminate')
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label={t('resourceTable.selectAllAria')}
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label={t('resourceTable.selectRowAria')}
         />
       ),
       enableSorting: false,
@@ -439,11 +435,7 @@ export function ResourceTable<T>({
         return Promise.resolve()
       }
 
-      return deleteResource(
-        resourceType ?? (resourceName.toLowerCase() as ResourceType),
-        name,
-        namespace
-      )
+      return deleteResource(resolvedResourceType, name, namespace)
         .then(() => {
           toast.success(t('resourceTable.deleteSuccess', { name }))
         })
@@ -468,7 +460,7 @@ export function ResourceTable<T>({
     } finally {
       setIsDeleting(false)
     }
-  }, [table, clusterScope, resourceType, resourceName, t, useSSE, refetch])
+  }, [table, clusterScope, resolvedResourceType, t, useSSE, refetch])
   // Calculate total and filtered row counts
   const totalRowCount = useMemo(
     () => (data as T[] | undefined)?.length || 0,
@@ -497,12 +489,19 @@ export function ResourceTable<T>({
             <Database className="h-12 w-12 text-muted-foreground animate-pulse" />
           </div>
           <h3 className="text-lg font-medium mb-1">
-            Loading {resourceName.toLowerCase()}...
+            {t('resourceTable.loadingResource', {
+              resource: resourceName.toLowerCase(),
+            })}
           </h3>
           <p className="text-muted-foreground">
-            Retrieving data
+            {t('resourceTable.retrievingData')}
             {!clusterScope && selectedNamespace
-              ? ` from ${selectedNamespace === '_all' ? 'All Namespaces' : `namespace ${selectedNamespace}`}`
+              ? ` ${t(
+                  selectedNamespace === '_all'
+                    ? 'resourceTable.fromAllNamespaces'
+                    : 'resourceTable.fromNamespace',
+                  { namespace: selectedNamespace }
+                )}`
               : ''}
           </p>
         </div>
@@ -526,14 +525,21 @@ export function ResourceTable<T>({
             <Box className="h-12 w-12 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium mb-1">
-            No {resourceName.toLowerCase()} found
+            {t('resourceTable.noResourceFound', {
+              resource: resourceName.toLowerCase(),
+            })}
           </h3>
           <p className="text-muted-foreground">
             {searchQuery
-              ? `No results match your search query: "${searchQuery}"`
+              ? t('resourceTable.noResultsMatchQuery', { query: searchQuery })
               : clusterScope
-                ? `There are no ${resourceName.toLowerCase()} found`
-                : `There are no ${resourceName.toLowerCase()} in the ${selectedNamespace} namespace`}
+                ? t('resourceTable.noResourceInCluster', {
+                    resource: resourceName.toLowerCase(),
+                  })
+                : t('resourceTable.noResourceInNamespace', {
+                    resource: resourceName.toLowerCase(),
+                    namespace: selectedNamespace,
+                  })}
           </p>
           {searchQuery && (
             <Button
@@ -541,7 +547,7 @@ export function ResourceTable<T>({
               className="mt-4"
               onClick={() => setSearchQuery('')}
             >
-              Clear Search
+              {t('resourceTable.clearSearch')}
             </Button>
           )}
         </div>
@@ -560,10 +566,10 @@ export function ResourceTable<T>({
           <h1 className="text-2xl font-bold capitalize">{resourceName}</h1>
           {!clusterScope && selectedNamespace && (
             <div className="text-muted-foreground flex items-center mt-1">
-              <span>Namespace:</span>
+              <span>{t('resourceTable.namespaceLabel')}</span>
               <Badge variant="outline" className="ml-2 ">
                 {selectedNamespace === '_all'
-                  ? 'All Namespaces'
+                  ? t('rbac.allNamespaces')
                   : selectedNamespace}
               </Badge>
             </div>
@@ -576,7 +582,7 @@ export function ResourceTable<T>({
               <React.Fragment key={index}>{toolbar}</React.Fragment>
             ))}
             {/* Watch/Live mode toggle switch */}
-            {resourceName === 'Pods' && (
+            {resolvedResourceType === 'pods' && (
               <div className="flex items-center gap-2">
                 <Label className="text-sm">
                   {useSSE ? (
@@ -618,7 +624,7 @@ export function ResourceTable<T>({
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="0">Off</SelectItem>
+                <SelectItem value="0">{t('resourceTable.off')}</SelectItem>
                 <SelectItem value="1000">1s</SelectItem>
                 <SelectItem value="5000">5s</SelectItem>
                 <SelectItem value="10000">10s</SelectItem>
@@ -658,15 +664,22 @@ export function ResourceTable<T>({
                   >
                     <SelectTrigger className="min-w-32">
                       <SelectValue
-                        placeholder={`Filter ${typeof columnDef.header === 'string' ? columnDef.header : 'Column'}`}
+                        placeholder={t('resourceTable.filterByColumn', {
+                          column:
+                            typeof columnDef.header === 'string'
+                              ? columnDef.header
+                              : t('resourceTable.column'),
+                        })}
                       />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">
-                        All{' '}
-                        {typeof columnDef.header === 'string'
-                          ? columnDef.header
-                          : 'Values'}
+                        {t('resourceTable.allColumnValues', {
+                          column:
+                            typeof columnDef.header === 'string'
+                              ? columnDef.header
+                              : t('resourceTable.values'),
+                        })}
                       </SelectItem>
                       {Array.from(uniqueValues.keys())
                         .sort()
@@ -691,7 +704,9 @@ export function ResourceTable<T>({
             <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder={`Search ${resourceName.toLowerCase()}...`}
+                placeholder={t('resourceTable.searchResource', {
+                  resource: resourceName.toLowerCase(),
+                })}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 pr-4 w-full sm:w-[100px] md:w-[200px]"
@@ -724,7 +739,7 @@ export function ResourceTable<T>({
           {showCreateButton && onCreateClick && (
             <Button onClick={onCreateClick} className="gap-1">
               <Plus className="h-2 w-2" />
-              New
+              {t('resourceTable.new')}
             </Button>
           )}
 
@@ -736,7 +751,9 @@ export function ResourceTable<T>({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                {t('resourceTable.toggleColumns')}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {table
                 .getAllLeafColumns()

@@ -99,7 +99,8 @@ export function DeploymentListPage() {
   return (
     <>
       <ResourceTable
-        resourceName="Deployments"
+        resourceName={t('nav.deployments')}
+        resourceType="deployments"
         columns={columns}
         searchQueryFilter={deploymentSearchFilter}
         showCreateButton={true}

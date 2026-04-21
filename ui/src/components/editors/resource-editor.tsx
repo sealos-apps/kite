@@ -1,4 +1,5 @@
 import { Container } from 'kubernetes-types/core/v1'
+import { useTranslation } from 'react-i18next'
 
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -9,6 +10,8 @@ interface ResourceEditorProps {
 }
 
 export function ResourceEditor({ container, onUpdate }: ResourceEditorProps) {
+  const { t } = useTranslation()
+
   const updateResources = (
     type: 'requests' | 'limits',
     resource: 'cpu' | 'memory',
@@ -30,12 +33,14 @@ export function ResourceEditor({ container, onUpdate }: ResourceEditorProps) {
       {/* Requests */}
       <div className="space-y-4 p-4 border rounded-lg">
         <div className="flex items-center gap-2">
-          <Label className="text-sm font-medium">Resource Requests</Label>
+          <Label className="text-sm font-medium">
+            {t('resourceEditor.resourceRequests')}
+          </Label>
         </div>
         <div className="space-y-3">
           <div>
             <Label htmlFor="cpu-request" className="text-sm">
-              CPU Request
+              {t('resourceEditor.cpuRequest')}
             </Label>
             <Input
               id="cpu-request"
@@ -43,15 +48,15 @@ export function ResourceEditor({ container, onUpdate }: ResourceEditorProps) {
               onChange={(e) =>
                 updateResources('requests', 'cpu', e.target.value)
               }
-              placeholder="100m"
+              placeholder={t('resourceEditor.cpuRequestPlaceholder')}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              e.g., 100m (0.1 CPU), 1 (1 CPU)
+              {t('resourceEditor.cpuRequestHint')}
             </p>
           </div>
           <div>
             <Label htmlFor="memory-request" className="text-sm">
-              Memory Request
+              {t('resourceEditor.memoryRequest')}
             </Label>
             <Input
               id="memory-request"
@@ -59,10 +64,10 @@ export function ResourceEditor({ container, onUpdate }: ResourceEditorProps) {
               onChange={(e) =>
                 updateResources('requests', 'memory', e.target.value)
               }
-              placeholder="128Mi"
+              placeholder={t('resourceEditor.memoryRequestPlaceholder')}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              e.g., 128Mi, 1Gi, 512M
+              {t('resourceEditor.memoryRequestHint')}
             </p>
           </div>
         </div>
@@ -71,26 +76,28 @@ export function ResourceEditor({ container, onUpdate }: ResourceEditorProps) {
       {/* Limits */}
       <div className="space-y-4 p-4 border rounded-lg">
         <div className="flex items-center gap-2">
-          <Label className="text-sm font-medium">Resource Limits</Label>
+          <Label className="text-sm font-medium">
+            {t('resourceEditor.resourceLimits')}
+          </Label>
         </div>
         <div className="space-y-3">
           <div>
             <Label htmlFor="cpu-limit" className="text-sm">
-              CPU Limit
+              {t('resourceEditor.cpuLimit')}
             </Label>
             <Input
               id="cpu-limit"
               value={container.resources?.limits?.cpu || ''}
               onChange={(e) => updateResources('limits', 'cpu', e.target.value)}
-              placeholder="500m"
+              placeholder={t('resourceEditor.cpuLimitPlaceholder')}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              e.g., 500m (0.5 CPU), 2 (2 CPUs)
+              {t('resourceEditor.cpuLimitHint')}
             </p>
           </div>
           <div>
             <Label htmlFor="memory-limit" className="text-sm">
-              Memory Limit
+              {t('resourceEditor.memoryLimit')}
             </Label>
             <Input
               id="memory-limit"
@@ -98,10 +105,10 @@ export function ResourceEditor({ container, onUpdate }: ResourceEditorProps) {
               onChange={(e) =>
                 updateResources('limits', 'memory', e.target.value)
               }
-              placeholder="512Mi"
+              placeholder={t('resourceEditor.memoryLimitPlaceholder')}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              e.g., 512Mi, 2Gi, 1G
+              {t('resourceEditor.memoryLimitHint')}
             </p>
           </div>
         </div>

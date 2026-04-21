@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { CaseSensitive, Check, LogOut, Palette } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,7 @@ import { SidebarCustomizer } from './sidebar-customizer'
 
 export function UserMenu() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
   const { colorTheme, setColorTheme, font, setFont } = useAppearance()
   const [open, setOpen] = useState(false)
 
@@ -67,12 +69,13 @@ export function UserMenu() {
             <p className="text-xs text-muted-foreground">{user.username}</p>
             {user.provider && (
               <p className="text-xs text-muted-foreground capitalize">
-                via {user.provider}
+                {t('userMenu.viaProvider', { provider: user.provider })}
               </p>
             )}
             {user.roles && user.roles.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                Role: {user.roles.map((role) => role.name).join(', ')}
+                {t('userMenu.roleLabel')}{' '}
+                {user.roles.map((role) => role.name).join(', ')}
               </p>
             )}
           </div>
@@ -83,7 +86,7 @@ export function UserMenu() {
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Palette className="mr-2 h-4 w-4" />
-            <span>Color Theme</span>
+            <span>{t('userMenu.colorTheme')}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             {Object.entries(colorThemes).map(([key]) => {
@@ -112,7 +115,7 @@ export function UserMenu() {
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <CaseSensitive className="mr-2 h-4 w-4" />
-            <span>Font</span>
+            <span>{t('userMenu.font')}</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuItem
@@ -123,7 +126,7 @@ export function UserMenu() {
                 font === 'system' ? 'font-medium text-foreground' : ''
               }`}
             >
-              <span>System</span>
+              <span>{t('userMenu.system')}</span>
               {font === 'system' && <Check className="h-4 w-4 text-primary" />}
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -163,7 +166,7 @@ export function UserMenu() {
               className="cursor-pointer text-red-600 focus:text-red-600"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>{t('userMenu.logOut')}</span>
             </DropdownMenuItem>
           </>
         )}

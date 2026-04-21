@@ -129,7 +129,8 @@ export function PVListPage() {
 
   return (
     <ResourceTable
-      resourceName={'PersistentVolumes'}
+      resourceName={t('nav.persistentvolumes')}
+      resourceType="persistentvolumes"
       columns={columns}
       clusterScope={true}
       searchQueryFilter={pvSearchFilter}

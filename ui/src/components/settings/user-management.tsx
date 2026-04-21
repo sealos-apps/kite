@@ -184,7 +184,7 @@ export function UserManagement() {
     () => [
       {
         id: 'id',
-        header: 'ID',
+        header: t('userManagement.table.id'),
         enableSorting: true,
         accessorFn: (row) => row.id,
         cell: ({ getValue }) => (
