@@ -39,14 +39,14 @@ export function JobListPage() {
           )
           const failedCondition = conditions.find((c) => c.type === 'Failed')
 
-          let status = t('status.running')
+          let status = 'Running'
           let variant: 'default' | 'destructive' | 'secondary' = 'secondary'
 
           if (completedCondition?.status === 'True') {
-            status = t('status.succeeded')
+            status = 'Succeeded'
             variant = 'default'
           } else if (failedCondition?.status === 'True') {
-            status = t('status.failed')
+            status = 'Failed'
             variant = 'destructive'
           }
 

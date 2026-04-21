@@ -44,9 +44,7 @@ export function CronJobListPage() {
           const isSuspended = row.original.spec?.suspend ?? false
           return (
             <Badge variant={isSuspended ? 'secondary' : 'default'}>
-              {isSuspended
-                ? t('cronjob.status.suspended')
-                : t('cronjob.status.active')}
+              {isSuspended ? 'Suspended' : 'Active'}
             </Badge>
           )
         },

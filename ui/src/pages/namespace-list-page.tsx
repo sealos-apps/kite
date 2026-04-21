@@ -26,7 +26,7 @@ export function NamespaceListPage() {
       }),
       columnHelper.accessor('status.phase', {
         header: t('common.status'),
-        cell: ({ row }) => row.original.status!.phase || t('status.unknown'),
+        cell: ({ row }) => row.original.status!.phase || 'Unknown',
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
         header: t('common.created'),

@@ -53,16 +53,14 @@ export function DaemonSetListPage() {
           const readyReplicas = row.original.status?.numberReady || 0
           const replicas = row.original.status?.desiredNumberScheduled || 0
           const isAvailable = readyReplicas === replicas
-          const status = isAvailable
-            ? t('deployments.available')
-            : t('common.loading')
+          const status = isAvailable ? 'Available' : 'Progressing'
           if (replicas === 0) {
             return (
               <Badge
                 variant="secondary"
                 className="text-muted-foreground px-1.5"
               >
-                {t('status.pending')}
+                Pending
               </Badge>
             )
           }

@@ -51,9 +51,7 @@ export function StatefulSetListPage() {
           const readyReplicas = row.original.status?.readyReplicas || 0
           const replicas = row.original.status?.replicas || 0
           const isAvailable = readyReplicas === replicas
-          const status = isAvailable
-            ? t('deployments.available')
-            : t('common.loading')
+          const status = isAvailable ? 'Available' : 'Progressing'
           if (replicas === 0) {
             return (
               <Badge

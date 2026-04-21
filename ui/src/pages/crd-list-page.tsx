@@ -84,7 +84,7 @@ export function CRDListPage() {
               variant={isEstablished ? 'default' : 'destructive'}
               className="text-xs"
             >
-              {isEstablished ? t('crd.established') : t('crd.notReady')}
+              {isEstablished ? 'Established' : 'Not Ready'}
             </Badge>
           )
         },
