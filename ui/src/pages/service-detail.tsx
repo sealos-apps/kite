@@ -252,7 +252,7 @@ export function ServiceDetail(props: { name: string; namespace?: string }) {
           },
           {
             value: 'Related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'services'}
@@ -274,7 +274,7 @@ export function ServiceDetail(props: { name: string; namespace?: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable<'services'>
                 resourceType={'services'}

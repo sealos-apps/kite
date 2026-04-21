@@ -157,21 +157,19 @@ export function ResourceTable<T>({
     ? undefined
     : fixedNamespace || selectedNamespace
   const [useSSE, setUseSSE] = useState(false)
+  const resolvedResourceType = (resourceType ??
+    (resourceName.toLowerCase() as ResourceType)) as ResourceType
   const {
     isLoading: queryLoading,
     data: queryData,
     isError: queryIsError,
     error: queryError,
     refetch: queryRefetch,
-  } = useResources(
-    resourceType ?? (resourceName.toLowerCase() as ResourceType),
-    requestNamespace,
-    {
-      refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
-      reduce: true, // Fetch reduced data for performance
-      disable: useSSE, // do not query when using SSE
-    }
-  )
+  } = useResources(resolvedResourceType, requestNamespace, {
+    refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
+    reduce: true, // Fetch reduced data for performance
+    disable: useSSE, // do not query when using SSE
+  })
 
   // SSE state (when enabled)
   // SSE watch hook
@@ -181,12 +179,10 @@ export function ResourceTable<T>({
     error: watchError,
     isConnected,
     refetch: reconnectSSE,
-  } = useResourcesWatch(
-    (resourceType ??
-      (resourceName.toLowerCase() as ResourceType)) as ResourceType,
-    requestNamespace,
-    { reduce: true, enabled: useSSE }
-  )
+  } = useResourcesWatch(resolvedResourceType, requestNamespace, {
+    reduce: true,
+    enabled: useSSE,
+  })
 
   // (moved below after error is defined)
 
@@ -439,11 +435,7 @@ export function ResourceTable<T>({
         return Promise.resolve()
       }
 
-      return deleteResource(
-        resourceType ?? (resourceName.toLowerCase() as ResourceType),
-        name,
-        namespace
-      )
+      return deleteResource(resolvedResourceType, name, namespace)
         .then(() => {
           toast.success(t('resourceTable.deleteSuccess', { name }))
         })
@@ -468,7 +460,7 @@ export function ResourceTable<T>({
     } finally {
       setIsDeleting(false)
     }
-  }, [table, clusterScope, resourceType, resourceName, t, useSSE, refetch])
+  }, [table, clusterScope, resolvedResourceType, t, useSSE, refetch])
   // Calculate total and filtered row counts
   const totalRowCount = useMemo(
     () => (data as T[] | undefined)?.length || 0,
@@ -590,7 +582,7 @@ export function ResourceTable<T>({
               <React.Fragment key={index}>{toolbar}</React.Fragment>
             ))}
             {/* Watch/Live mode toggle switch */}
-            {resourceName === 'Pods' && (
+            {resolvedResourceType === 'pods' && (
               <div className="flex items-center gap-2">
                 <Label className="text-sm">
                   {useSSE ? (

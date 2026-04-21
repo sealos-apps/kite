@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 
 import { cn } from '@/lib/utils'
@@ -31,6 +32,7 @@ export function ResponsiveTabs({
   className,
   tabsListClassName,
 }: ResponsiveTabsProps) {
+  const { t } = useTranslation()
   const isMobile = useIsMobile()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -55,7 +57,7 @@ export function ResponsiveTabs({
       <div className={cn('space-y-4', className)}>
         <Select value={value} onValueChange={onValueChange}>
           <SelectTrigger className="w-full">
-            <SelectValue>{currentTab?.label || 'Select tab'}</SelectValue>
+            <SelectValue>{currentTab?.label || t('common.selectTab')}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {tabs.map((tab) => (

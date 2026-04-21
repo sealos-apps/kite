@@ -225,7 +225,11 @@ export function NodeDetail(props: { name: string }) {
 
   if (isError || !data) {
     return (
-      <ErrorMessage resourceName="Node" error={error} refetch={handleRefresh} />
+      <ErrorMessage
+        resourceName={t('nav.nodes')}
+        error={error}
+        refetch={handleRefresh}
+      />
     )
   }
 

@@ -698,7 +698,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
             : []),
           {
             value: 'Related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'deployments'}
@@ -709,7 +709,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable
                 resourceType="deployments"
@@ -725,7 +725,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                   value: 'volumes',
                   label: (
                     <>
-                      Volumes{' '}
+                      {t('deploymentCreateDialog.volumes')}{' '}
                       <Badge variant="secondary">
                         {deployment.spec.template.spec.volumes.length}
                       </Badge>
@@ -758,7 +758,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'monitor',
-            label: 'Monitor',
+            label: t('monitoring.title'),
             content: (
               <PodMonitoring
                 namespace={namespace}

@@ -1,12 +1,14 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { ConfigMap } from 'kubernetes-types/core/v1'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { formatDate } from '@/lib/utils'
 import { ResourceTable } from '@/components/resource-table'
 
 export function ConfigMapListPage() {
+  const { t } = useTranslation()
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<ConfigMap>()
 
@@ -14,7 +16,7 @@ export function ConfigMapListPage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor('metadata.name', {
-        header: 'Name',
+        header: t('common.name'),
         cell: ({ row }) => (
           <div className="font-medium text-blue-500 hover:underline">
             <Link
@@ -28,7 +30,7 @@ export function ConfigMapListPage() {
         ),
       }),
       columnHelper.accessor('data', {
-        header: 'Data Keys',
+        header: t('common.dataKeys'),
         cell: ({ getValue }) => {
           const data = getValue() || {}
           const keys = Object.keys(data)
@@ -46,7 +48,7 @@ export function ConfigMapListPage() {
         },
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
-        header: 'Created',
+        header: t('common.created'),
         cell: ({ getValue }) => {
           const dateStr = formatDate(getValue() || '')
 
@@ -56,7 +58,7 @@ export function ConfigMapListPage() {
         },
       }),
     ],
-    [columnHelper]
+    [columnHelper, t]
   )
 
   // Custom filter for configmap search
@@ -77,7 +79,8 @@ export function ConfigMapListPage() {
 
   return (
     <ResourceTable
-      resourceName="ConfigMaps"
+      resourceName={t('nav.configMaps')}
+      resourceType="configmaps"
       columns={columns}
       searchQueryFilter={configMapSearchFilter}
     />

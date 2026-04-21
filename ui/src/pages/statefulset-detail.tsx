@@ -675,7 +675,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
             : []),
           {
             value: 'Related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'statefulsets'}
@@ -697,7 +697,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable
                 resourceType="statefulsets"

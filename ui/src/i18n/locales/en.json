@@ -15,10 +15,16 @@
     "namespace": "Namespace",
     "status": "Status",
     "created": "Created",
+    "age": "Age",
+    "type": "Type",
+    "dataKeys": "Data Keys",
+    "ip": "IP",
+    "ipAddress": "IP Address",
     "actions": "Actions",
     "refresh": "Refresh",
     "language": "Language",
     "close": "Close",
+    "selectTab": "Select tab",
     "done": "Done",
     "desired": "Desired",
     "current": "Current",
@@ -26,6 +32,7 @@
     "assign": "Assign",
     "creating": "Creating...",
     "description": "Description",
+    "details": "Details",
     "disable": "Disable",
     "enable": "Enable",
     "password": "Password",
@@ -200,7 +207,47 @@
     "externalIP": "External IP",
     "ports": "Ports",
     "age": "Age",
-    "serviceName": "Service Name"
+    "serviceName": "Service Name",
+    "noServicesFound": "No services found"
+  },
+  "related": {
+    "title": "Related",
+    "kind": "Kind",
+    "empty": "No related resources found"
+  },
+  "volumeTable": {
+    "title": "Volumes",
+    "loading": "Loading volumes...",
+    "defaultMedium": "Default",
+    "sizeLabel": "Size",
+    "noMounts": "No mounts",
+    "volumeMounts": "Volume Mounts",
+    "empty": "No volumes configured for this resource."
+  },
+  "ingresses": {
+    "ingressClass": "Ingress Class",
+    "hosts": "Hosts",
+    "loadBalancer": "Load Balancer"
+  },
+  "gateway": {
+    "gatewayClass": "Gateway Class"
+  },
+  "httproute": {
+    "hostnames": "Hostnames"
+  },
+  "hpa": {
+    "target": "Target",
+    "minPods": "Min Pods",
+    "maxPods": "Max Pods",
+    "currentPods": "Current Pods",
+    "metrics": "Metrics"
+  },
+  "crd": {
+    "group": "Group",
+    "versions": "Versions",
+    "scope": "Scope",
+    "established": "Established",
+    "notReady": "Not Ready"
   },
   "nodes": {
     "title": "Nodes",
@@ -249,11 +296,26 @@
     "memoryUsage": "Memory Usage",
     "networkUsage": "Network Usage",
     "diskUsage": "Disk Usage",
+    "diskIOUsage": "Disk I/O Usage",
     "resourceUtilization": "Resource Utilization",
     "requests": "Requests",
     "limits": "Limits",
     "total": "Total",
-    "title": "Monitor"
+    "title": "Monitor",
+    "cpuCores": "CPU (cores)",
+    "memoryWithUnit": "Memory ({{unit}})",
+    "incoming": "Incoming",
+    "outgoing": "Outgoing",
+    "read": "Read",
+    "write": "Write",
+    "usage": "Usage",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "noCpuUsageData": "No CPU usage data available",
+    "noMemoryUsageData": "No memory usage data available",
+    "noNetworkUsageData": "No network usage data available",
+    "noDiskIOUsageData": "No disk I/O usage data available",
+    "noResourceUtilizationData": "No resource utilization data available"
   },
   "login": {
     "title": "Sign In",
@@ -341,7 +403,15 @@
     "values": "Values",
     "searchResource": "Search {{resource}}...",
     "new": "New",
-    "toggleColumns": "Toggle columns"
+    "toggleColumns": "Toggle columns",
+    "noResults": "No results.",
+    "showingFilteredRows": "Showing {{filtered}} of {{total}} row(s)",
+    "filteredByQuery": "(filtered by \"{{query}}\")",
+    "rowsTotal": "{{count}} row(s) total.",
+    "rowsPerPage": "Rows per page:",
+    "pageOf": "Page {{page}} of {{total}}",
+    "goToPreviousPage": "Go to previous page",
+    "goToNextPage": "Go to next page"
   },
   "deploymentCreateDialog": {
     "atLeastOneContainerRequired": "At least one container is required",
@@ -572,6 +642,9 @@
       "unassigned": "Unassigned",
       "updateError": "Failed to update role",
       "updated": "Role updated"
+    },
+    "table": {
+      "assignments": "Assignments"
     }
   },
   "settings": {
@@ -817,6 +890,7 @@
   },
   "resourceHistory": {
     "title": "Resource History",
+    "id": "ID",
     "operator": "Operator",
     "operationTime": "Time",
     "operationType": "Type",
@@ -1126,6 +1200,7 @@
     "table": {
       "avatar": "Avatar",
       "createdAt": "Created At",
+      "id": "ID",
       "lastLoginAt": "Last Login",
       "name": "Name",
       "provider": "Provider",
@@ -1204,6 +1279,7 @@
     "informationTitle": "CronJob Information",
     "jobCreated": "Job created successfully",
     "lastSchedule": "Last Schedule",
+    "lastSuccess": "Last Success",
     "loadingActiveJobs": "Loading active jobs...",
     "noActiveJobs": "No active jobs currently running.",
     "noJobsFound": "No jobs found for this CronJob",
@@ -1211,9 +1287,15 @@
     "resume": "Resume",
     "runNow": "Run Now",
     "schedule": "Schedule",
+    "state": "State",
     "startingDeadline": "Starting Deadline",
     "successfulJobsHistory": "Successful Jobs History",
     "suspend": "Suspend",
+    "status": {
+      "active": "Active",
+      "idle": "Idle",
+      "suspended": "Suspended"
+    },
     "timeZone": "Time Zone",
     "volumes": "Volumes"
   },

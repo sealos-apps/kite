@@ -81,21 +81,21 @@ export function PodListPage() {
       }),
       columnHelper.accessor((row) => row.metrics?.cpuUsage || 0, {
         id: 'cpu',
-        header: 'CPU',
+        header: t('monitoring.cpu'),
         cell: ({ row }) => (
           <MetricCell metrics={row.original.metrics} type="cpu" />
         ),
       }),
       columnHelper.accessor((row) => row.metrics?.memoryUsage || 0, {
         id: 'memory',
-        header: 'Memory',
+        header: t('monitoring.memory'),
         cell: ({ row }) => (
           <MetricCell metrics={row.original.metrics} type="memory" />
         ),
       }),
       columnHelper.accessor((row) => row.status?.podIP, {
         id: 'podIP',
-        header: 'IP',
+        header: t('common.ip'),
         cell: ({ getValue }) => {
           const ip = getValue() || '-'
           return (
@@ -161,7 +161,8 @@ export function PodListPage() {
 
   return (
     <ResourceTable<Pod>
-      resourceName="Pods"
+      resourceName={t('nav.pods')}
+      resourceType="pods"
       columns={columns}
       clusterScope={false}
       searchQueryFilter={podSearchFilter}

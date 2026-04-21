@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { HorizontalPodAutoscaler } from 'kubernetes-types/autoscaling/v2'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { formatDate } from '@/lib/utils'
@@ -47,12 +48,13 @@ function getMetricUtilization(hpa: HorizontalPodAutoscaler): string {
 }
 
 export function HorizontalPodAutoscalerListPage() {
+  const { t } = useTranslation()
   const columnHelper = createColumnHelper<HorizontalPodAutoscaler>()
 
   const columns = useMemo(
     () => [
       columnHelper.accessor('metadata.name', {
-        header: 'Name',
+        header: t('common.name'),
         cell: ({ row }) => (
           <div className="font-medium text-blue-500 hover:underline">
             <Link
@@ -66,33 +68,33 @@ export function HorizontalPodAutoscalerListPage() {
         ),
       }),
       columnHelper.accessor((row) => getHpaTargetInfo(row), {
-        header: 'Target',
+        header: t('hpa.target'),
         cell: ({ getValue }) => getValue(),
       }),
       columnHelper.accessor((row) => row.spec?.minReplicas, {
         id: 'minReplicas',
-        header: 'Min Pods',
+        header: t('hpa.minPods'),
         cell: ({ getValue }) => getValue() || '-',
       }),
       columnHelper.accessor((row) => row.spec?.maxReplicas, {
         id: 'maxReplicas',
-        header: 'Max Pods',
+        header: t('hpa.maxPods'),
         cell: ({ getValue }) => getValue() || '-',
       }),
       columnHelper.accessor((row) => getCurrentReplicas(row), {
         id: 'currentReplicas',
-        header: 'Current Pods',
+        header: t('hpa.currentPods'),
         cell: ({ getValue }) => getValue(),
       }),
       columnHelper.accessor((row) => getMetricUtilization(row), {
         id: 'metrics',
-        header: 'Metrics',
+        header: t('hpa.metrics'),
         cell: ({ getValue }) => (
           <span className="text-muted-foreground text-sm">{getValue()}</span>
         ),
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
-        header: 'Created',
+        header: t('common.created'),
         cell: ({ getValue }) => {
           const dateStr = formatDate(getValue() || '')
 
@@ -102,7 +104,7 @@ export function HorizontalPodAutoscalerListPage() {
         },
       }),
     ],
-    [columnHelper]
+    [columnHelper, t]
   )
 
   const horizontalPodAutoscalerSearchFilter = useCallback(
@@ -119,7 +121,8 @@ export function HorizontalPodAutoscalerListPage() {
 
   return (
     <ResourceTable
-      resourceName="HorizontalPodAutoscalers"
+      resourceName={t('nav.horizontalpodautoscalers')}
+      resourceType="horizontalpodautoscalers"
       columns={columns}
       searchQueryFilter={horizontalPodAutoscalerSearchFilter}
     />

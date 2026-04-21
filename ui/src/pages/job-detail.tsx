@@ -104,7 +104,20 @@ export function JobDetail(props: { namespace: string; name: string }) {
     }
   }, [job])
 
-  const jobStatus = useMemo(() => getJobStatusBadge(job), [job])
+  const jobStatus = useMemo(() => {
+    const statusBadge = getJobStatusBadge(job)
+    const statusMap: Record<string, string> = {
+      Failed: t('status.failed'),
+      Complete: t('status.succeeded'),
+      Running: t('status.running'),
+      Pending: t('status.pending'),
+    }
+
+    return {
+      ...statusBadge,
+      label: statusMap[statusBadge.label] || statusBadge.label,
+    }
+  }, [job, t])
 
   const handleManualRefresh = async () => {
     setRefreshKey((prev) => prev + 1)
@@ -430,7 +443,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
             : []),
           {
             value: 'related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'jobs'}
@@ -448,7 +461,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable
                 resourceType="jobs"

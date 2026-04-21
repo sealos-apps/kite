@@ -62,7 +62,7 @@ export function DaemonSetListPage() {
                 variant="secondary"
                 className="text-muted-foreground px-1.5"
               >
-                Pending
+                {t('status.pending')}
               </Badge>
             )
           }
@@ -106,7 +106,8 @@ export function DaemonSetListPage() {
 
   return (
     <ResourceTable
-      resourceName={'DaemonSets'}
+      resourceName={t('nav.daemonsets')}
+      resourceType="daemonsets"
       columns={columns}
       searchQueryFilter={daemonSetSearchFilter}
     />

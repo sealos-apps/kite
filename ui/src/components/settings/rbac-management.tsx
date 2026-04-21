@@ -61,7 +61,7 @@ export function RBACManagement() {
       },
       {
         id: 'clusters',
-        header: 'Clusters',
+        header: t('rbac.form.clusters.label'),
         cell: ({ row: { original: r } }) => (
           <div className="text-sm text-muted-foreground">
             {r.clusters.length > 0 ? (
@@ -74,7 +74,7 @@ export function RBACManagement() {
       },
       {
         id: 'namespaces',
-        header: 'Namespaces',
+        header: t('rbac.form.namespaces.label'),
         cell: ({ row: { original: r } }) => (
           <div className="text-sm text-muted-foreground">
             {r.namespaces.length > 0 ? (
@@ -88,7 +88,7 @@ export function RBACManagement() {
 
       {
         id: 'Resources',
-        header: 'Resources',
+        header: t('rbac.form.resources.label'),
         cell: ({ row: { original: r } }) => (
           <div className="text-sm text-muted-foreground">
             {r.resources.length > 0 ? (
@@ -101,7 +101,7 @@ export function RBACManagement() {
       },
       {
         id: 'verbs',
-        header: 'Verbs',
+        header: t('rbac.form.verbs.label'),
         cell: ({ row: { original: r } }) => (
           <div className="text-sm text-muted-foreground">
             {r.verbs.length > 0 ? (
@@ -114,7 +114,7 @@ export function RBACManagement() {
       },
       {
         id: 'assignments',
-        header: 'Assignments',
+        header: t('rbac.table.assignments'),
         cell: ({ row: { original: r } }) => {
           const users =
             r.assignments?.filter((a) => a.subjectType === 'user') || []

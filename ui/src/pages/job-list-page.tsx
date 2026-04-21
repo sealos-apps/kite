@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Job } from 'kubernetes-types/batch/v1'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { formatDate } from '@/lib/utils'
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ResourceTable } from '@/components/resource-table'
 
 export function JobListPage() {
+  const { t } = useTranslation()
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<Job>()
 
@@ -15,7 +17,7 @@ export function JobListPage() {
   const columns = useMemo(
     () => [
       columnHelper.accessor('metadata.name', {
-        header: 'Name',
+        header: t('common.name'),
         cell: ({ row }) => (
           <div className="font-medium text-blue-500 hover:underline">
             <Link
@@ -29,7 +31,7 @@ export function JobListPage() {
         ),
       }),
       columnHelper.accessor('status.conditions', {
-        header: 'Status',
+        header: t('common.status'),
         cell: ({ row }) => {
           const conditions = row.original.status?.conditions || []
           const completedCondition = conditions.find(
@@ -37,14 +39,14 @@ export function JobListPage() {
           )
           const failedCondition = conditions.find((c) => c.type === 'Failed')
 
-          let status = 'Running'
+          let status = t('status.running')
           let variant: 'default' | 'destructive' | 'secondary' = 'secondary'
 
           if (completedCondition?.status === 'True') {
-            status = 'Complete'
+            status = t('status.succeeded')
             variant = 'default'
           } else if (failedCondition?.status === 'True') {
-            status = 'Failed'
+            status = t('status.failed')
             variant = 'destructive'
           }
 
@@ -53,7 +55,7 @@ export function JobListPage() {
       }),
       columnHelper.accessor((row) => row.status, {
         id: 'completions',
-        header: 'Completions',
+        header: t('job.completions'),
         cell: ({ row }) => {
           const status = row.original.status
           const succeeded = status?.succeeded || 0
@@ -62,7 +64,7 @@ export function JobListPage() {
         },
       }),
       columnHelper.accessor('status.startTime', {
-        header: 'Started',
+        header: t('job.startTime'),
         cell: ({ getValue }) => {
           const startTime = getValue()
           if (!startTime) return '-'
@@ -75,7 +77,7 @@ export function JobListPage() {
         },
       }),
       columnHelper.accessor('status.completionTime', {
-        header: 'Completed',
+        header: t('job.completionTime'),
         cell: ({ getValue }) => {
           const completionTime = getValue()
           if (!completionTime) return '-'
@@ -88,7 +90,7 @@ export function JobListPage() {
         },
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
-        header: 'Created',
+        header: t('common.created'),
         cell: ({ getValue }) => {
           const dateStr = formatDate(getValue() || '')
 
@@ -98,7 +100,7 @@ export function JobListPage() {
         },
       }),
     ],
-    [columnHelper]
+    [columnHelper, t]
   )
 
   // Custom filter for job search
@@ -111,7 +113,8 @@ export function JobListPage() {
 
   return (
     <ResourceTable
-      resourceName="Jobs"
+      resourceName={t('nav.jobs')}
+      resourceType="jobs"
       columns={columns}
       searchQueryFilter={jobSearchFilter}
     />

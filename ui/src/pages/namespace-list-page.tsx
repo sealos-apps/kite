@@ -26,7 +26,7 @@ export function NamespaceListPage() {
       }),
       columnHelper.accessor('status.phase', {
         header: t('common.status'),
-        cell: ({ row }) => row.original.status!.phase || 'Unknown',
+        cell: ({ row }) => row.original.status!.phase || t('status.unknown'),
       }),
       columnHelper.accessor('metadata.creationTimestamp', {
         header: t('common.created'),
@@ -44,7 +44,8 @@ export function NamespaceListPage() {
 
   return (
     <ResourceTable
-      resourceName="Namespaces"
+      resourceName={t('nav.namespaces')}
+      resourceType="namespaces"
       columns={columns}
       clusterScope={true}
       searchQueryFilter={filter}

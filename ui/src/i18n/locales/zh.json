@@ -17,10 +17,16 @@
     "namespace": "命名空间",
     "status": "状态",
     "created": "创建时间",
+    "age": "运行时间",
+    "type": "类型",
+    "dataKeys": "数据键",
+    "ip": "IP",
+    "ipAddress": "IP 地址",
     "actions": "操作",
     "refresh": "刷新",
     "language": "语言",
     "close": "关闭",
+    "selectTab": "选择标签",
     "enable": "启用",
     "disable": "禁用",
     "resetPassword": "重置密码",
@@ -32,6 +38,7 @@
     "done": "完成",
     "required": "此字段为必填项",
     "description": "描述",
+    "details": "详情",
     "yaml": "YAML",
     "available": "可用",
     "apply": "应用",
@@ -92,8 +99,8 @@
     "statefulsets": "有状态副本集",
     "daemonsets": "守护进程集",
     "jobs": "任务",
-    "services": "Services",
-    "ingresses": "Ingresses",
+    "services": "服务",
+    "ingresses": "入口",
     "gateways": "网关",
     "httproutes": "HTTP 路由",
     "configMaps": "配置映射",
@@ -220,13 +227,53 @@
     "age": "运行时间"
   },
   "services": {
-    "title": "Services",
+    "title": "服务",
     "type": "类型",
     "clusterIP": "集群IP",
     "externalIP": "外部IP",
     "ports": "端口",
     "age": "运行时间",
-    "serviceName": "服务名称"
+    "serviceName": "服务名称",
+    "noServicesFound": "未找到服务"
+  },
+  "related": {
+    "title": "关联资源",
+    "kind": "类型",
+    "empty": "未找到关联资源"
+  },
+  "volumeTable": {
+    "title": "卷",
+    "loading": "加载卷中...",
+    "defaultMedium": "默认",
+    "sizeLabel": "大小",
+    "noMounts": "无挂载",
+    "volumeMounts": "卷挂载",
+    "empty": "该资源未配置卷。"
+  },
+  "ingresses": {
+    "ingressClass": "入口类",
+    "hosts": "主机",
+    "loadBalancer": "负载均衡"
+  },
+  "gateway": {
+    "gatewayClass": "网关类"
+  },
+  "httproute": {
+    "hostnames": "主机名"
+  },
+  "hpa": {
+    "target": "目标",
+    "minPods": "最小 Pod 数",
+    "maxPods": "最大 Pod 数",
+    "currentPods": "当前 Pod 数",
+    "metrics": "指标"
+  },
+  "crd": {
+    "group": "分组",
+    "versions": "版本",
+    "scope": "作用域",
+    "established": "已建立",
+    "notReady": "未就绪"
   },
   "nodes": {
     "title": "节点",
@@ -275,11 +322,26 @@
     "memoryUsage": "内存使用率",
     "networkUsage": "网络使用量",
     "diskUsage": "磁盘使用率",
+    "diskIOUsage": "磁盘 I/O 使用量",
     "resourceUtilization": "资源利用率",
     "requests": "请求",
     "limits": "限制",
     "total": "总计",
-    "title": "监控"
+    "title": "监控",
+    "cpuCores": "CPU（核）",
+    "memoryWithUnit": "内存（{{unit}}）",
+    "incoming": "入站",
+    "outgoing": "出站",
+    "read": "读",
+    "write": "写",
+    "usage": "使用量",
+    "cpu": "CPU",
+    "memory": "内存",
+    "noCpuUsageData": "暂无 CPU 使用数据",
+    "noMemoryUsageData": "暂无内存使用数据",
+    "noNetworkUsageData": "暂无网络使用数据",
+    "noDiskIOUsageData": "暂无磁盘 I/O 使用数据",
+    "noResourceUtilizationData": "暂无资源利用率数据"
   },
   "login": {
     "title": "登录",
@@ -367,7 +429,15 @@
     "values": "值",
     "searchResource": "搜索 {{resource}}...",
     "new": "新建",
-    "toggleColumns": "切换列"
+    "toggleColumns": "切换列",
+    "noResults": "暂无结果。",
+    "showingFilteredRows": "显示 {{filtered}} / {{total}} 行",
+    "filteredByQuery": "（按“{{query}}”筛选）",
+    "rowsTotal": "共 {{count}} 行。",
+    "rowsPerPage": "每页行数：",
+    "pageOf": "第 {{page}} / {{total}} 页",
+    "goToPreviousPage": "转到上一页",
+    "goToNextPage": "转到下一页"
   },
   "deploymentCreateDialog": {
     "atLeastOneContainerRequired": "至少需要一个容器",
@@ -598,6 +668,9 @@
       "unassigned": "取消分配成功",
       "updateError": "更新角色失败",
       "updated": "角色更新成功"
+    },
+    "table": {
+      "assignments": "分配"
     }
   },
   "settings": {
@@ -802,6 +875,7 @@
     },
     "table": {
       "username": "用户名",
+      "id": "ID",
       "name": "名称",
       "avatar": "头像",
       "status": "状态",
@@ -888,6 +962,7 @@
   },
   "resourceHistory": {
     "title": "资源历史",
+    "id": "ID",
     "operator": "操作人",
     "operationTime": "操作时间",
     "operationType": "操作类型",
@@ -1204,6 +1279,7 @@
     "informationTitle": "CronJob 信息",
     "jobCreated": "任务创建成功",
     "lastSchedule": "上次调度",
+    "lastSuccess": "上次成功",
     "loadingActiveJobs": "活动任务加载中...",
     "noActiveJobs": "当前没有正在运行的活动任务。",
     "noJobsFound": "未找到该 CronJob 生成的任务",
@@ -1211,9 +1287,15 @@
     "resume": "恢复",
     "runNow": "立即运行",
     "schedule": "调度计划",
+    "state": "状态",
     "startingDeadline": "启动截止时间",
     "successfulJobsHistory": "成功任务历史保留",
     "suspend": "暂停",
+    "status": {
+      "active": "活跃",
+      "idle": "空闲",
+      "suspended": "已暂停"
+    },
     "timeZone": "时区",
     "volumes": "卷"
   },

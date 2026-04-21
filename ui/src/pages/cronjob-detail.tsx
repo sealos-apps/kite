@@ -103,19 +103,22 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
     }
 
     if (cronjob.spec?.suspend) {
-      return { label: 'Suspended', variant: 'secondary' as const }
+      return {
+        label: t('cronjob.status.suspended'),
+        variant: 'secondary' as const,
+      }
     }
 
     if ((cronjob.status?.active?.length || 0) > 0) {
-      return { label: 'Active', variant: 'default' as const }
+      return { label: t('cronjob.status.active'), variant: 'default' as const }
     }
 
     if (cronjob.status?.lastSuccessfulTime) {
-      return { label: 'Idle', variant: 'outline' as const }
+      return { label: t('cronjob.status.idle'), variant: 'outline' as const }
     }
 
-    return { label: 'Pending', variant: 'outline' as const }
-  }, [cronjob])
+    return { label: t('status.pending'), variant: 'outline' as const }
+  }, [cronjob, t])
 
   const cronJobJobs = useMemo(() => {
     if (!jobs) {
@@ -155,7 +158,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
   const jobColumns = useMemo<Column<Job>[]>(
     () => [
       {
-        header: 'Name',
+        header: t('common.name'),
         accessor: (job) => job,
         align: 'left',
         cell: (value) => {
@@ -171,15 +174,25 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
         },
       },
       {
-        header: 'Status',
+        header: t('common.status'),
         accessor: (job) => getJobStatusBadge(job),
         cell: (value) => {
           const badge = value as JobStatusBadge
-          return <Badge variant={badge.variant}>{badge.label}</Badge>
+          const statusMap: Record<string, string> = {
+            Failed: t('status.failed'),
+            Complete: t('status.succeeded'),
+            Running: t('status.running'),
+            Pending: t('status.pending'),
+          }
+          return (
+            <Badge variant={badge.variant}>
+              {statusMap[badge.label] || badge.label}
+            </Badge>
+          )
         },
       },
       {
-        header: 'Succeeded',
+        header: t('job.completions'),
         accessor: (job) => {
           const succeeded = job.status?.succeeded || 0
           const completions = job.spec?.completions || 1
@@ -188,7 +201,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
         cell: (value) => <span className="text-sm">{value as string}</span>,
       },
       {
-        header: 'Started',
+        header: t('job.startTime'),
         accessor: (job) => job.status?.startTime,
         cell: (value) =>
           value ? (
@@ -200,7 +213,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           ),
       },
       {
-        header: 'Completed',
+        header: t('job.completionTime'),
         accessor: (job) => job.status?.completionTime,
         cell: (value) =>
           value ? (
@@ -212,7 +225,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           ),
       },
     ],
-    []
+    [t]
   )
 
   const handleManualRefresh = async () => {
@@ -654,7 +667,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'cronjobs'}
@@ -676,7 +689,7 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'history',
-            label: 'History',
+            label: t('resourceHistory.title'),
             content: (
               <ResourceHistoryTable
                 resourceType="cronjobs"

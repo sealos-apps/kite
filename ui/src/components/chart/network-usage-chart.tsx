@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   Area,
   AreaChart,
@@ -48,19 +49,23 @@ const formatBytes = (bytes: number) => {
     : value.toFixed(1) + sizes[i]
 }
 
-const chartConfig = {
-  networkOut: {
-    label: 'Outgoing',
-    color: 'oklch(0.55 0.22 235)', // Updated blue color to match theme
-  },
-  networkIn: {
-    label: 'Incoming',
-    color: 'oklch(0.55 0.20 145)', // Updated green color to match theme
-  },
-} satisfies ChartConfig
-
 const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
   const { networkIn, networkOut, isLoading, error, syncId } = prop
+  const { t } = useTranslation()
+
+  const chartConfig = React.useMemo<ChartConfig>(
+    () => ({
+      networkOut: {
+        label: t('monitoring.outgoing'),
+        color: 'oklch(0.55 0.22 235)', // Updated blue color to match theme
+      },
+      networkIn: {
+        label: t('monitoring.incoming'),
+        color: 'oklch(0.55 0.20 145)', // Updated green color to match theme
+      },
+    }),
+    [t]
+  )
 
   const chartData = React.useMemo(() => {
     if (!networkIn || !networkOut) return []
@@ -107,7 +112,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Network Usage
+            {t('monitoring.networkUsage')}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-2 sm:px-6">
@@ -124,7 +129,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
     return (
       <Card className="@container/card">
         <CardHeader>
-          <CardTitle>Network Usage</CardTitle>
+          <CardTitle>{t('monitoring.networkUsage')}</CardTitle>
         </CardHeader>
         <CardContent className="px-2 sm:px-6">
           <Alert variant="destructive">
@@ -145,11 +150,11 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
     return (
       <Card className="@container/card">
         <CardHeader>
-          <CardTitle>Network Usage</CardTitle>
+          <CardTitle>{t('monitoring.networkUsage')}</CardTitle>
         </CardHeader>
         <CardContent className="px-2 sm:px-6">
           <div className="flex h-[250px] w-full items-center justify-center text-muted-foreground">
-            <p>No network usage data available</p>
+            <p>{t('monitoring.noNetworkUsageData')}</p>
           </div>
         </CardContent>
       </Card>
@@ -159,7 +164,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Network Usage</CardTitle>
+        <CardTitle>{t('monitoring.networkUsage')}</CardTitle>
       </CardHeader>
       <CardContent className="px-2 sm:px-6">
         <ChartContainer

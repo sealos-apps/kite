@@ -547,7 +547,7 @@ export function PodDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'files',
-            label: 'Files',
+            label: t('pods.files.title'),
             content: (
               <PodFileBrowser
                 namespace={namespace}
@@ -580,7 +580,7 @@ export function PodDetail(props: { namespace: string; name: string }) {
           },
           {
             value: 'Related',
-            label: 'Related',
+            label: t('related.title'),
             content: (
               <RelatedResourcesTable
                 resource={'pods'}
