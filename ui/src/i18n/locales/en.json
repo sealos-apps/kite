@@ -71,6 +71,7 @@
       "storage": "storage",
       "config": "config",
       "other": "other",
+      "cr": "CR",
       "security": "Security",
       "workloads": "Workloads"
     },

@@ -33,7 +33,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { t } = useTranslation()
   const location = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
-  const { config, isLoading, getIconComponent } = useSidebarConfig()
+  const {
+    config,
+    isLoading,
+    getIconComponent,
+    shouldShowSidebarItem,
+    resolveSidebarItemTitle,
+  } = useSidebarConfig()
   const { data: versionInfo } = useVersionInfo()
   const { currentClusterInfo } = useCluster()
 
@@ -56,11 +62,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pinnedItems = useMemo(() => {
     if (!config) return []
     return config.groups
-      .flatMap((group) => group.items)
-      .filter((item) => shouldShowItemInCurrentCluster(item.url))
-      .filter((item) => config.pinnedItems.includes(item.id))
-      .filter((item) => !config.hiddenItems.includes(item.id))
-  }, [config, shouldShowItemInCurrentCluster])
+      .flatMap((group) =>
+        group.items.map((item) => ({ groupID: group.id, item }))
+      )
+      .filter(({ groupID, item }) => shouldShowSidebarItem(groupID, item))
+      .filter(({ item }) => shouldShowItemInCurrentCluster(item.url))
+      .filter(({ item }) => config.pinnedItems.includes(item.id))
+      .filter(({ item }) => !config.hiddenItems.includes(item.id))
+  }, [config, shouldShowItemInCurrentCluster, shouldShowSidebarItem])
 
   const visibleGroups = useMemo(() => {
     if (!config) return []
@@ -70,13 +79,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       .map((group) => ({
         ...group,
         items: group.items
+          .filter((item) => shouldShowSidebarItem(group.id, item))
           .filter((item) => shouldShowItemInCurrentCluster(item.url))
           .filter((item) => !config.hiddenItems.includes(item.id))
           .filter((item) => !config.pinnedItems.includes(item.id))
           .sort((a, b) => a.order - b.order),
       }))
       .filter((group) => group.items.length > 0)
-  }, [config, shouldShowItemInCurrentCluster])
+  }, [config, shouldShowItemInCurrentCluster, shouldShowSidebarItem])
 
   const isActive = (url: string) => {
     if (url === '/') {
@@ -191,10 +201,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {pinnedItems.map((item) => {
+                {pinnedItems.map(({ groupID, item }) => {
                   const IconComponent = getIconComponent(item.icon)
-                  const title = item.titleKey
-                    ? t(item.titleKey, { defaultValue: item.titleKey })
+                  const titleKey = resolveSidebarItemTitle(groupID, item)
+                  const title = titleKey
+                    ? t(titleKey, { defaultValue: titleKey })
                     : ''
                   return (
                     <SidebarMenuItem key={item.id}>
@@ -238,8 +249,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarMenu>
                     {group.items.map((item) => {
                       const IconComponent = getIconComponent(item.icon)
-                      const title = item.titleKey
-                        ? t(item.titleKey, { defaultValue: item.titleKey })
+                      const titleKey = resolveSidebarItemTitle(group.id, item)
+                      const title = titleKey
+                        ? t(titleKey, { defaultValue: titleKey })
                         : ''
                       return (
                         <SidebarMenuItem key={item.id}>
