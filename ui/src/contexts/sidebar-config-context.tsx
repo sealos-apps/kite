@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -36,6 +37,7 @@ import {
   IconUser,
   IconUsers,
 } from '@tabler/icons-react'
+import { CustomResourceDefinition } from 'kubernetes-types/apiextensions/v1'
 
 import {
   DefaultMenus,
@@ -43,6 +45,7 @@ import {
   SidebarGroup,
   SidebarItem,
 } from '@/types/sidebar'
+import { useResources } from '@/lib/api'
 import { isSidebarPathHidden } from '@/lib/resource-visibility'
 import { withSubPath } from '@/lib/subpath'
 
@@ -87,6 +90,8 @@ interface SidebarConfigContextType {
   isLoading: boolean
   hasUpdate: boolean
   canCreateCustomCRDGroup: boolean
+  shouldShowSidebarItem: (groupId: string, item: SidebarItem) => boolean
+  resolveSidebarItemTitle: (groupId: string, item: SidebarItem) => string
   updateConfig: (updates: Partial<SidebarConfig>) => void
   toggleItemVisibility: (itemId: string) => void
   toggleGroupVisibility: (groupId: string) => void
@@ -121,6 +126,107 @@ export const useSidebarConfig = () => {
 
 interface SidebarConfigProviderProps {
   children: React.ReactNode
+}
+
+const getSidebarGroupID = (groupKey: string): string =>
+  groupKey.toLowerCase().replace(/\./g, '-').replace(/\s+/g, '-')
+
+const BUILTIN_CR_GROUP_KEY = 'sidebar.groups.cr'
+const BUILTIN_CR_GROUP_ID = getSidebarGroupID(BUILTIN_CR_GROUP_KEY)
+const BUILTIN_CRD_NAMES = [
+  'apps.app.sealos.io',
+  'devboxes.devbox.sealos.io',
+  'rabbitmqclusters.rabbitmq.com',
+  'elasticsearches.elasticsearch.k8s.elastic.co',
+  'clusters.apps.kubeblocks.io',
+] as const
+const BUILTIN_CRD_NAME_SET = new Set<string>(BUILTIN_CRD_NAMES)
+
+const buildBuiltinCRSidebarItems = (): SidebarItem[] =>
+  BUILTIN_CRD_NAMES.map((crdName, index) => ({
+    id: `${BUILTIN_CR_GROUP_ID}-${`/crds/${crdName}`.replace(/[^a-zA-Z0-9]/g, '-')}`,
+    titleKey: crdName,
+    url: `/crds/${crdName}`,
+    icon: 'IconCode',
+    visible: true,
+    pinned: false,
+    order: index,
+  }))
+
+const ensureBuiltinCRGroup = (config: SidebarConfig): SidebarConfig => {
+  const builtinItems = buildBuiltinCRSidebarItems()
+  const existingGroupIndex = config.groups.findIndex(
+    (group) => group.id === BUILTIN_CR_GROUP_ID
+  )
+
+  if (existingGroupIndex === -1) {
+    const maxOrder = config.groups.reduce(
+      (maxOrderSoFar, group) => Math.max(maxOrderSoFar, group.order),
+      -1
+    )
+    const builtinGroup: SidebarGroup = {
+      id: BUILTIN_CR_GROUP_ID,
+      nameKey: BUILTIN_CR_GROUP_KEY,
+      items: builtinItems,
+      visible: true,
+      collapsed: false,
+      order: maxOrder + 1,
+    }
+
+    return {
+      ...config,
+      groups: [...config.groups, builtinGroup],
+      groupOrder: config.groupOrder.includes(BUILTIN_CR_GROUP_ID)
+        ? config.groupOrder
+        : [...config.groupOrder, BUILTIN_CR_GROUP_ID],
+    }
+  }
+
+  const groups = config.groups.map((group) => {
+    if (group.id !== BUILTIN_CR_GROUP_ID) {
+      return group
+    }
+
+    const existingItemIDs = new Set(group.items.map((item) => item.id))
+    const missingItems = builtinItems.filter(
+      (item) => !existingItemIDs.has(item.id)
+    )
+
+    if (missingItems.length === 0 && group.nameKey === BUILTIN_CR_GROUP_KEY) {
+      return group
+    }
+
+    return {
+      ...group,
+      nameKey: BUILTIN_CR_GROUP_KEY,
+      items:
+        missingItems.length === 0
+          ? group.items
+          : [
+              ...group.items,
+              ...missingItems.map((item, index) => ({
+                ...item,
+                order: group.items.length + index,
+              })),
+            ],
+    }
+  })
+
+  return {
+    ...config,
+    groups,
+    groupOrder: config.groupOrder.includes(BUILTIN_CR_GROUP_ID)
+      ? config.groupOrder
+      : [...config.groupOrder, BUILTIN_CR_GROUP_ID],
+  }
+}
+
+const getCRDNameFromSidebarURL = (url: string): string | null => {
+  const [resource, crdName] = url.replace(/^\/+/, '').split('/')
+  if (resource !== 'crds' || !crdName) {
+    return null
+  }
+  return crdName
 }
 
 const defaultMenus: DefaultMenus = {
@@ -199,6 +305,11 @@ const defaultMenus: DefaultMenus = {
     { titleKey: 'nav.events', url: '/events', icon: IconBell },
     { titleKey: 'nav.crds', url: '/crds', icon: IconCode },
   ],
+  [BUILTIN_CR_GROUP_KEY]: BUILTIN_CRD_NAMES.map((crdName) => ({
+    titleKey: crdName,
+    url: `/crds/${crdName}`,
+    icon: IconCode,
+  })),
 }
 
 const CURRENT_CONFIG_VERSION = 1
@@ -262,10 +373,7 @@ const defaultConfigs = (): SidebarConfig => {
   let groupOrder = 0
 
   Object.entries(defaultMenus).forEach(([groupKey, items]) => {
-    const groupId = groupKey
-      .toLowerCase()
-      .replace(/\./g, '-')
-      .replace(/\s+/g, '-')
+    const groupId = getSidebarGroupID(groupKey)
     const sidebarItems: SidebarItem[] = items.map((item, index) => ({
       id: `${groupId}-${item.url.replace(/[^a-zA-Z0-9]/g, '-')}`,
       titleKey: item.titleKey,
@@ -305,9 +413,55 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const hasLoadedConfigRef = useRef(false)
   const lastLoadedPreferenceRef = useRef<string | null>(null)
   const { user } = useAuth()
+  const { data: crdsData, isFetched: hasFetchedCRDs } = useResources(
+    'crds',
+    undefined,
+    {
+      disable: !user,
+    }
+  )
   const sidebarPreference = user?.sidebar_preference || ''
   const canCreateCustomCRDGroupPermission =
     user?.capabilities?.canCreateCustomCRDGroup ?? user?.isAdmin() ?? false
+  const availableBuiltinCRDs = useMemo(
+    () =>
+      new Set(
+        ((crdsData as CustomResourceDefinition[] | undefined) ?? [])
+          .map((crd) => crd.metadata?.name)
+          .filter((crdName): crdName is string => {
+            if (typeof crdName !== 'string') {
+              return false
+            }
+            return BUILTIN_CRD_NAME_SET.has(crdName)
+          })
+      ),
+    [crdsData]
+  )
+  const shouldShowSidebarItem = useCallback(
+    (groupId: string, item: SidebarItem) => {
+      if (groupId !== BUILTIN_CR_GROUP_ID) {
+        return true
+      }
+
+      const crdName = getCRDNameFromSidebarURL(item.url)
+      if (!crdName || !BUILTIN_CRD_NAME_SET.has(crdName)) {
+        return false
+      }
+
+      if (!hasFetchedCRDs) {
+        return false
+      }
+
+      return availableBuiltinCRDs.has(crdName)
+    },
+    [availableBuiltinCRDs, hasFetchedCRDs]
+  )
+  const resolveSidebarItemTitle = useCallback(
+    (_groupId: string, item: SidebarItem) => {
+      return item.titleKey
+    },
+    []
+  )
 
   const loadConfig = useCallback(() => {
     const normalizedPreference = sidebarPreference.trim()
@@ -320,7 +474,9 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
 
     if (normalizedPreference) {
       try {
-        const userConfig = JSON.parse(normalizedPreference)
+        const userConfig = ensureBuiltinCRGroup(
+          JSON.parse(normalizedPreference)
+        )
         const sanitizedConfig = sanitizeSidebarConfig(userConfig, {
           canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
         })
@@ -339,7 +495,8 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
 
   const saveConfig = useCallback(
     async (newConfig: SidebarConfig) => {
-      const sanitizedConfig = sanitizeSidebarConfig(newConfig, {
+      const configWithBuiltinCRGroup = ensureBuiltinCRGroup(newConfig)
+      const sanitizedConfig = sanitizeSidebarConfig(configWithBuiltinCRGroup, {
         canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
       })
 
@@ -618,6 +775,8 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     isLoading,
     hasUpdate,
     canCreateCustomCRDGroup: canCreateCustomCRDGroupPermission,
+    shouldShowSidebarItem,
+    resolveSidebarItemTitle,
     updateConfig,
     toggleItemVisibility,
     toggleGroupVisibility,

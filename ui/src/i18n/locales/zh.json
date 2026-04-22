@@ -130,6 +130,7 @@
       "storage": "存储",
       "config": "配置",
       "other": "其他",
+      "cr": "自定义资源",
       "security": "安全",
       "workloads": "工作负载"
     },

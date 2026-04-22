@@ -110,7 +110,12 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { config, getIconComponent } = useSidebarConfig()
+  const {
+    config,
+    getIconComponent,
+    shouldShowSidebarItem,
+    resolveSidebarItemTitle,
+  } = useSidebarConfig()
   const { setTheme, actualTheme } = useAppearance()
   const {
     clusters,
@@ -212,17 +217,27 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         .slice()
         .sort((a, b) => a.order - b.order)
         .forEach((item) => {
+          if (!shouldShowSidebarItem(group.id, item)) {
+            return
+          }
           if (isSidebarPathHidden(item.url)) {
             return
           }
 
-          const title = item.titleKey
-            ? t(item.titleKey, { defaultValue: item.titleKey })
+          const titleKey = resolveSidebarItemTitle(group.id, item)
+          const title = titleKey
+            ? t(titleKey, { defaultValue: titleKey })
             : item.id
           const Icon = getIconComponent(item.icon) as ComponentType<{
             className?: string | undefined
           }>
-          const searchTerms = [title, groupLabel, item.url, item.titleKey]
+          const searchTerms = [
+            title,
+            groupLabel,
+            item.url,
+            titleKey,
+            item.titleKey,
+          ]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
@@ -240,7 +255,14 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     })
 
     return items
-  }, [config, getIconComponent, t, user])
+  }, [
+    config,
+    getIconComponent,
+    resolveSidebarItemTitle,
+    shouldShowSidebarItem,
+    t,
+    user,
+  ])
 
   const sidebarResults = useMemo(() => {
     const trimmedQuery = query.trim().toLowerCase()

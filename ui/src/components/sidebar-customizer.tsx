@@ -64,6 +64,8 @@ export function SidebarCustomizer({
     removeCustomGroup,
     removeCRDToGroup,
     moveGroup,
+    shouldShowSidebarItem,
+    resolveSidebarItemTitle,
   } = useSidebarConfig()
 
   const getResourceByUrl = useCallback((url: string): ResourceType | null => {
@@ -102,10 +104,13 @@ export function SidebarCustomizer({
   const pinnedItems = useMemo(() => {
     if (!config) return []
     return config.groups
-      .flatMap((group) => group.items)
-      .filter((item) => shouldShowItemInCurrentCluster(item.url))
-      .filter((item) => config.pinnedItems.includes(item.id))
-  }, [config, shouldShowItemInCurrentCluster])
+      .flatMap((group) =>
+        group.items.map((item) => ({ groupID: group.id, item }))
+      )
+      .filter(({ groupID, item }) => shouldShowSidebarItem(groupID, item))
+      .filter(({ item }) => shouldShowItemInCurrentCluster(item.url))
+      .filter(({ item }) => config.pinnedItems.includes(item.id))
+  }, [config, shouldShowItemInCurrentCluster, shouldShowSidebarItem])
 
   const sortedGroups = useMemo(() => {
     if (!config) return []
@@ -113,12 +118,14 @@ export function SidebarCustomizer({
       .sort((a, b) => a.order - b.order)
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) =>
-          shouldShowItemInCurrentCluster(item.url)
+        items: group.items.filter(
+          (item) =>
+            shouldShowSidebarItem(group.id, item) &&
+            shouldShowItemInCurrentCluster(item.url)
         ),
       }))
       .filter((group) => group.isCustom || group.items.length > 0)
-  }, [config, shouldShowItemInCurrentCluster])
+  }, [config, shouldShowItemInCurrentCluster, shouldShowSidebarItem])
 
   if (isLoading || !config) {
     return null
@@ -167,10 +174,11 @@ export function SidebarCustomizer({
                     {pinnedItems.length})
                   </Label>
                   <div className="space-y-2">
-                    {pinnedItems.map((item) => {
+                    {pinnedItems.map(({ groupID, item }) => {
                       const IconComponent = getIconComponent(item.icon)
-                      const title = item.titleKey
-                        ? t(item.titleKey, { defaultValue: item.titleKey })
+                      const titleKey = resolveSidebarItemTitle(groupID, item)
+                      const title = titleKey
+                        ? t(titleKey, { defaultValue: titleKey })
                         : ''
                       return (
                         <div
@@ -296,8 +304,9 @@ export function SidebarCustomizer({
                       const IconComponent = getIconComponent(item.icon)
                       const isHidden = config.hiddenItems.includes(item.id)
                       const isPinned = config.pinnedItems.includes(item.id)
-                      const title = item.titleKey
-                        ? t(item.titleKey, { defaultValue: item.titleKey })
+                      const titleKey = resolveSidebarItemTitle(group.id, item)
+                      const title = titleKey
+                        ? t(titleKey, { defaultValue: titleKey })
                         : ''
 
                       return (
