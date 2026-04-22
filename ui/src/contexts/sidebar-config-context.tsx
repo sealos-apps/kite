@@ -428,10 +428,12 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       new Set(
         ((crdsData as CustomResourceDefinition[] | undefined) ?? [])
           .map((crd) => crd.metadata?.name)
-          .filter(
-            (crdName): crdName is string =>
-              Boolean(crdName) && BUILTIN_CRD_NAME_SET.has(crdName)
-          )
+          .filter((crdName): crdName is string => {
+            if (typeof crdName !== 'string') {
+              return false
+            }
+            return BUILTIN_CRD_NAME_SET.has(crdName)
+          })
       ),
     [crdsData]
   )
