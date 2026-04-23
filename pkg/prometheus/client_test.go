@@ -41,10 +41,10 @@ func TestBuildResourceUsageQueriesWithoutNamespaceOrInstance(t *testing.T) {
 	if got, want := memoryQuery, `sum(container_memory_usage_bytes{container!="POD",container!=""}) / sum(kube_node_status_allocatable{resource="memory"}) * 100`; got != want {
 		t.Fatalf("memory query mismatch\nwant: %s\ngot:  %s", want, got)
 	}
-	if got, want := networkInQuery, `sum(rate(container_network_receive_bytes_total{}[1m]))`; got != want {
+	if got, want := networkInQuery, `sum(rate(node_network_receive_bytes_total{device!="lo"}[1m]))`; got != want {
 		t.Fatalf("network in query mismatch\nwant: %s\ngot:  %s", want, got)
 	}
-	if got, want := networkOutQuery, `sum(rate(container_network_transmit_bytes_total{}[1m]))`; got != want {
+	if got, want := networkOutQuery, `sum(rate(node_network_transmit_bytes_total{device!="lo"}[1m]))`; got != want {
 		t.Fatalf("network out query mismatch\nwant: %s\ngot:  %s", want, got)
 	}
 }

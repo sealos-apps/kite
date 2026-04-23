@@ -139,13 +139,15 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	// Query Network incoming bytes rate (bytes per second)
 	networkInData, err := c.queryRange(ctx, networkInQuery, start, now, step)
 	if err != nil {
-		return nil, fmt.Errorf("error querying Network incoming bytes: %w", err)
+		klog.Warningf("network incoming query failed, fallback to empty series: query=%s err=%v", networkInQuery, err)
+		networkInData = []UsageDataPoint{}
 	}
 
 	// Query Network outgoing bytes rate (bytes per second)
 	networkOutData, err := c.queryRange(ctx, networkOutQuery, start, now, step)
 	if err != nil {
-		return nil, fmt.Errorf("error querying Network outgoing bytes: %w", err)
+		klog.Warningf("network outgoing query failed, fallback to empty series: query=%s err=%v", networkOutQuery, err)
+		networkOutData = []UsageDataPoint{}
 	}
 
 	if len(cpuData) == 0 && len(memoryData) == 0 && len(networkInData) == 0 && len(networkOutData) == 0 {
@@ -170,14 +172,6 @@ func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsage
 	}
 	if instance != "" {
 		containerConditions = append(containerConditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
-	}
-
-	networkConditions := []string{}
-	if options.Namespace != "" {
-		networkConditions = append(networkConditions, fmt.Sprintf(`namespace="%s"`, options.Namespace))
-	}
-	if instance != "" {
-		networkConditions = append(networkConditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
 	}
 
 	cpuQuery := ""
@@ -210,9 +204,28 @@ func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsage
 		memoryQuery = fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(containerConditions, ","), strings.Join(memoryConditions, ","))
 	}
 
-	networkInQuery := fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, strings.Join(networkConditions, ","))
-	networkOutQuery := fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, strings.Join(networkConditions, ","))
+	networkInQuery, networkOutQuery := buildNetworkUsageQueries(instance, nodeLabel, options)
 	return cpuQuery, memoryQuery, networkInQuery, networkOutQuery
+}
+
+func buildNetworkUsageQueries(instance, nodeLabel string, options ResourceUsageOptions) (string, string) {
+	// For cluster-wide overview (no namespace and no node), prefer node-level metrics
+	// to avoid high-cardinality container-level scans.
+	if options.Namespace == "" && instance == "" {
+		return `sum(rate(node_network_receive_bytes_total{device!="lo"}[1m]))`,
+			`sum(rate(node_network_transmit_bytes_total{device!="lo"}[1m]))`
+	}
+
+	networkConditions := []string{}
+	if options.Namespace != "" {
+		networkConditions = append(networkConditions, fmt.Sprintf(`namespace="%s"`, options.Namespace))
+	}
+	if instance != "" {
+		networkConditions = append(networkConditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
+	}
+
+	return fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, strings.Join(networkConditions, ",")),
+		fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, strings.Join(networkConditions, ","))
 }
 
 func formatPromQLScalar(value float64) string {
