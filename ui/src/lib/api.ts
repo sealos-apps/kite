@@ -41,6 +41,30 @@ export interface PaginatedResult<T> {
   }
 }
 
+export interface BuiltinSidebarCRDPrinterColumn {
+  name: string
+  type: string
+  jsonPath: string
+  description?: string
+  format?: string
+  priority?: number
+}
+
+export interface BuiltinSidebarCRDVersion {
+  name: string
+  served: boolean
+  storage: boolean
+  additionalPrinterColumns?: BuiltinSidebarCRDPrinterColumn[]
+}
+
+export interface BuiltinSidebarCRD {
+  name: string
+  kind: string
+  group: string
+  scope: 'Cluster' | 'Namespaced' | string
+  versions: BuiltinSidebarCRDVersion[]
+}
+
 // Generic fetch function with error handling
 async function fetchAPI<T>(endpoint: string): Promise<T> {
   try {
@@ -401,6 +425,19 @@ export const useResources = <T extends ResourceType>(
     placeholderData: (prevData) => prevData,
     refetchInterval: options?.refreshInterval || 0,
     staleTime: options?.staleTime || (resource === 'crds' ? 5000 : 1000),
+  })
+}
+
+export const useBuiltinSidebarCRDs = (options?: { disable?: boolean }) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: [clusterKey, 'sidebar', 'builtin-crds'],
+    queryFn: () =>
+      fetchAPI<{ items: BuiltinSidebarCRD[] }>('/sidebar/builtin-crds'),
+    enabled: !options?.disable,
+    select: (data) => data.items,
+    placeholderData: (prevData) => prevData,
+    staleTime: 30 * 1000,
   })
 }
 

@@ -204,6 +204,7 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 
 		api.GET("/image/tags", handlers.GetImageTags)
 		api.GET("/templates", handlers.ListTemplates)
+		api.GET("/sidebar/builtin-crds", handlers.ListBuiltinSidebarCRDs)
 
 		proxyHandler := handlers.NewProxyHandler()
 		proxyHandler.RegisterRoutes(api)

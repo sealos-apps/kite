@@ -10,7 +10,11 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { CustomResource, ResourceType } from '@/types/api'
-import { fetchResource } from '@/lib/api'
+import {
+  BuiltinSidebarCRD,
+  fetchResource,
+  useBuiltinSidebarCRDs,
+} from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { useCluster } from '@/hooks/use-cluster'
 import { Button } from '@/components/ui/button'
@@ -23,19 +27,70 @@ import {
 import { ResourceTable } from '@/components/resource-table'
 import { YamlEditor } from '@/components/yaml-editor'
 
+function buildCRDFromBuiltinSidebarInfo(
+  crd: BuiltinSidebarCRD
+): CustomResourceDefinition {
+  return {
+    apiVersion: 'apiextensions.k8s.io/v1',
+    kind: 'CustomResourceDefinition',
+    metadata: {
+      name: crd.name,
+    },
+    spec: {
+      group: crd.group,
+      names: {
+        kind: crd.kind,
+        plural: crd.name.split('.')[0],
+      },
+      scope: crd.scope as CustomResourceDefinition['spec']['scope'],
+      versions: crd.versions.map((version) => ({
+        name: version.name,
+        served: version.served,
+        storage: version.storage,
+        schema: {
+          openAPIV3Schema: {
+            type: 'object',
+          },
+        },
+        additionalPrinterColumns: version.additionalPrinterColumns,
+      })),
+    },
+  } as CustomResourceDefinition
+}
+
 export function CRListPage() {
   const { t } = useTranslation()
   const [isYamlDialogOpen, setIsYamlDialogOpen] = useState(false)
   const [yamlContent, setYamlContent] = useState('')
   const { crd } = useParams<{ crd: string }>()
   const { currentClusterInfo } = useCluster()
-  const isClusterScopeBlocked = !!currentClusterInfo?.namespaceScoped
-  const { data: crdData, isLoading: isLoadingCRD } = useQuery({
+  const isNamespaceScopedCluster = !!currentClusterInfo?.namespaceScoped
+  const {
+    data: builtinCRDs,
+    isLoading: isLoadingBuiltinCRDs,
+    isFetched: hasFetchedBuiltinCRDs,
+  } = useBuiltinSidebarCRDs({ disable: !crd })
+  const builtinCRDData = useMemo<CustomResourceDefinition | undefined>(() => {
+    const builtinCRD = builtinCRDs?.find((item) => item.name === crd)
+    if (!builtinCRD) {
+      return undefined
+    }
+    return buildCRDFromBuiltinSidebarInfo(builtinCRD)
+  }, [builtinCRDs, crd])
+  const { data: fullCRDData, isLoading: isLoadingFullCRD } = useQuery({
     queryKey: ['crds', crd],
     queryFn: () =>
       fetchResource<CustomResourceDefinition>('crds', crd!, '_all'),
-    enabled: !!crd && !isClusterScopeBlocked,
+    enabled: !!crd && !isNamespaceScopedCluster,
   })
+  const crdData = fullCRDData ?? builtinCRDData
+  const isClusterScopeBlocked =
+    isNamespaceScopedCluster &&
+    hasFetchedBuiltinCRDs &&
+    (!builtinCRDData || builtinCRDData.spec.scope === 'Cluster')
+  const isLoadingCRD = isNamespaceScopedCluster
+    ? isLoadingBuiltinCRDs
+    : isLoadingFullCRD
 
   useEffect(() => {
     if (!isClusterScopeBlocked) return
@@ -53,19 +108,23 @@ export function CRListPage() {
     setIsYamlDialogOpen(true)
   }, [])
   const extraToolbars = useMemo(() => {
+    if (!fullCRDData) {
+      return []
+    }
+
     return [
       <Button
         variant="outline"
         size="default"
         onClick={() => {
-          handleViewYaml(crdData as CustomResourceDefinition)
+          handleViewYaml(fullCRDData)
         }}
       >
         <Eye className="h-4 w-4 mr-1" />
         {t('common.yaml')}
       </Button>,
     ]
-  }, [crdData, handleViewYaml, t])
+  }, [fullCRDData, handleViewYaml, t])
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor('metadata.name', {
