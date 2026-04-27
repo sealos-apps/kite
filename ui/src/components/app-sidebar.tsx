@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 
 import { clusterScopeResources, ResourceType } from '@/types/api'
+import { SidebarItem } from '@/types/sidebar'
 import { useVersionInfo } from '@/lib/api'
 import { useCluster } from '@/hooks/use-cluster'
 import {
@@ -39,6 +40,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     getIconComponent,
     shouldShowSidebarItem,
     resolveSidebarItemTitle,
+    getSidebarItemScope,
   } = useSidebarConfig()
   const { data: versionInfo } = useVersionInfo()
   const { currentClusterInfo } = useCluster()
@@ -50,13 +52,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, [])
 
   const shouldShowItemInCurrentCluster = useCallback(
-    (url: string) => {
+    (groupID: string, item: SidebarItem) => {
       if (!currentClusterInfo?.namespaceScoped) return true
-      const resource = getResourceByUrl(url)
+      const scope = getSidebarItemScope(groupID, item)
+      if (scope) {
+        return scope !== 'Cluster'
+      }
+
+      const resource = getResourceByUrl(item.url)
       if (!resource) return true
       return !clusterScopeResources.includes(resource)
     },
-    [currentClusterInfo, getResourceByUrl]
+    [currentClusterInfo, getResourceByUrl, getSidebarItemScope]
   )
 
   const pinnedItems = useMemo(() => {
@@ -66,7 +73,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         group.items.map((item) => ({ groupID: group.id, item }))
       )
       .filter(({ groupID, item }) => shouldShowSidebarItem(groupID, item))
-      .filter(({ item }) => shouldShowItemInCurrentCluster(item.url))
+      .filter(({ groupID, item }) =>
+        shouldShowItemInCurrentCluster(groupID, item)
+      )
       .filter(({ item }) => config.pinnedItems.includes(item.id))
       .filter(({ item }) => !config.hiddenItems.includes(item.id))
   }, [config, shouldShowItemInCurrentCluster, shouldShowSidebarItem])
@@ -80,7 +89,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ...group,
         items: group.items
           .filter((item) => shouldShowSidebarItem(group.id, item))
-          .filter((item) => shouldShowItemInCurrentCluster(item.url))
+          .filter((item) => shouldShowItemInCurrentCluster(group.id, item))
           .filter((item) => !config.hiddenItems.includes(item.id))
           .filter((item) => !config.pinnedItems.includes(item.id))
           .sort((a, b) => a.order - b.order),

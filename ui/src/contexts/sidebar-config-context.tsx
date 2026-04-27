@@ -37,7 +37,6 @@ import {
   IconUser,
   IconUsers,
 } from '@tabler/icons-react'
-import { CustomResourceDefinition } from 'kubernetes-types/apiextensions/v1'
 
 import {
   DefaultMenus,
@@ -45,7 +44,7 @@ import {
   SidebarGroup,
   SidebarItem,
 } from '@/types/sidebar'
-import { useResources } from '@/lib/api'
+import { useBuiltinSidebarCRDs } from '@/lib/api'
 import { isSidebarPathHidden } from '@/lib/resource-visibility'
 import { withSubPath } from '@/lib/subpath'
 
@@ -92,6 +91,10 @@ interface SidebarConfigContextType {
   canCreateCustomCRDGroup: boolean
   shouldShowSidebarItem: (groupId: string, item: SidebarItem) => boolean
   resolveSidebarItemTitle: (groupId: string, item: SidebarItem) => string
+  getSidebarItemScope: (
+    groupId: string,
+    item: SidebarItem
+  ) => 'Cluster' | 'Namespaced' | string | undefined
   updateConfig: (updates: Partial<SidebarConfig>) => void
   toggleItemVisibility: (itemId: string) => void
   toggleGroupVisibility: (groupId: string) => void
@@ -413,21 +416,22 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
   const hasLoadedConfigRef = useRef(false)
   const lastLoadedPreferenceRef = useRef<string | null>(null)
   const { user } = useAuth()
-  const { data: crdsData, isFetched: hasFetchedCRDs } = useResources(
-    'crds',
-    undefined,
-    {
+  const { data: builtinCRDs, isFetched: hasFetchedBuiltinCRDs } =
+    useBuiltinSidebarCRDs({
       disable: !user,
-    }
-  )
+    })
   const sidebarPreference = user?.sidebar_preference || ''
   const canCreateCustomCRDGroupPermission =
     user?.capabilities?.canCreateCustomCRDGroup ?? user?.isAdmin() ?? false
+  const builtinCRDByName = useMemo(
+    () => new Map((builtinCRDs ?? []).map((crd) => [crd.name, crd])),
+    [builtinCRDs]
+  )
   const availableBuiltinCRDs = useMemo(
     () =>
       new Set(
-        ((crdsData as CustomResourceDefinition[] | undefined) ?? [])
-          .map((crd) => crd.metadata?.name)
+        (builtinCRDs ?? [])
+          .map((crd) => crd.name)
           .filter((crdName): crdName is string => {
             if (typeof crdName !== 'string') {
               return false
@@ -435,7 +439,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
             return BUILTIN_CRD_NAME_SET.has(crdName)
           })
       ),
-    [crdsData]
+    [builtinCRDs]
   )
   const shouldShowSidebarItem = useCallback(
     (groupId: string, item: SidebarItem) => {
@@ -448,19 +452,34 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
         return false
       }
 
-      if (!hasFetchedCRDs) {
+      if (!hasFetchedBuiltinCRDs) {
         return false
       }
 
       return availableBuiltinCRDs.has(crdName)
     },
-    [availableBuiltinCRDs, hasFetchedCRDs]
+    [availableBuiltinCRDs, hasFetchedBuiltinCRDs]
   )
   const resolveSidebarItemTitle = useCallback(
     (_groupId: string, item: SidebarItem) => {
       return item.titleKey
     },
     []
+  )
+  const getSidebarItemScope = useCallback(
+    (groupId: string, item: SidebarItem) => {
+      if (groupId !== BUILTIN_CR_GROUP_ID) {
+        return undefined
+      }
+
+      const crdName = getCRDNameFromSidebarURL(item.url)
+      if (!crdName) {
+        return undefined
+      }
+
+      return builtinCRDByName.get(crdName)?.scope
+    },
+    [builtinCRDByName]
   )
 
   const loadConfig = useCallback(() => {
@@ -777,6 +796,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     canCreateCustomCRDGroup: canCreateCustomCRDGroupPermission,
     shouldShowSidebarItem,
     resolveSidebarItemTitle,
+    getSidebarItemScope,
     updateConfig,
     toggleItemVisibility,
     toggleGroupVisibility,

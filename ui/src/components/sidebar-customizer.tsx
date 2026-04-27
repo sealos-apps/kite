@@ -16,6 +16,7 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { clusterScopeResources, ResourceType } from '@/types/api'
+import { SidebarItem } from '@/types/sidebar'
 import { useCluster } from '@/hooks/use-cluster'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,6 +67,7 @@ export function SidebarCustomizer({
     moveGroup,
     shouldShowSidebarItem,
     resolveSidebarItemTitle,
+    getSidebarItemScope,
   } = useSidebarConfig()
 
   const getResourceByUrl = useCallback((url: string): ResourceType | null => {
@@ -75,13 +77,18 @@ export function SidebarCustomizer({
   }, [])
 
   const shouldShowItemInCurrentCluster = useCallback(
-    (url: string) => {
+    (groupID: string, item: SidebarItem) => {
       if (!currentClusterInfo?.namespaceScoped) return true
-      const resource = getResourceByUrl(url)
+      const scope = getSidebarItemScope(groupID, item)
+      if (scope) {
+        return scope !== 'Cluster'
+      }
+
+      const resource = getResourceByUrl(item.url)
       if (!resource) return true
       return !clusterScopeResources.includes(resource)
     },
-    [currentClusterInfo, getResourceByUrl]
+    [currentClusterInfo, getResourceByUrl, getSidebarItemScope]
   )
 
   const handleCreateGroup = () => {
@@ -108,7 +115,9 @@ export function SidebarCustomizer({
         group.items.map((item) => ({ groupID: group.id, item }))
       )
       .filter(({ groupID, item }) => shouldShowSidebarItem(groupID, item))
-      .filter(({ item }) => shouldShowItemInCurrentCluster(item.url))
+      .filter(({ groupID, item }) =>
+        shouldShowItemInCurrentCluster(groupID, item)
+      )
       .filter(({ item }) => config.pinnedItems.includes(item.id))
   }, [config, shouldShowItemInCurrentCluster, shouldShowSidebarItem])
 
@@ -121,7 +130,7 @@ export function SidebarCustomizer({
         items: group.items.filter(
           (item) =>
             shouldShowSidebarItem(group.id, item) &&
-            shouldShowItemInCurrentCluster(item.url)
+            shouldShowItemInCurrentCluster(group.id, item)
         ),
       }))
       .filter((group) => group.isCustom || group.items.length > 0)
