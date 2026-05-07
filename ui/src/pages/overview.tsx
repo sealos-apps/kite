@@ -58,7 +58,7 @@ export function Overview() {
         user?.provider !== 'Anonymous' &&
         user?.roles?.some((role) => role.name === 'admin') && <SettingsHint />}
 
-      <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ResourceCharts
           data={overview?.resource}
           isLoading={isLoading}
@@ -69,7 +69,7 @@ export function Overview() {
       </div>
 
       {overview?.prometheusEnabled && (
-        <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <ResourceUtilizationChart
             cpu={resourceUsage?.cpu || []}
             memory={resourceUsage?.memory || []}

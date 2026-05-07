@@ -247,7 +247,7 @@ export function TemplateManagement() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl! max-h-[90vh] flex flex-col">
+        <DialogContent className="!max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {editingTemplate

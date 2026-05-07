@@ -35,7 +35,7 @@ export function ClusterStatsCards({
 
   if (isLoading || !stats) {
     return (
-      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader>
@@ -114,11 +114,11 @@ export function ClusterStatsCards({
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       {statsConfig.map((stat) => {
         const Icon = stat.icon
         return (
-          <Card key={stat.label} className="@container/card">
+          <Card key={stat.label}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -127,7 +127,7 @@ export function ClusterStatsCards({
                   </div>
                   <div>
                     <CardDescription>{stat.label}</CardDescription>
-                    <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                    <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
                       {stat.routePath ? (
                         <Link
                           to={stat.routePath}

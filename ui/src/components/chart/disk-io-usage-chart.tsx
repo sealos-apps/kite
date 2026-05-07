@@ -57,11 +57,11 @@ const DiskIOUsageChart = React.memo((prop: DiskIOUsageChartProps) => {
     () => ({
       diskWrite: {
         label: t('monitoring.write'),
-        color: 'oklch(0.55 0.22 235)', // Blue color for write operations
+        color: 'rgb(0, 124, 221)', // Blue color for write operations
       },
       diskRead: {
         label: t('monitoring.read'),
-        color: 'oklch(0.55 0.20 145)', // Green color for read operations
+        color: 'rgb(0, 149, 79)', // Green color for read operations
       },
     }),
     [t]
@@ -108,7 +108,7 @@ const DiskIOUsageChart = React.memo((prop: DiskIOUsageChartProps) => {
   // Show loading skeleton
   if (isLoading) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -127,7 +127,7 @@ const DiskIOUsageChart = React.memo((prop: DiskIOUsageChartProps) => {
   // Show error state
   if (error) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.diskIOUsage')}</CardTitle>
         </CardHeader>
@@ -148,7 +148,7 @@ const DiskIOUsageChart = React.memo((prop: DiskIOUsageChartProps) => {
     (diskRead.length === 0 && diskWrite.length === 0)
   ) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.diskIOUsage')}</CardTitle>
         </CardHeader>
@@ -162,7 +162,7 @@ const DiskIOUsageChart = React.memo((prop: DiskIOUsageChartProps) => {
   }
 
   return (
-    <Card className="@container/card">
+    <Card>
       <CardHeader>
         <CardTitle>{t('monitoring.diskIOUsage')}</CardTitle>
       </CardHeader>
