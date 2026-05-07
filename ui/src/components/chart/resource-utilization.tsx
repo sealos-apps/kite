@@ -83,7 +83,7 @@ const ResourceUtilizationChart = React.memo(
     // Show loading skeleton
     if (isLoading) {
       return (
-        <Card className="@container/card">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -102,7 +102,7 @@ const ResourceUtilizationChart = React.memo(
     // Show error state
     if (error) {
       return (
-        <Card className="@container/card">
+        <Card>
           <CardHeader>
             <CardTitle>{t('monitoring.resourceUtilization')}</CardTitle>
           </CardHeader>
@@ -119,7 +119,7 @@ const ResourceUtilizationChart = React.memo(
     // Show empty state
     if (!cpu || !memory || (cpu.length === 0 && memory.length === 0)) {
       return (
-        <Card className="@container/card">
+        <Card>
           <CardHeader>
             <CardTitle>{t('monitoring.resourceUtilization')}</CardTitle>
           </CardHeader>
@@ -133,7 +133,7 @@ const ResourceUtilizationChart = React.memo(
     }
 
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.resourceUtilization')}</CardTitle>
         </CardHeader>

@@ -31,8 +31,9 @@ export function DescribeDialog({
           Describe
         </Button>
       </DialogTrigger>
-      <DialogContent className="!max-w-dvw">
+      <DialogContent className="w-[calc(100vw-2rem)] !max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden sm:!max-w-[90vw] lg:!max-w-5xl xl:!max-w-6xl">
         <TextViewer
+          className="min-h-0"
           title={`kubectl describe ${resourceType} ${namespace ? `-n ${namespace}` : ''} ${name}`}
           value={describeText?.result || ''}
         />

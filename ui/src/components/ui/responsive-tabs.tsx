@@ -77,7 +77,7 @@ export function ResponsiveTabs({
     <Tabs value={value} onValueChange={onValueChange} className={className}>
       <TabsList
         className={cn(
-          '**:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1',
+          '[&_[data-slot=badge]]:bg-muted-foreground/30 [&_[data-slot=badge]]:size-5 [&_[data-slot=badge]]:rounded-full [&_[data-slot=badge]]:px-1',
           tabsListClassName
         )}
       >

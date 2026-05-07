@@ -39,7 +39,7 @@ export function TextViewer({
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <div className="overflow-hidden h-[calc(100dvh-300px)]">
+          <div className="overflow-hidden h-[calc(100vh-300px)]">
             <Editor
               language="yaml"
               theme={actualTheme === 'dark' ? 'custom-dark' : 'custom-vs'}

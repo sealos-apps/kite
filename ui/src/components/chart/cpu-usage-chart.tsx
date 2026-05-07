@@ -64,7 +64,7 @@ const CPUUsageChart = React.memo((prop: CpuUsageChartProps) => {
   // Show loading skeleton
   if (isLoading) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -83,7 +83,7 @@ const CPUUsageChart = React.memo((prop: CpuUsageChartProps) => {
   // Show error state
   if (error) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.cpuUsage')}</CardTitle>
         </CardHeader>
@@ -100,7 +100,7 @@ const CPUUsageChart = React.memo((prop: CpuUsageChartProps) => {
   // Show empty state
   if (!data || data.length === 0) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.cpuUsage')}</CardTitle>
         </CardHeader>
@@ -114,7 +114,7 @@ const CPUUsageChart = React.memo((prop: CpuUsageChartProps) => {
   }
 
   return (
-    <Card className="@container/card">
+    <Card>
       <CardHeader>
         <CardTitle>{t('monitoring.cpuUsage')}</CardTitle>
       </CardHeader>

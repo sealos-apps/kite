@@ -1,5 +1,4 @@
 import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { dynamicBase } from 'vite-plugin-dynamic-base'
@@ -14,7 +13,6 @@ export default defineConfig({
       transformIndexHtml: true,
     }),
     react(),
-    tailwindcss(),
   ],
   envPrefix: ['VITE_', 'KITE_'],
   build: {

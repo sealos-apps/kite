@@ -190,7 +190,7 @@ export function YamlEditor<T extends ResourceType>({
               <p className="text-sm text-destructive">{validationError}</p>
             </div>
           )}
-          <div className="overflow-hidden h-[calc(100dvh-300px)]">
+          <div className="overflow-hidden h-[calc(100vh-300px)]">
             <Editor
               key={`yaml-editor-${colorTheme}-${actualTheme}`} // Force remount on theme change
               language="yaml"

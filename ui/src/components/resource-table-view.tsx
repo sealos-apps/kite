@@ -144,7 +144,7 @@ export function ResourceTableView<T>({
                     </TableRow>
                   ))}
                 </TableHeader>
-                <TableBody className="**:data-[slot=table-cell]:first:w-0">
+                <TableBody className="[&_[data-slot=table-cell]:first-child]:w-0">
                   {renderRows()}
                 </TableBody>
               </Table>

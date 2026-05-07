@@ -57,11 +57,11 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
     () => ({
       networkOut: {
         label: t('monitoring.outgoing'),
-        color: 'oklch(0.55 0.22 235)', // Updated blue color to match theme
+        color: 'rgb(0, 124, 221)', // Updated blue color to match theme
       },
       networkIn: {
         label: t('monitoring.incoming'),
-        color: 'oklch(0.55 0.20 145)', // Updated green color to match theme
+        color: 'rgb(0, 149, 79)', // Updated green color to match theme
       },
     }),
     [t]
@@ -108,7 +108,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
   // Show loading skeleton
   if (isLoading) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -127,7 +127,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
   // Show error state
   if (error) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.networkUsage')}</CardTitle>
         </CardHeader>
@@ -148,7 +148,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
     (networkIn.length === 0 && networkOut.length === 0)
   ) {
     return (
-      <Card className="@container/card">
+      <Card>
         <CardHeader>
           <CardTitle>{t('monitoring.networkUsage')}</CardTitle>
         </CardHeader>
@@ -162,7 +162,7 @@ const NetworkUsageChart = React.memo((prop: NetworkUsageChartProps) => {
   }
 
   return (
-    <Card className="@container/card">
+    <Card>
       <CardHeader>
         <CardTitle>{t('monitoring.networkUsage')}</CardTitle>
       </CardHeader>

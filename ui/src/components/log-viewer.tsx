@@ -797,7 +797,7 @@ export function LogViewer({
 
       <CardContent className="flex-1 p-0 relative">
         <Editor
-          height={isFullscreen ? 'calc(100dvh - 60px)' : 'calc(100dvh - 255px)'}
+          height={isFullscreen ? 'calc(100vh - 60px)' : 'calc(100vh - 255px)'}
           theme={`log-theme-${logTheme}`}
           beforeMount={(monaco) => {
             // Define custom themes for each log theme
