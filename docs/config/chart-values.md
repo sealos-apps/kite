@@ -29,10 +29,13 @@ This document describes all available configuration options for the Kite Helm Ch
 
 ## Database Configuration
 
-| Parameter | Description                                                              | Default  |
-| --------- | ------------------------------------------------------------------------ | -------- |
-| `db.type` | Database type: `sqlite`, `postgres`, `mysql`                             | `postgres` |
-| `db.dsn`  | Full DSN string for MySQL/Postgres. Required when type is mysql/postgres | `""`     |
+| Parameter       | Description                                                                                                  | Default    |
+| --------------- | ------------------------------------------------------------------------------------------------------------ | ---------- |
+| `db.type`       | Database type: `sqlite`, `postgres`, `mysql`                                                                 | `postgres` |
+| `db.dsn`        | Full DSN string for MySQL/Postgres. Required when type is mysql/postgres and native Postgres is disabled      | `""`       |
+| `db.autoCreate` | Whether Kite should create the target MySQL/Postgres database automatically before running schema migrations | `true`     |
+
+When `db.autoCreate` is enabled, the configured database user must have permission to create databases. Kite only creates the target database itself; tables are still created by the normal application migration flow.
 
 ### SQLite Configuration
 

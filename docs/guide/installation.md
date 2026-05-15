@@ -6,7 +6,7 @@ This guide provides detailed instructions for installing Kite in a Kubernetes en
 
 - `kubectl` with cluster administrator privileges
 - Helm v3 (recommended for Helm installation)
-- MySQL/PostgreSQL database, or local storage for sqlite
+- MySQL/PostgreSQL database, or local storage for sqlite. If you want Kite to create the target MySQL/PostgreSQL database automatically, the configured database user must have database creation permission.
 
 ## Installation Methods
 

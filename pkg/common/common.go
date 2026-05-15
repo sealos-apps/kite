@@ -31,6 +31,7 @@ var (
 	NodeTerminalImage = "busybox:latest"
 	DBType            = "sqlite"
 	DBDSN             = "dev.db"
+	DBAutoCreate      = true
 
 	KiteEncryptKey = "kite-default-encryption-key-change-in-production"
 
@@ -86,6 +87,17 @@ func LoadEnvs() {
 			klog.Fatalf("Invalid DB_TYPE: %s, must be one of sqlite, mysql, postgres", dbType)
 		}
 		DBType = dbType
+	}
+
+	if v := strings.TrimSpace(os.Getenv("DB_AUTO_CREATE")); v != "" {
+		switch strings.ToLower(v) {
+		case "true":
+			DBAutoCreate = true
+		case "false":
+			DBAutoCreate = false
+		default:
+			klog.Warningf("Invalid DB_AUTO_CREATE=%q, use true|false, fallback to true", v)
+		}
 	}
 
 	if key := os.Getenv("KITE_ENCRYPT_KEY"); key != "" {
