@@ -29,10 +29,13 @@
 
 ## 数据库配置
 
-| 参数      | 描述                                                             | 默认值   |
-| --------- | ---------------------------------------------------------------- | -------- |
-| `db.type` | 数据库类型：`sqlite`、`postgres`、`mysql`                        | `postgres` |
-| `db.dsn`  | MySQL/Postgres 的完整 DSN 字符串。当类型为 mysql/postgres 时必需 | `""`     |
+| 参数            | 描述                                                                  | 默认值     |
+| --------------- | --------------------------------------------------------------------- | ---------- |
+| `db.type`       | 数据库类型：`sqlite`、`postgres`、`mysql`                             | `postgres` |
+| `db.dsn`        | MySQL/Postgres 的完整 DSN 字符串。关闭内置 Postgres 且使用外部库时必需 | `""`       |
+| `db.autoCreate` | Kite 是否在运行表结构迁移前自动创建目标 MySQL/Postgres database       | `true`     |
+
+开启 `db.autoCreate` 时，配置的数据库账号需要有创建 database 的权限。Kite 只负责创建目标 database，表结构仍由应用正常迁移流程创建。
 
 ### SQLite 配置
 

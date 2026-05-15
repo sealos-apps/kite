@@ -58,6 +58,7 @@ secret:
 db:
   type: postgres
   dsn: ''
+  autoCreate: true
 
   postgres:
     database: postgres

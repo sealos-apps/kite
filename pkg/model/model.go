@@ -48,6 +48,12 @@ func InitDB() {
 		cfg := &gorm.Config{
 			Logger: newLogger,
 		}
+		if common.DBAutoCreate {
+			if err = ensureDatabaseExists(common.DBType, dsn); err != nil {
+				panic("failed to ensure database exists: " + err.Error())
+			}
+		}
+
 		if common.DBType == "sqlite" {
 			DB, err = gorm.Open(sqlite.Open(dsn), cfg)
 			if err != nil {

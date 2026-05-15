@@ -6,7 +6,7 @@
 
 - 拥有集群管理员权限的 `kubectl`
 - Helm v3（推荐使用 Helm 安装）
-- MySQL/PostgreSQL 数据库，或本地存储用于 sqlite
+- MySQL/PostgreSQL 数据库，或本地存储用于 sqlite。如果希望 Kite 自动创建目标 MySQL/PostgreSQL database，配置的数据库账号需要有创建 database 的权限。
 
 ## 安装方式
 
