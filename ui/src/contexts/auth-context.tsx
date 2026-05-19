@@ -525,7 +525,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Token refresh failed:', error)
       writeAuthToken(null)
       setUser(null)
-      window.location.href = withSubPath('/login')
+      window.location.href = withSubPath('/login?reason=session_refresh_failed')
     }
   }
 
@@ -541,7 +541,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         writeAuthToken(null)
         setUser(null)
         writeCurrentCluster(null)
-        window.location.href = withSubPath('/login')
+        window.location.href = withSubPath('/login?reason=logout')
       } else {
         throw new Error('Failed to logout')
       }

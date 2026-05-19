@@ -19,8 +19,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    // Redirect to login page with return URL
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return (
+      <Navigate
+        to="/login?reason=unauthenticated"
+        state={{ from: location }}
+        replace
+      />
+    )
   }
 
   return <>{children}</>

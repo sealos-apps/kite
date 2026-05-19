@@ -363,6 +363,37 @@
     "tryAgainHint": "您可以尝试使用具有所需权限的其他账户登录。",
     "noLoginMethods": "未配置登录方式",
     "configureAuth": "请在您的环境中配置身份验证提供程序",
+    "unavailableTitle": "Kite 暂时无法建立访问会话",
+    "unavailableDescription": "这通常不是客户需要重新登录，而是服务端配置、数据库连接或认证服务异常。",
+    "sessionStatus": "访问会话",
+    "actionRequiredTitle": "需要运维处理",
+    "faultHint": "登录入口已关闭。请运维人员修复服务端问题后刷新页面。",
+    "operatorCheckTitle": "建议检查",
+    "operatorCheckLabels": {
+      "database": "数据库",
+      "authConfig": "认证配置",
+      "backendLogs": "后端日志"
+    },
+    "operatorChecks": {
+      "database": "确认 DSN、账号权限和迁移状态正常。",
+      "authConfig": "确认 Sealos 登录、JWT 密钥和回调配置一致。",
+      "backendLogs": "查看数据库、认证或会话创建错误。"
+    },
+    "refresh": "刷新页面",
+    "faultReasons": {
+      "unauthenticated": "当前没有可用的访问会话",
+      "session_refresh_failed": "会话刷新失败",
+      "authentication_failed": "认证请求失败",
+      "logout": "当前会话已退出",
+      "insufficient_permissions": "当前用户没有访问权限",
+      "token_exchange_failed": "认证令牌交换失败",
+      "user_info_failed": "用户信息获取失败",
+      "jwt_generation_failed": "会话令牌创建失败",
+      "callback_failed": "认证回调失败",
+      "callback_error": "认证回调异常",
+      "user_disabled": "用户已被禁用",
+      "unknown": "认证服务暂时不可用"
+    },
     "footer": "© {{year}} Kite. 版权所有。",
     "documentation": "文档",
     "errors": {

@@ -337,6 +337,37 @@
     "tryAgainHint": "You can try logging in with a different account that has the required permissions.",
     "noLoginMethods": "No login methods configured",
     "configureAuth": "Please configure authentication providers in your environment",
+    "unavailableTitle": "Kite cannot establish an access session",
+    "unavailableDescription": "This usually means a server-side configuration, database, or authentication service problem, not that the customer needs to sign in again.",
+    "sessionStatus": "Access session",
+    "actionRequiredTitle": "Operator action required",
+    "faultHint": "The login entry has been disabled. Ask an operator to fix the server-side issue, then refresh this page.",
+    "operatorCheckTitle": "Suggested checks",
+    "operatorCheckLabels": {
+      "database": "Database",
+      "authConfig": "Auth config",
+      "backendLogs": "Backend logs"
+    },
+    "operatorChecks": {
+      "database": "Check the DSN, account permissions, and migration state.",
+      "authConfig": "Check Sealos login, JWT secrets, and callback settings.",
+      "backendLogs": "Look for database, auth, or session creation errors."
+    },
+    "refresh": "Refresh page",
+    "faultReasons": {
+      "unauthenticated": "No access session is available",
+      "session_refresh_failed": "Session refresh failed",
+      "authentication_failed": "Authentication request failed",
+      "logout": "The current session has ended",
+      "insufficient_permissions": "The current user does not have access",
+      "token_exchange_failed": "Authentication token exchange failed",
+      "user_info_failed": "Failed to fetch user profile",
+      "jwt_generation_failed": "Failed to create a session token",
+      "callback_failed": "Authentication callback failed",
+      "callback_error": "Authentication callback returned an error",
+      "user_disabled": "The user has been disabled",
+      "unknown": "Authentication service is temporarily unavailable"
+    },
     "footer": "© {{year}} Kite. All rights reserved.",
     "documentation": "Documentation",
     "errors": {
