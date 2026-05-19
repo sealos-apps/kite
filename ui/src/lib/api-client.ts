@@ -85,7 +85,9 @@ class ApiClient {
           response = await fetch(fullUrl, defaultOptions)
         } catch (refreshError) {
           console.error('Token refresh failed:', refreshError)
-          window.location.href = withSubPath('/login')
+          window.location.href = withSubPath(
+            '/login?reason=authentication_failed'
+          )
           throw new Error('Authentication failed')
         }
       }

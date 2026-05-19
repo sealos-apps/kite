@@ -1,0 +1,111 @@
+# 运行手册
+
+## 本地开发
+
+安装依赖：
+
+```bash
+make deps
+```
+
+同时启动后端和 Vite：
+
+```bash
+make dev
+```
+
+默认本地入口：
+
+- 后端：`http://localhost:8080`
+- Vite 开发服务：`http://localhost:5173`
+- 健康检查：`http://localhost:8080/healthz`
+
+## 构建与测试
+
+构建前端静态资源和 Go 二进制：
+
+```bash
+make build
+```
+
+运行后端测试：
+
+```bash
+make test
+```
+
+运行 lint：
+
+```bash
+make lint
+```
+
+运行前端类型检查：
+
+```bash
+cd ui && pnpm run type-check
+```
+
+构建文档：
+
+```bash
+make docs-build
+```
+
+## 关键环境变量
+
+- `PORT`：HTTP 监听端口，默认 `8080`。
+- `KITE_BASE`：部署在子路径时使用，例如 `/kite`。
+- `DB_TYPE`：`sqlite`、`mysql` 或 `postgres`。
+- `DB_DSN`：数据库 DSN。SQLite 默认是 `dev.db`。
+- `DB_AUTO_CREATE`：是否在迁移前自动创建缺失的 MySQL/PostgreSQL database，默认 `true`。
+- `JWT_SECRET`：Kite 会话签名密钥。
+- `KITE_ENCRYPT_KEY`：敏感存储值的加密密钥。
+- `KUBECONFIG`：首次导入集群时使用的 kubeconfig 路径。
+- `ANONYMOUS_USER_ENABLED`：跳过普通认证。除非部署环境明确可信，否则不要在生产环境开启。
+- `SEALOS_AUTH_ENABLED`：启用 Sealos 登录接口。
+- `SEALOS_JWT_SECRET`：Sealos 认证校验使用的 JWT 密钥。
+- `AUTH_COOKIE_SAMESITE` 和 `AUTH_COOKIE_SECURE`：普通部署和 iframe 部署下的 Cookie 策略。
+- `VITE_SEALOS_AUTO_LOGIN`：构建期前端开关，控制是否自动尝试 Sealos SDK 会话登录。
+
+## 认证故障页
+
+`/login` 现在是运维故障页。客户看到该页时，应优先检查服务端状态，而不是要求客户手动登录。
+
+常见 reason code：
+
+- `unauthenticated`：前端没有找到可用会话。
+- `session_refresh_failed`：Cookie 或会话刷新失败。
+- `authentication_failed`：API 认证重试失败。
+- `insufficient_permissions`：当前用户没有匹配的 Kite RBAC 权限。
+- `token_exchange_failed`、`user_info_failed`、`jwt_generation_failed`、`callback_failed`、`callback_error`：OAuth 回调或会话创建失败。
+- `user_disabled`：Kite 用户存在，但已被禁用。
+
+建议检查：
+
+1. 查看后端日志里的数据库、迁移、JWT、OAuth、Sealos 认证或会话创建错误。
+2. 检查 `DB_TYPE`、`DB_DSN` 和数据库账号权限。若 `DB_AUTO_CREATE=true`，MySQL/PostgreSQL 账号需要有创建 database 的权限。
+3. 检查 `JWT_SECRET`、`KITE_ENCRYPT_KEY`、`SEALOS_AUTH_ENABLED`、`SEALOS_JWT_SECRET` 和 OAuth provider 回调配置。
+4. 确认浏览器能收到并发送 `auth_token` Cookie。iframe/跨站部署需要检查 `AUTH_COOKIE_SAMESITE=none`、`AUTH_COOKIE_SECURE=true` 和 HTTPS。
+5. 对于 `insufficient_permissions`，检查 Kite RBAC 角色分配和 OAuth 组/用户映射。
+
+## 数据库排障
+
+数据库启动故障通常会发生在完整 UI 可用之前。重点查找如下 panic：
+
+- `failed to ensure database exists`
+- `failed to connect database`
+- `failed to migrate database`
+- `database connection is nil`
+
+SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 MySQL 或 PostgreSQL。
+
+## Kubernetes 连接排障
+
+- 托管 Kubernetes 的 kubeconfig 如果使用 `aws`、`gcloud`、`kubelogin` 这类 `exec` 插件，应改用 Service Account token kubeconfig。参考 `docs/zh/config/managed-k8s-auth.md`。
+- 如果访问资源时报权限错误，先检查 Kite RBAC，再检查服务账号或导入 kubeconfig 对应的 Kubernetes RBAC。
+- 如果生产镜像没有 shell，不要强行 `kubectl exec` 进 Kite，改用临时 debug/client pod。
+
+## 生产镜像说明
+
+生产部署默认构建和发布 `linux/amd64` 镜像，除非明确要求 ARM。

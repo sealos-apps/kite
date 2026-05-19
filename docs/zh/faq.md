@@ -22,6 +22,19 @@ Kite 将使用 umami 收集极少的匿名使用数据。
 
 你需要参考 [RBAC 配置指南](./config/rbac-config) 来配置用户的权限。
 
+## 为什么看到的是访问会话故障页，而不是登录表单？
+
+Kite 不再在 `/login` 展示交互式登录表单。这个页面是运维故障页，用于提示浏览器当前无法建立或刷新可用的访问会话。
+
+这通常需要运维人员检查服务端状态：
+
+- 数据库连接、账号权限和迁移状态
+- OAuth、Sealos 认证、JWT 密钥和回调配置
+- 后端日志中的会话创建或认证刷新失败
+- 如果页面提示权限不足，检查 RBAC 角色分配
+
+reason code 排查清单见[运行手册](./runbook)。
+
 ## 托管 Kubernetes 集群连接问题
 
 如果您使用托管 Kubernetes 集群（AKS、EKS、GKE 等）并在将集群添加到 Kite 时遇到身份验证错误，这通常是因为默认的 kubeconfig 使用了需要 CLI 工具（如 `kubelogin`、`aws` 或 `gcloud`）的 `exec` 插件。

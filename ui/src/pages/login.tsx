@@ -1,127 +1,89 @@
-import { FormEvent, useState } from 'react'
 import Logo from '@/assets/icon.svg'
 import { useAuth } from '@/contexts/auth-context'
+import {
+  AlertTriangle,
+  Database,
+  KeyRound,
+  RefreshCcw,
+  Server,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useSearchParams } from 'react-router-dom'
 
-import { withSubPath } from '@/lib/subpath'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Footer } from '@/components/footer'
 import { LanguageToggle } from '@/components/language-toggle'
+import { ModeToggle } from '@/components/mode-toggle'
+
+type AuthFaultReason =
+  | 'unauthenticated'
+  | 'session_refresh_failed'
+  | 'authentication_failed'
+  | 'logout'
+  | 'insufficient_permissions'
+  | 'token_exchange_failed'
+  | 'user_info_failed'
+  | 'jwt_generation_failed'
+  | 'callback_failed'
+  | 'callback_error'
+  | 'user_disabled'
+  | 'unknown'
+
+const authFaultReasons = new Set<AuthFaultReason>([
+  'unauthenticated',
+  'session_refresh_failed',
+  'authentication_failed',
+  'logout',
+  'insufficient_permissions',
+  'token_exchange_failed',
+  'user_info_failed',
+  'jwt_generation_failed',
+  'callback_failed',
+  'callback_error',
+  'user_disabled',
+  'unknown',
+])
+
+const normalizeReason = (
+  reason: string | null,
+  error: string | null
+): AuthFaultReason => {
+  const value = reason || error || 'unknown'
+  if (authFaultReasons.has(value as AuthFaultReason)) {
+    return value as AuthFaultReason
+  }
+  return 'unknown'
+}
 
 export function LoginPage() {
   const { t } = useTranslation()
-  const { user, login, loginWithPassword, providers, isLoading } = useAuth()
+  const { user, isLoading } = useAuth()
   const [searchParams] = useSearchParams()
-  const [loginLoading, setLoginLoading] = useState<string | null>(null)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [passwordError, setPasswordError] = useState<string | null>(null)
 
-  const error = searchParams.get('error')
+  const reason = normalizeReason(
+    searchParams.get('reason'),
+    searchParams.get('error')
+  )
+  const checks = [
+    {
+      icon: Database,
+      label: t('login.operatorCheckLabels.database'),
+      description: t('login.operatorChecks.database'),
+    },
+    {
+      icon: KeyRound,
+      label: t('login.operatorCheckLabels.authConfig'),
+      description: t('login.operatorChecks.authConfig'),
+    },
+    {
+      icon: Server,
+      label: t('login.operatorCheckLabels.backendLogs'),
+      description: t('login.operatorChecks.backendLogs'),
+    },
+  ]
 
   if (user && !isLoading) {
     return <Navigate to="/" replace />
-  }
-
-  const handleLogin = async (provider: string) => {
-    setLoginLoading(provider)
-    try {
-      await login(provider)
-    } catch (error) {
-      console.error('Login error:', error)
-      setLoginLoading(null)
-    }
-  }
-
-  const handlePasswordLogin = async (e: FormEvent) => {
-    e.preventDefault()
-    setLoginLoading('password')
-    setPasswordError(null)
-    try {
-      await loginWithPassword(username, password)
-    } catch (err) {
-      if (err instanceof Error) {
-        setPasswordError(err.message || t('login.errors.invalidCredentials'))
-      } else {
-        setPasswordError(t('login.errors.unknownError'))
-      }
-    } finally {
-      setLoginLoading(null)
-    }
-  }
-
-  const getErrorMessage = (errorCode: string | null) => {
-    if (!errorCode) return null
-
-    // Get additional parameters for more detailed error messages
-    const provider = searchParams.get('provider') || 'OAuth provider'
-    const user = searchParams.get('user')
-    const reason = searchParams.get('reason') || errorCode
-
-    switch (reason) {
-      case 'insufficient_permissions':
-        return {
-          title: t('login.errors.accessDenied'),
-          message: user
-            ? t('login.errors.insufficientPermissionsUser', { user })
-            : t('login.errors.insufficientPermissions'),
-          details: t('login.errors.insufficientPermissionsDetails'),
-        }
-      case 'token_exchange_failed':
-        return {
-          title: t('login.errors.authenticationFailed'),
-          message: t('login.errors.tokenExchangeFailed', { provider }),
-          details: t('login.errors.tokenExchangeDetails'),
-        }
-      case 'user_info_failed':
-        return {
-          title: t('login.errors.profileAccessFailed'),
-          message: t('login.errors.userInfoFailed', { provider }),
-          details: t('login.errors.userInfoDetails'),
-        }
-      case 'jwt_generation_failed':
-        return {
-          title: t('login.errors.sessionCreationFailed'),
-          message: user
-            ? t('login.errors.jwtGenerationFailedUser', { user })
-            : t('login.errors.jwtGenerationFailed'),
-          details: t('login.errors.jwtGenerationDetails'),
-        }
-      case 'callback_failed':
-        return {
-          title: t('login.errors.oauthCallbackFailed'),
-          message: t('login.errors.callbackFailed'),
-          details: t('login.errors.contactSupport'),
-        }
-      case 'callback_error':
-        return {
-          title: t('login.errors.authenticationError'),
-          message: t('login.errors.callbackError'),
-          details: t('login.errors.contactSupport'),
-        }
-      case 'user_disabled':
-        return {
-          title: t('login.errors.userDisabled', 'User Disabled'),
-          message: t('login.errors.userDisabledMessage'),
-        }
-      default:
-        return {
-          title: t('login.errors.authenticationError'),
-          message: t('login.errors.generalError'),
-          details: t('login.errors.contactSupport'),
-        }
-    }
   }
 
   if (isLoading) {
@@ -133,175 +95,100 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Language Toggle - Top Right */}
-      <div className="absolute top-6 right-6 z-10">
-        <LanguageToggle />
-      </div>
-
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <img src={Logo} className="h-10 w-10 dark:invert" />{' '}
-              <h1 className="text-2xl font-bold">Kite</h1>
+    <div className="min-h-screen bg-muted/20">
+      <div className="flex min-h-screen flex-col">
+        <header className="flex h-[var(--header-height)] shrink-0 items-center border-b bg-background px-4 lg:px-6">
+          <div className="flex items-center gap-2">
+            <img src={Logo} className="h-8 w-8 dark:invert" alt="Kite" />
+            <div className="min-w-0">
+              <div className="text-base font-semibold leading-none">Kite</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {t('login.kubernetesDashboard')}
+              </div>
             </div>
-            <p className="text-gray-600">{t('login.kubernetesDashboard')}</p>
           </div>
+          <div className="ml-auto flex items-center gap-2">
+            <LanguageToggle />
+            <ModeToggle />
+          </div>
+        </header>
 
-          <Card className="shadow-sm border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-xl">{t('login.signIn')}</CardTitle>
-              <CardDescription className="text-gray-600">
-                {t('login.subtitle')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {error && (
-                <div className="space-y-3">
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertDescription className="text-red-700">
-                      <div className="space-y-2">
-                        <div className="font-semibold">
-                          {getErrorMessage(error)?.title}
-                        </div>
-                        <div>{getErrorMessage(error)?.message}</div>
-                        {getErrorMessage(error)?.details && (
-                          <div className="text-sm text-red-600 mt-2">
-                            {getErrorMessage(error)?.details}
-                          </div>
-                        )}
+        <main className="flex flex-1 items-center px-4 py-10 lg:px-6">
+          <div className="mx-auto w-full max-w-4xl">
+            <div className="flex flex-col gap-4 md:gap-6">
+              <div>
+                <h1 className="text-2xl font-bold">
+                  {t('login.unavailableTitle')}
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t('login.unavailableDescription')}
+                </p>
+              </div>
+
+              <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+                <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                  <div className="border-b p-5 lg:border-b-0 lg:border-r lg:p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/60">
+                        <AlertTriangle className="h-5 w-5" aria-hidden="true" />
                       </div>
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Additional actions for permission errors */}
-                  {(searchParams.get('reason') === 'insufficient_permissions' ||
-                    error === 'insufficient_permissions') && (
-                    <div className="text-center space-y-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          window.location.href = withSubPath('/login')
-                        }}
-                        className="w-full"
-                      >
-                        {t('login.tryAgainDifferentAccount')}
-                      </Button>
-                      <p className="text-xs text-gray-500">
-                        {t('login.tryAgainHint')}
-                      </p>
+                      <div className="min-w-0">
+                        <div className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                          {t(`login.faultReasons.${reason}`)}
+                        </div>
+                        <h2 className="mt-4 text-lg font-semibold">
+                          {t('login.actionRequiredTitle')}
+                        </h2>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                          {t('login.faultHint')}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-5"
+                          onClick={() => window.location.reload()}
+                        >
+                          <RefreshCcw aria-hidden="true" />
+                          {t('login.refresh')}
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
 
-              {providers.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">{t('login.noLoginMethods')}</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {t('login.configureAuth')}
-                  </p>
+                  <div className="bg-muted/20 p-5 lg:p-6">
+                    <div className="text-sm font-semibold text-foreground">
+                      {t('login.operatorCheckTitle')}
+                    </div>
+                    <div className="mt-4 space-y-4">
+                      {checks.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <div key={item.label} className="flex gap-3">
+                            <Icon
+                              className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-foreground">
+                                {item.label}
+                              </div>
+                              <div className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                                {item.description}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {providers.includes('password') && (
-                    <form onSubmit={handlePasswordLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="username">{t('login.username')}</Label>
-                        <Input
-                          id="username"
-                          type="text"
-                          placeholder={t('login.enterUsername')}
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">{t('login.password')}</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder={t('login.enterPassword')}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                        />
-                      </div>
-                      {passwordError && (
-                        <Alert variant="destructive">
-                          <AlertDescription>{passwordError}</AlertDescription>
-                        </Alert>
-                      )}
-                      <Button
-                        type="submit"
-                        disabled={loginLoading !== null}
-                        className="w-full"
-                      >
-                        {loginLoading === 'password' ? (
-                          <div className="flex items-center space-x-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
-                            <span>{t('login.signingIn')}</span>
-                          </div>
-                        ) : (
-                          t('login.signInWithPassword')
-                        )}
-                      </Button>
-                    </form>
-                  )}
+              </div>
+            </div>
+          </div>
+        </main>
 
-                  {providers.filter((p) => p !== 'password').length > 0 &&
-                    providers.includes('password') && (
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="px-2 text-muted-foreground bg-card rounded">
-                            {t('login.orContinueWith')}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                  {providers
-                    .filter((p) => p !== 'password')
-                    .map((provider) => (
-                      <Button
-                        key={provider}
-                        onClick={() => handleLogin(provider)}
-                        disabled={loginLoading !== null}
-                        className="w-full h-10"
-                        variant="outline"
-                      >
-                        {loginLoading === provider ? (
-                          <div className="flex items-center space-x-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
-                            <span>{t('login.signingIn')}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <span>
-                              {t('login.signInWith', {
-                                provider:
-                                  provider.charAt(0).toUpperCase() +
-                                  provider.slice(1),
-                              })}
-                            </span>
-                          </div>
-                        )}
-                      </Button>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Footer />
       </div>
-
-      {/* Footer */}
-      <Footer />
     </div>
   )
 }

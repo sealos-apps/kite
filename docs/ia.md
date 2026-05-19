@@ -1,0 +1,49 @@
+# Information Architecture
+
+This document summarizes the main route and navigation structure for Kite.
+
+## Top-Level Routes
+
+| Route | Component | Purpose |
+| --- | --- | --- |
+| `/setup` | `InitializationPage` | First-run setup for creating the initial user and importing a cluster. |
+| `/login` | `LoginPage` | Standalone operational fault page for auth/session failures. It is not an interactive login form. |
+| `/` | `App` with `ProtectedRoute` | Authenticated application shell with sidebar, header, global search, and resource routes. |
+
+All routes respect the optional `KITE_BASE` subpath through `getSubPath()` and React Router `basename`.
+
+## Auth And Initialization Gates
+
+- `InitCheckRoute` wraps `/login` and `/`, sending uninitialized installs to `/setup`.
+- `ProtectedRoute` wraps `/`, sending missing users to `/login?reason=unauthenticated`.
+- Auth refresh and API auth failures use reason-coded `/login` redirects so the fault page can explain the likely operator-owned issue.
+
+## Authenticated App Shell
+
+The authenticated shell includes:
+
+- `AppSidebar` for resource navigation and customization.
+- `SiteHeader` for current page controls.
+- `GlobalSearch` for cross-resource search.
+- `ClusterProvider` and cluster-aware API client configuration.
+
+When `?iframe=true` is present, the app renders the route outlet without the standard shell.
+
+## Resource Routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` and `/dashboard` | Cluster overview. |
+| `/settings` | Admin settings for users, RBAC, OAuth providers, clusters, API keys, templates, and related management screens. |
+| `/crds/:crd` | Generic Custom Resource list page for a selected CRD. |
+| `/crds/:resource/:namespace/:name` | Namespaced Custom Resource detail page. |
+| `/crds/:resource/:name` | Cluster-scoped Custom Resource detail page. |
+| `/:resource` | Generic built-in resource list page. |
+| `/:resource/:namespace/:name` | Namespaced resource detail page. |
+| `/:resource/:name` | Cluster-scoped resource detail page. |
+
+## Standalone State Rules
+
+- `/setup` and `/login` should remain standalone and should not include the authenticated dashboard sidebar.
+- `/login` must use the Kite logo and operator-focused copy for configuration, database, or authentication-service problems.
+- Full app navigation should appear only when the route actually allows the user to navigate authenticated resource workflows.
