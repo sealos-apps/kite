@@ -50,3 +50,8 @@ Run from repo root unless noted:
 - Do not commit kubeconfig files, tokens, or other secrets.
 - Review `SECURITY.md` before reporting or handling vulnerabilities.
 - Never execute database write operations unless explicitly requested.
+
+## Auth UI Product Decisions
+- `/login` is an operational fault page, not an interactive sign-in surface. Do not reintroduce username/password forms, OAuth provider buttons, or a dashboard sidebar there unless the product decision changes explicitly.
+- Auth/session failures should redirect to `/login?reason=<code>` and explain that the likely cause is server-side configuration, database, or authentication-service trouble. Keep the page standalone, use the real Kite logo asset, and keep the remediation copy operator-focused.
+- The interactive authentication APIs still exist (`/api/auth/login/password`, `/api/auth/login`, `/api/auth/callback`, `/api/auth/login/sealos`) for backend/session flows and admin-managed auth configuration.

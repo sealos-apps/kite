@@ -22,6 +22,19 @@ This means that user `admin` does not have permission to access `configmaps` res
 
 You need to refer to the [RBAC Configuration Guide](./config/rbac-config) to configure user permissions.
 
+## Why do I see an access-session fault page instead of a login form?
+
+Kite no longer shows an interactive login form on `/login`. That page is an operational fault page used when the browser cannot establish or refresh a usable access session.
+
+This usually means an operator should check server-side state:
+
+- database connection, account permissions, and migration status
+- OAuth, Sealos auth, JWT secret, and callback configuration
+- backend logs for session creation or auth refresh failures
+- RBAC assignments if the page reports insufficient permissions
+
+See the [Runbook](./runbook) for the reason-code checklist.
+
 ## Managed Kubernetes Cluster Connection Issues
 
 If you're using a managed Kubernetes cluster (AKS, EKS, GKE, etc.) and encounter authentication errors when adding the cluster to Kite, this is usually because the default kubeconfig uses `exec` plugins that require CLI tools (like `kubelogin`, `aws`, or `gcloud`).
