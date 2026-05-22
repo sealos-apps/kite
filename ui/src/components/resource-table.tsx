@@ -90,13 +90,31 @@ export function ResourceTable<T>({
   defaultHiddenColumns = [],
 }: ResourceTableProps<T>) {
   const { t } = useTranslation()
-  const { user } = useAuth()
-  const { currentCluster, currentClusterInfo } = useCluster()
-  const defaultNamespace = user?.isAdmin() ? '_all' : 'default'
+  const { user, isLoading: authLoading } = useAuth()
+  const {
+    currentCluster,
+    currentClusterInfo,
+    isLoading: clustersLoading,
+  } = useCluster()
+  const isAdminUser = user?.isAdmin() ?? false
+  const defaultNamespace = isAdminUser ? '_all' : 'default'
+  const clusterDefaultNamespace = currentClusterInfo?.namespace || undefined
   const fixedNamespace =
     !clusterScope && currentClusterInfo?.namespaceScoped
       ? currentClusterInfo.namespace
       : undefined
+  const namespaceSelectionReady =
+    clusterScope ||
+    Boolean(fixedNamespace) ||
+    Boolean(
+      currentCluster && currentClusterInfo && !authLoading && !clustersLoading
+    )
+  const selectedNamespaceStorageKey = currentCluster
+    ? `${currentCluster}selectedNamespace`
+    : undefined
+  const selectedNamespaceSourceKey = selectedNamespaceStorageKey
+    ? `${selectedNamespaceStorageKey}:source`
+    : undefined
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
     const currentCluster = localStorage.getItem('current-cluster')
@@ -153,9 +171,73 @@ export function ResourceTable<T>({
       ? undefined // No namespace for cluster scope
       : storedNamespace || defaultNamespace
   })
+  const preferredNamespace = clusterDefaultNamespace || defaultNamespace
+  const storedNamespace =
+    selectedNamespaceStorageKey && namespaceSelectionReady
+      ? localStorage.getItem(selectedNamespaceStorageKey)
+      : null
+  const storedNamespaceSource =
+    selectedNamespaceSourceKey && namespaceSelectionReady
+      ? localStorage.getItem(selectedNamespaceSourceKey)
+      : null
+  const shouldRepairLegacyDefaultFallback =
+    storedNamespace === 'default' &&
+    storedNamespaceSource !== 'manual' &&
+    isAdminUser &&
+    Boolean(clusterDefaultNamespace) &&
+    clusterDefaultNamespace !== 'default'
+  const storedNamespaceIsAutomatic =
+    storedNamespaceSource === 'fallback' ||
+    storedNamespaceSource === 'fixed' ||
+    shouldRepairLegacyDefaultFallback
+  const targetNamespace =
+    storedNamespace && !storedNamespaceIsAutomatic
+      ? storedNamespace
+      : preferredNamespace
+  const effectiveSelectedNamespace =
+    namespaceSelectionReady && !clusterScope && !fixedNamespace
+      ? targetNamespace
+      : selectedNamespace
+  const {
+    data: availableNamespaces,
+    isPlaceholderData: namespacesArePlaceholder,
+  } = useResources('namespaces', undefined, {
+    disable: clusterScope || !!fixedNamespace || !namespaceSelectionReady,
+  })
+  const namespaceNames = useMemo(
+    () =>
+      (availableNamespaces || [])
+        .map((namespace) => namespace.metadata?.name)
+        .filter((name): name is string => Boolean(name)),
+    [availableNamespaces]
+  )
+  const namespaceValidationRequired =
+    namespaceSelectionReady &&
+    !clusterScope &&
+    !fixedNamespace &&
+    Boolean(effectiveSelectedNamespace) &&
+    effectiveSelectedNamespace !== '_all'
+  const namespaceValidationPending =
+    namespaceValidationRequired &&
+    (namespacesArePlaceholder || !availableNamespaces)
+  const selectedNamespaceExists =
+    effectiveSelectedNamespace &&
+    namespaceNames.includes(effectiveSelectedNamespace)
+  const missingNamespaceFallback =
+    clusterDefaultNamespace && namespaceNames.includes(clusterDefaultNamespace)
+      ? clusterDefaultNamespace
+      : defaultNamespace === '_all' || namespaceNames.includes(defaultNamespace)
+        ? defaultNamespace
+        : namespaceNames[0]
+  const validatedSelectedNamespace =
+    namespaceValidationRequired &&
+    !namespaceValidationPending &&
+    !selectedNamespaceExists
+      ? missingNamespaceFallback
+      : effectiveSelectedNamespace
   const requestNamespace = clusterScope
     ? undefined
-    : fixedNamespace || selectedNamespace
+    : fixedNamespace || validatedSelectedNamespace
   const [useSSE, setUseSSE] = useState(false)
   const resolvedResourceType = (resourceType ??
     (resourceName.toLowerCase() as ResourceType)) as ResourceType
@@ -168,7 +250,11 @@ export function ResourceTable<T>({
   } = useResources(resolvedResourceType, requestNamespace, {
     refreshInterval: useSSE ? 0 : refreshInterval, // disable polling when SSE
     reduce: true, // Fetch reduced data for performance
-    disable: useSSE, // do not query when using SSE
+    disable:
+      useSSE ||
+      !namespaceSelectionReady ||
+      namespaceValidationPending ||
+      (!clusterScope && !fixedNamespace && !validatedSelectedNamespace),
   })
 
   // SSE state (when enabled)
@@ -181,7 +267,11 @@ export function ResourceTable<T>({
     refetch: reconnectSSE,
   } = useResourcesWatch(resolvedResourceType, requestNamespace, {
     reduce: true,
-    enabled: useSSE,
+    enabled:
+      useSSE &&
+      namespaceSelectionReady &&
+      !namespaceValidationPending &&
+      Boolean(clusterScope || fixedNamespace || validatedSelectedNamespace),
   })
 
   // (moved below after error is defined)
@@ -228,46 +318,108 @@ export function ResourceTable<T>({
   }, [columnFilters, searchQuery])
 
   useEffect(() => {
-    if (clusterScope || !currentCluster) return
+    if (
+      clusterScope ||
+      !currentCluster ||
+      !namespaceSelectionReady ||
+      !selectedNamespaceStorageKey ||
+      !selectedNamespaceSourceKey
+    ) {
+      return
+    }
 
-    const selectedNamespaceStorageKey = `${currentCluster}selectedNamespace`
     if (fixedNamespace) {
       localStorage.setItem(selectedNamespaceStorageKey, fixedNamespace)
+      localStorage.setItem(selectedNamespaceSourceKey, 'fixed')
       if (selectedNamespace !== fixedNamespace) {
         setSelectedNamespace(fixedNamespace)
       }
       return
     }
 
-    const storedNamespace = localStorage.getItem(selectedNamespaceStorageKey)
-    const targetNamespace = storedNamespace || defaultNamespace
+    if (storedNamespaceIsAutomatic && storedNamespace !== targetNamespace) {
+      localStorage.setItem(selectedNamespaceStorageKey, targetNamespace)
+      localStorage.setItem(selectedNamespaceSourceKey, 'fallback')
+    }
+
     if (selectedNamespace !== targetNamespace) {
       setSelectedNamespace(targetNamespace)
     }
   }, [
     clusterScope,
+    clusterDefaultNamespace,
     currentCluster,
     defaultNamespace,
     fixedNamespace,
+    namespaceSelectionReady,
     selectedNamespace,
+    selectedNamespaceSourceKey,
+    selectedNamespaceStorageKey,
+    storedNamespace,
+    storedNamespaceIsAutomatic,
+    targetNamespace,
+  ])
+
+  useEffect(() => {
+    if (
+      clusterScope ||
+      fixedNamespace ||
+      !currentCluster ||
+      !namespaceSelectionReady ||
+      !selectedNamespaceStorageKey ||
+      !selectedNamespaceSourceKey ||
+      !effectiveSelectedNamespace ||
+      effectiveSelectedNamespace === '_all' ||
+      namespaceValidationPending ||
+      !availableNamespaces
+    ) {
+      return
+    }
+
+    if (selectedNamespaceExists) {
+      return
+    }
+
+    if (!missingNamespaceFallback) {
+      return
+    }
+
+    localStorage.setItem(selectedNamespaceStorageKey, missingNamespaceFallback)
+    localStorage.setItem(selectedNamespaceSourceKey, 'fallback')
+    setSelectedNamespace(missingNamespaceFallback)
+  }, [
+    availableNamespaces,
+    clusterScope,
+    currentCluster,
+    effectiveSelectedNamespace,
+    fixedNamespace,
+    missingNamespaceFallback,
+    namespaceSelectionReady,
+    namespaceValidationPending,
+    selectedNamespaceExists,
+    selectedNamespaceSourceKey,
+    selectedNamespaceStorageKey,
   ])
 
   // Handle namespace change
   const handleNamespaceChange = useCallback(
     (value: string) => {
       if (fixedNamespace) return
-      if (setSelectedNamespace) {
-        localStorage.setItem(
-          localStorage.getItem('current-cluster') + 'selectedNamespace',
-          value
-        )
+      if (setSelectedNamespace && selectedNamespaceStorageKey) {
+        localStorage.setItem(selectedNamespaceStorageKey, value)
+        localStorage.setItem(`${selectedNamespaceStorageKey}:source`, 'manual')
         setSelectedNamespace(value)
         // Reset pagination and search when changing namespace
         setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
         setSearchQuery('')
       }
     },
-    [fixedNamespace, setSelectedNamespace, pagination.pageSize]
+    [
+      fixedNamespace,
+      setSelectedNamespace,
+      selectedNamespaceStorageKey,
+      pagination.pageSize,
+    ]
   )
 
   // Add namespace column when showing all namespaces
