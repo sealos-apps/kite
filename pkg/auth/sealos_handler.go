@@ -204,16 +204,31 @@ func upsertSealosCluster(clusterName, kubeconfig, namespace string) error {
 		return err
 	}
 
-	updates := map[string]interface{}{
-		"description": description,
-		"config":      model.SecretString(kubeconfig),
-		"in_cluster":  false,
-		"enable":      true,
+	updates := buildSealosClusterUpdates(cluster, description, kubeconfig, defaultPrometheusURL)
+	if len(updates) == 0 {
+		return nil
+	}
+	return model.UpdateCluster(cluster, updates)
+}
+
+func buildSealosClusterUpdates(cluster *model.Cluster, description, kubeconfig, defaultPrometheusURL string) map[string]interface{} {
+	updates := map[string]interface{}{}
+	if cluster.Description != description {
+		updates["description"] = description
+	}
+	if string(cluster.Config) != kubeconfig {
+		updates["config"] = model.SecretString(kubeconfig)
+	}
+	if cluster.InCluster {
+		updates["in_cluster"] = false
+	}
+	if !cluster.Enable {
+		updates["enable"] = true
 	}
 	if strings.TrimSpace(cluster.PrometheusURL) == "" && defaultPrometheusURL != "" {
 		updates["prometheus_url"] = defaultPrometheusURL
 	}
-	return model.UpdateCluster(cluster, updates)
+	return updates
 }
 
 // SyncSealosPrometheusDefaults applies default Prometheus URL to existing

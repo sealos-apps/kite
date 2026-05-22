@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -22,8 +23,6 @@ import (
 	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	gatewayapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -45,6 +44,8 @@ type K8sClient struct {
 	MetricsClient *metricsclient.Clientset
 
 	cancel context.CancelFunc
+	done   <-chan struct{}
+	once   sync.Once
 }
 
 // NewClient creates a K8sClient from a rest.Config
@@ -68,6 +69,7 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 	}
 
 	var c client.Client
+	var done <-chan struct{}
 	if os.Getenv("DISABLE_CACHE") == "true" {
 		c, err = newDirectClient()
 		if err != nil {
@@ -75,19 +77,13 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 	} else {
-		mgr, err := manager.New(config, manager.Options{
-			Scheme:         runtimeScheme,
-			LeaderElection: false,
-			Metrics: metricsserver.Options{
-				BindAddress: "0", // Disable metrics server
-			},
-			Cache: cache.Options{
-				DefaultWatchErrorHandler: func(ctx context.Context, r *toolscache.Reflector, err error) {
-				},
+		k8sCache, err := cache.New(config, cache.Options{
+			Scheme: runtimeScheme,
+			DefaultWatchErrorHandler: func(ctx context.Context, r *toolscache.Reflector, err error) {
 			},
 		})
 		if err != nil {
-			klog.Warningf("failed to create cached manager, falling back to direct client: %v", err)
+			klog.Warningf("failed to create k8s cache, falling back to direct client: %v", err)
 			c, err = newDirectClient()
 			if err != nil {
 				cancel()
@@ -103,7 +99,7 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 		}
 
 		// Add field indexer for Pod spec.nodeName to enable efficient querying by node
-		if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		if err := k8sCache.IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
 			pod := rawObj.(*corev1.Pod)
 			if pod.Spec.NodeName == "" {
 				return nil
@@ -126,16 +122,20 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 				cancel:        cancel,
 			}, nil
 		}
+
+		cacheDone := make(chan struct{})
 		go func() {
-			if err := mgr.Start(ctx); err != nil {
-				fmt.Printf("Error starting manager: %v\n", err)
+			defer close(cacheDone)
+			if err := k8sCache.Start(ctx); err != nil {
+				klog.Warningf("failed to run k8s cache: %v", err)
 			}
 		}()
 		cacheSyncCtx, cacheSyncCancel := context.WithTimeout(ctx, 8*time.Second)
 		defer cacheSyncCancel()
-		if !mgr.GetCache().WaitForCacheSync(cacheSyncCtx) {
+		if !k8sCache.WaitForCacheSync(cacheSyncCtx) {
 			klog.Warningf("failed to sync cached client within timeout, falling back to direct client")
 			cancel()
+			waitForCacheStop(cacheDone)
 			ctx, cancel = context.WithCancel(context.Background())
 			c, err = newDirectClient()
 			if err != nil {
@@ -150,7 +150,18 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 				cancel:        cancel,
 			}, nil
 		}
-		c = mgr.GetClient()
+		c, err = client.New(config, client.Options{
+			Scheme: runtimeScheme,
+			Cache: &client.CacheOptions{
+				Reader: k8sCache,
+			},
+		})
+		if err != nil {
+			cancel()
+			waitForCacheStop(cacheDone)
+			return nil, fmt.Errorf("failed to create cached client: %w", err)
+		}
+		done = cacheDone
 	}
 
 	return &K8sClient{
@@ -159,12 +170,28 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 		Configuration: config,
 		MetricsClient: metricsClient,
 		cancel:        cancel,
+		done:          done,
 	}, nil
 }
 
 func (c *K8sClient) Stop(name string) {
 	klog.Infof("Stopping K8s client for %s", name)
-	c.cancel()
+	c.once.Do(func() {
+		c.cancel()
+		waitForCacheStop(c.done)
+	})
+}
+
+func waitForCacheStop(done <-chan struct{}) {
+	if done == nil {
+		return
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		klog.Warningf("timed out waiting for k8s cache to stop")
+	}
 }
 
 // GetScheme returns the runtime scheme used by the client
