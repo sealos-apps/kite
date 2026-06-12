@@ -107,7 +107,7 @@ func (h *PodHandler) ListMetrics(c *gin.Context) (map[string]metricsv1.PodMetric
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 	var metricsList metricsv1.PodMetricsList
 	var listOpts []client.ListOption
-	if namespace := c.Param("namespace"); namespace != "" && namespace != "_all" {
+	if namespace := c.Param("namespace"); namespace != "" && namespace != common.AllNamespaces {
 		listOpts = append(listOpts, client.InNamespace(namespace))
 	}
 	if labelSelector := c.Query("labelSelector"); labelSelector != "" {
@@ -194,7 +194,7 @@ func (h *PodHandler) Resize(c *gin.Context) {
 	namespace := c.Param("namespace")
 	oldPod := &corev1.Pod{}
 	namespacedName := types.NamespacedName{Name: name}
-	if namespace != "" && namespace != "_all" {
+	if namespace != "" && namespace != common.AllNamespaces {
 		namespacedName.Namespace = namespace
 	}
 	if err := cs.K8sClient.Get(c.Request.Context(), namespacedName, oldPod); err != nil {
@@ -524,7 +524,7 @@ func (h *PodHandler) Watch(c *gin.Context) {
 	// Parse params
 	namespace := c.Param("namespace")
 	if namespace == "" {
-		namespace = "_all"
+		namespace = common.AllNamespaces
 	}
 	reduce := c.DefaultQuery("reduce", "false") == "true"
 	labelSelector := c.Query("labelSelector")
@@ -539,7 +539,7 @@ func (h *PodHandler) Watch(c *gin.Context) {
 	}
 
 	ns := namespace
-	if ns == "_all" {
+	if ns == common.AllNamespaces {
 		ns = ""
 	}
 	metricsMap, err := h.ListMetrics(c)

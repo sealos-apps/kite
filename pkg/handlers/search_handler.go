@@ -9,8 +9,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/golang-lru/v2/expirable"
+	"github.com/zxh326/kite/pkg/cluster"
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/handlers/resources"
+	"github.com/zxh326/kite/pkg/model"
+	"github.com/zxh326/kite/pkg/rbac"
 	"github.com/zxh326/kite/pkg/utils"
 )
 
@@ -24,12 +27,22 @@ type SearchResponse struct {
 
 func NewSearchHandler() *SearchHandler {
 	return &SearchHandler{
-		cache: expirable.NewLRU[string, []common.SearchResult](100, nil, time.Minute*10),
+		cache: expirable.NewLRU[string, []common.SearchResult](100, nil, time.Minute*5),
 	}
 }
 
-func (h *SearchHandler) createCacheKey(query string) string {
-	return fmt.Sprintf("search:%s", query)
+func (h *SearchHandler) createCacheKey(c *gin.Context, query string, limit int) string {
+	user := c.MustGet("user").(model.User)
+	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	return fmt.Sprintf(
+		"search:%s:%s:%t:%s:%d:%s",
+		user.Key(),
+		cs.Name,
+		cs.NamespaceScoped,
+		cs.Namespace,
+		limit,
+		query,
+	)
 }
 
 func (h *SearchHandler) Search(c *gin.Context, query string, limit int) ([]common.SearchResult, error) {
@@ -44,7 +57,7 @@ func (h *SearchHandler) Search(c *gin.Context, query string, limit int) ([]commo
 			if err != nil {
 				continue
 			}
-			allResults = append(allResults, results...)
+			allResults = append(allResults, filterSearchResults(c, results)...)
 		}
 	}
 
@@ -56,7 +69,7 @@ func (h *SearchHandler) Search(c *gin.Context, query string, limit int) ([]commo
 		allResults = allResults[:limit]
 	}
 
-	h.cache.Add(h.createCacheKey(query), allResults)
+	h.cache.Add(h.createCacheKey(c, query, limit), allResults)
 	return allResults, nil
 }
 
@@ -75,17 +88,14 @@ func (h *SearchHandler) GlobalSearch(c *gin.Context) {
 		limit = 50
 	}
 
-	cacheKey := h.createCacheKey(query)
+	cacheKey := h.createCacheKey(c, query, limit)
 
 	if cachedResults, found := h.cache.Get(cacheKey); found {
+		cachedResults = filterSearchResults(c, cachedResults)
 		response := SearchResponse{
 			Results: cachedResults,
 			Total:   len(cachedResults),
 		}
-		go func() {
-			// Perform search in the background to update cache
-			_, _ = h.Search(c, query, limit)
-		}()
 		c.JSON(http.StatusOK, response)
 		return
 	}
@@ -102,6 +112,46 @@ func (h *SearchHandler) GlobalSearch(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func filterSearchResults(c *gin.Context, results []common.SearchResult) []common.SearchResult {
+	if len(results) == 0 {
+		return results
+	}
+	user := c.MustGet("user").(model.User)
+	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	filtered := make([]common.SearchResult, 0, len(results))
+	for _, result := range results {
+		if canViewSearchResult(user, cs, result) {
+			filtered = append(filtered, result)
+		}
+	}
+	return filtered
+}
+
+func canViewSearchResult(user model.User, cs *cluster.ClientSet, result common.SearchResult) bool {
+	resource := result.ResourceType
+	if meta := common.LookupResource(resource); meta != nil {
+		resource = string(meta.Plural)
+		if meta.Plural == common.Namespaces {
+			return rbac.CanAccessNamespace(user, cs.Name, result.Name)
+		}
+		if meta.ClusterScoped {
+			if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) {
+				return false
+			}
+			return rbac.CanAccess(user, resource, string(common.VerbGet), cs.Name, "")
+		}
+	}
+
+	namespace := strings.TrimSpace(result.Namespace)
+	if namespace == "" {
+		namespace = common.AllNamespaces
+	}
+	if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) && namespace != cs.Namespace {
+		return false
+	}
+	return rbac.CanAccess(user, resource, string(common.VerbGet), cs.Name, namespace)
 }
 
 func getResourceOrder(resourceType string) int {

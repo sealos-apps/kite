@@ -22,6 +22,8 @@ Default local endpoints:
 
 ## Build And Test
 
+Kite uses Helm v4 and requires Go 1.26 or newer for backend builds. Keep local Go, Dockerfile, and CI `GO_VERSION` aligned.
+
 Build frontend static assets and the Go binary:
 
 ```bash
@@ -46,6 +48,12 @@ Run frontend type checks:
 cd ui && pnpm run type-check
 ```
 
+Run the full frontend production build:
+
+```bash
+cd ui && COREPACK_ENABLE_AUTO_PIN=0 pnpm run build
+```
+
 Build documentation:
 
 ```bash
@@ -67,6 +75,11 @@ make docs-build
 - `SEALOS_JWT_SECRET`: JWT secret used for Sealos auth validation.
 - `AUTH_COOKIE_SAMESITE` and `AUTH_COOKIE_SECURE`: cookie settings for normal and iframe deployments.
 - `VITE_SEALOS_AUTO_LOGIN`: frontend build-time flag controlling Sealos SDK session login attempts.
+
+AI and terminal feature state is stored in the admin general settings record rather than plain environment variables:
+
+- `aiAgentEnabled`, `aiProvider`, `aiModel`, `aiApiKey`, `aiBaseUrl`, and `aiMaxTokens` configure the optional AI assistant.
+- `kubectlEnabled`, `kubectlImage`, and `nodeTerminalImage` configure optional terminal helper pods.
 
 ## Auth Fault Page
 
@@ -105,6 +118,28 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - If managed Kubernetes kubeconfigs use an `exec` plugin such as `aws`, `gcloud`, or `kubelogin`, use a Service Account token kubeconfig instead. See `docs/config/managed-k8s-auth.md`.
 - If resource access fails with permission errors, verify Kite RBAC first, then Kubernetes RBAC for the service account or imported kubeconfig.
 - If a production image has no shell, use a temporary debug/client pod rather than `kubectl exec` into Kite.
+
+## AI Assistant Operations
+
+- The AI assistant is disabled until an admin enables it in general settings and provides an OpenAI-compatible or Anthropic-compatible provider configuration.
+- Read-only tools still use the current authenticated user, cluster, and namespace scope.
+- Mutating tools require both Kite RBAC and an explicit continue/confirmation step. Pending sessions are scoped to the same user and cluster.
+- If AI chat returns a disabled/provider error, check the general settings record, provider base URL, API key, and model name.
+
+## Helm Operations
+
+- Chart catalog and repository APIs live under `/api/v1/admin/charts` and are admin-only because Kite may use stored repository credentials to fetch index files and chart content.
+- Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
+- Helm install, upgrade, rollback, uninstall, and auto-upgrade render target manifests before writing. Added resources require `create`, retained resources require `update`, and removed resources require `delete` on the rendered Kubernetes resource.
+- Cluster-scoped rendered resources such as CRDs, Namespaces, ClusterRoles, and ClusterRoleBindings require the Kite admin role and are rejected on namespace-scoped Sealos clusters.
+- If an upgrade or rollback fails with a rendered resource permission error, inspect the dry-run manifest diff and grant the specific resource verb in Kite RBAC or choose a chart/values set that stays inside the user's namespace scope.
+
+## Kubectl Terminal Operations
+
+- Kubectl terminal is disabled by default and is admin-only.
+- Before enabling it, create a ServiceAccount named `kite-kubectl-admin` in the agent namespace with exactly the Kubernetes RBAC the deployment intends to expose.
+- Kite creates and cleans up per-session kubectl pods, but it must not auto-create cluster-admin bindings.
+- If the terminal fails immediately, check the general settings flag, the configured kubectl image, and whether the `kite-kubectl-admin` ServiceAccount exists in the agent namespace.
 
 ## Production Image Notes
 

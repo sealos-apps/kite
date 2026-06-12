@@ -12,15 +12,17 @@ import i18n from '@/i18n'
 import { useQueryClient } from '@tanstack/react-query'
 import * as sealosDesktopSDK from 'sealos-desktop-sdk/app'
 
+import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
 import {
   CURRENT_CLUSTER_CHANGE_EVENT,
   readCurrentCluster,
   writeCurrentCluster,
 } from '@/lib/current-cluster'
-import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
 import { withSubPath } from '@/lib/subpath'
 
 interface UserCapabilities {
+  aiEnabled?: boolean
+  kubectlEnabled?: boolean
   canCreateCustomCRDGroup?: boolean
 }
 
@@ -47,6 +49,10 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   providers: string[]
+  capabilities: Required<
+    Pick<UserCapabilities, 'aiEnabled' | 'kubectlEnabled'>
+  > &
+    Pick<UserCapabilities, 'canCreateCustomCRDGroup'>
   login: (provider?: string) => Promise<void>
   loginWithPassword: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -89,6 +95,10 @@ type SealosLanguage = 'en' | 'zh'
 
 const SEALOS_PROVIDER = 'sealos'
 const SEALOS_LANGUAGE_CHANGED_EVENT = 'change_i18n'
+const DEFAULT_CAPABILITIES = {
+  aiEnabled: false,
+  kubectlEnabled: false,
+}
 
 const getEnvFlag = (value: string | undefined): boolean | null => {
   if (value === 'true') return true
@@ -386,37 +396,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [checkAuthInternal, isSealosExternalBlocked, queryClient]
   )
 
-  const syncSealosLanguage = useCallback(async (currentUser: User | null) => {
-    if (isSealosExternalBlocked) {
-      return
-    }
-    if (!shouldTrySealosAutoLogin()) {
-      return
-    }
-
-    // Respect explicit non-sealos logins; only auto-sync when unauthenticated or already in sealos mode.
-    if (currentUser && currentUser.provider !== SEALOS_PROVIDER) {
-      return
-    }
-
-    try {
-      const sealosLanguage = await getSealosLanguage()
-      if (!sealosLanguage) {
+  const syncSealosLanguage = useCallback(
+    async (currentUser: User | null) => {
+      if (isSealosExternalBlocked) {
+        return
+      }
+      if (!shouldTrySealosAutoLogin()) {
         return
       }
 
-      const currentLanguage = (i18n.resolvedLanguage ?? i18n.language)
-        .toLowerCase()
-        .trim()
-      if (currentLanguage.startsWith(sealosLanguage)) {
+      // Respect explicit non-sealos logins; only auto-sync when unauthenticated or already in sealos mode.
+      if (currentUser && currentUser.provider !== SEALOS_PROVIDER) {
         return
       }
 
-      await i18n.changeLanguage(sealosLanguage)
-    } catch (error) {
-      console.error('Sealos language sync failed:', error)
-    }
-  }, [isSealosExternalBlocked])
+      try {
+        const sealosLanguage = await getSealosLanguage()
+        if (!sealosLanguage) {
+          return
+        }
+
+        const currentLanguage = (i18n.resolvedLanguage ?? i18n.language)
+          .toLowerCase()
+          .trim()
+        if (currentLanguage.startsWith(sealosLanguage)) {
+          return
+        }
+
+        await i18n.changeLanguage(sealosLanguage)
+      } catch (error) {
+        console.error('Sealos language sync failed:', error)
+      }
+    },
+    [isSealosExternalBlocked]
+  )
 
   useEffect(() => {
     if (isSealosExternalBlocked) {
@@ -642,6 +655,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     isLoading,
     providers,
+    capabilities: {
+      ...DEFAULT_CAPABILITIES,
+      ...user?.capabilities,
+    },
     login,
     loginWithPassword,
     logout,
@@ -669,9 +686,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     )
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

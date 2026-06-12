@@ -6,11 +6,14 @@ import (
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/rbac"
+	"k8s.io/klog/v2"
 )
 
 // UserCapabilities contains user capability flags used by frontend behavior gates.
 type UserCapabilities struct {
 	CanCreateCustomCRDGroup bool `json:"canCreateCustomCRDGroup"`
+	AIEnabled               bool `json:"aiEnabled"`
+	KubectlEnabled          bool `json:"kubectlEnabled"`
 }
 
 // CanCreateCustomCRDGroup returns whether the user can create sidebar custom CRD groups.
@@ -43,7 +46,23 @@ func CanCreateCustomCRDGroup(user model.User, clusterName string) bool {
 }
 
 func BuildUserCapabilities(user model.User, clusterName string) UserCapabilities {
-	return UserCapabilities{
+	capabilities := UserCapabilities{
 		CanCreateCustomCRDGroup: CanCreateCustomCRDGroup(user, clusterName),
+		AIEnabled:               false,
+		KubectlEnabled:          false,
 	}
+
+	if model.DB == nil {
+		return capabilities
+	}
+
+	setting, err := model.GetGeneralSetting()
+	if err != nil {
+		klog.Warningf("failed to load general setting for user capabilities: %v", err)
+		return capabilities
+	}
+
+	capabilities.AIEnabled = setting.AIAgentEnabled
+	capabilities.KubectlEnabled = setting.KubectlEnabled
+	return capabilities
 }

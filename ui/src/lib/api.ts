@@ -10,6 +10,20 @@ import {
   Cluster,
   clusterScopeResources,
   FetchUserListResponse,
+  GeneralSetting,
+  GeneralSettingUpdateRequest,
+  HelmChartContent,
+  HelmChartContentType,
+  HelmChartDetail,
+  HelmChartList,
+  HelmRelease,
+  HelmReleaseAutoUpgrade,
+  HelmReleaseAutoUpgradeRequest,
+  HelmReleaseDryRunResponse,
+  HelmReleaseHistoryResponse,
+  HelmReleaseInstallRequest,
+  HelmReleaseUpgradeRequest,
+  HelmRepository,
   ImageTagInfo,
   OAuthProvider,
   OverviewData,
@@ -196,6 +210,330 @@ export const scaleDeployment = async (
   })
 
   return response
+}
+
+export const upgradeHelmRelease = async (
+  namespace: string,
+  name: string,
+  body?: HelmReleaseUpgradeRequest
+): Promise<{ message?: string }> => {
+  return apiClient.put<{ message?: string }>(
+    `/helmreleases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/upgrade`,
+    body || {}
+  )
+}
+
+export const dryRunUpgradeHelmRelease = async (
+  namespace: string,
+  name: string,
+  body?: HelmReleaseUpgradeRequest
+): Promise<HelmReleaseDryRunResponse> => {
+  return apiClient.put<HelmReleaseDryRunResponse>(
+    `/helmreleases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/upgrade/dry-run`,
+    body || {}
+  )
+}
+
+export const rollbackHelmRelease = async (
+  namespace: string,
+  name: string,
+  revision?: number
+): Promise<{ message?: string }> => {
+  return apiClient.put<{ message?: string }>(
+    `/helmreleases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/rollback`,
+    revision ? { revision } : {}
+  )
+}
+
+export const fetchHelmReleaseAutoUpgrade = (
+  namespace: string,
+  name: string
+): Promise<HelmReleaseAutoUpgrade> => {
+  return fetchAPI<HelmReleaseAutoUpgrade>(
+    `/helmreleases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/auto-upgrade`
+  )
+}
+
+export const updateHelmReleaseAutoUpgrade = (
+  namespace: string,
+  name: string,
+  body: HelmReleaseAutoUpgradeRequest
+): Promise<HelmReleaseAutoUpgrade> => {
+  return apiClient.put<HelmReleaseAutoUpgrade>(
+    `/helmreleases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/auto-upgrade`,
+    body
+  )
+}
+
+export const useHelmReleaseAutoUpgrade = (
+  namespace: string,
+  name: string,
+  options?: { enabled?: boolean; staleTime?: number }
+) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: ['helmrelease-auto-upgrade', clusterKey, namespace, name],
+    queryFn: () => fetchHelmReleaseAutoUpgrade(namespace, name),
+    enabled: (options?.enabled ?? true) && !!namespace && !!name,
+    staleTime: options?.staleTime || 30000,
+  })
+}
+
+export const installHelmRelease = async (
+  namespace: string,
+  body: HelmReleaseInstallRequest
+): Promise<HelmRelease> => {
+  const resolvedNamespace = resolveNamespaceForResource(
+    'helmreleases',
+    namespace
+  )
+  return apiClient.post<HelmRelease>(
+    `/helmreleases/${encodeURIComponent(resolvedNamespace || namespace)}`,
+    body
+  )
+}
+
+export const dryRunInstallHelmRelease = async (
+  namespace: string,
+  body: HelmReleaseInstallRequest
+): Promise<HelmReleaseDryRunResponse> => {
+  const resolvedNamespace = resolveNamespaceForResource(
+    'helmreleases',
+    namespace
+  )
+  return apiClient.post<HelmReleaseDryRunResponse>(
+    `/helmreleases/${encodeURIComponent(resolvedNamespace || namespace)}/dry-run`,
+    body
+  )
+}
+
+export const fetchHelmReleaseHistory = (
+  namespace: string,
+  name: string
+): Promise<HelmReleaseHistoryResponse> => {
+  return fetchAPI<HelmReleaseHistoryResponse>(
+    `/helmreleases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/history`
+  )
+}
+
+export const useHelmReleaseHistory = (
+  namespace: string,
+  name: string,
+  options?: { enabled?: boolean; staleTime?: number }
+) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: ['helmrelease-history', clusterKey, namespace, name],
+    queryFn: () => fetchHelmReleaseHistory(namespace, name),
+    enabled: options?.enabled ?? true,
+    staleTime: options?.staleTime || 30000,
+  })
+}
+
+export const fetchHelmRepositories = (): Promise<HelmRepository[]> => {
+  return fetchAPI<HelmRepository[]>('/admin/charts/repositories')
+}
+
+export const createHelmRepository = (
+  body: Pick<HelmRepository, 'name' | 'url'> & {
+    username?: string
+    password?: string
+  }
+): Promise<HelmRepository> => {
+  return apiClient.post<HelmRepository>('/admin/charts/repositories', body)
+}
+
+export const deleteHelmRepository = (
+  id: number
+): Promise<{ message: string }> => {
+  return apiClient.delete<{ message: string }>(
+    `/admin/charts/repositories/${id}`
+  )
+}
+
+export const fetchHelmCharts = (options?: {
+  repository?: string
+  query?: string
+}): Promise<HelmChartList> => {
+  const params = new URLSearchParams()
+  if (options?.repository) {
+    params.append('repository', options.repository)
+  }
+  if (options?.query) {
+    params.append('q', options.query)
+  }
+  const query = params.toString()
+  return fetchAPI<HelmChartList>(`/admin/charts${query ? `?${query}` : ''}`)
+}
+
+export const fetchArtifactHubCharts = (options?: {
+  query?: string
+  verifiedPublisher?: boolean
+  limit?: number
+  offset?: number
+}): Promise<HelmChartList> => {
+  const params = new URLSearchParams()
+  if (options?.query) {
+    params.append('q', options.query)
+  }
+  if (options?.verifiedPublisher !== undefined) {
+    params.append('verifiedPublisher', String(options.verifiedPublisher))
+  }
+  if (options?.limit) {
+    params.append('limit', String(options.limit))
+  }
+  if (options?.offset) {
+    params.append('offset', String(options.offset))
+  }
+  const query = params.toString()
+  return fetchAPI<HelmChartList>(
+    `/admin/charts/artifacthub${query ? `?${query}` : ''}`
+  )
+}
+
+export const fetchHelmChart = (
+  repository: string,
+  name: string,
+  version?: string,
+  source?: 'repository' | 'artifacthub'
+): Promise<HelmChartDetail> => {
+  const params = new URLSearchParams()
+  if (version) {
+    params.append('version', version)
+  }
+  const query = params.toString()
+  const endpoint =
+    source === 'artifacthub'
+      ? `/admin/charts/artifacthub/${encodeURIComponent(repository)}/${encodeURIComponent(name)}`
+      : `/admin/charts/${encodeURIComponent(repository)}/${encodeURIComponent(name)}`
+
+  return fetchAPI<HelmChartDetail>(`${endpoint}${query ? `?${query}` : ''}`)
+}
+
+export const fetchHelmChartContent = (
+  repository: string,
+  name: string,
+  content: HelmChartContentType,
+  version?: string,
+  source?: 'repository' | 'artifacthub'
+): Promise<HelmChartContent> => {
+  const params = new URLSearchParams()
+  if (version) {
+    params.append('version', version)
+  }
+  const query = params.toString()
+  const endpoint =
+    source === 'artifacthub'
+      ? `/admin/charts/artifacthub/${encodeURIComponent(repository)}/${encodeURIComponent(name)}/content/${content}`
+      : `/admin/charts/${encodeURIComponent(repository)}/${encodeURIComponent(name)}/content/${content}`
+
+  return fetchAPI<HelmChartContent>(`${endpoint}${query ? `?${query}` : ''}`)
+}
+
+export const useHelmRepositories = () => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: ['helmcharts', clusterKey, 'repositories'],
+    queryFn: fetchHelmRepositories,
+  })
+}
+
+export const useHelmCharts = (options?: {
+  repository?: string
+  query?: string
+  enabled?: boolean
+}) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: [
+      'helmcharts',
+      clusterKey,
+      'charts',
+      options?.repository || '',
+      options?.query || '',
+    ],
+    queryFn: () => fetchHelmCharts(options),
+    enabled: options?.enabled ?? true,
+  })
+}
+
+export const useArtifactHubCharts = (options?: {
+  query?: string
+  verifiedPublisher?: boolean
+  limit?: number
+  offset?: number
+  enabled?: boolean
+}) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: [
+      'helmcharts',
+      clusterKey,
+      'artifacthub',
+      options?.query || '',
+      options?.verifiedPublisher ?? true,
+      options?.limit || 20,
+      options?.offset || 0,
+    ],
+    queryFn: () => fetchArtifactHubCharts(options),
+    enabled: options?.enabled ?? true,
+  })
+}
+
+export const useHelmChart = (
+  repository: string | undefined,
+  name: string | undefined,
+  version?: string,
+  source?: 'repository' | 'artifacthub',
+  enabled = true
+) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: [
+      'helmcharts',
+      clusterKey,
+      'chart',
+      source || 'repository',
+      repository,
+      name,
+      version || '',
+    ],
+    queryFn: () =>
+      fetchHelmChart(repository || '', name || '', version, source),
+    enabled: Boolean(enabled && repository && name),
+  })
+}
+
+export const useHelmChartContent = (
+  repository: string | undefined,
+  name: string | undefined,
+  content: HelmChartContentType,
+  version?: string,
+  source?: 'repository' | 'artifacthub',
+  enabled = true
+) => {
+  const clusterKey = getCurrentClusterCacheKey()
+  return useQuery({
+    queryKey: [
+      'helmcharts',
+      clusterKey,
+      'chart-content',
+      source || 'repository',
+      repository,
+      name,
+      version || '',
+      content,
+    ],
+    queryFn: () =>
+      fetchHelmChartContent(
+        repository || '',
+        name || '',
+        content,
+        version,
+        source
+      ),
+    enabled: Boolean(enabled && repository && name),
+  })
 }
 
 // Node operation APIs
@@ -1742,6 +2080,24 @@ export const useUserList = (
     queryFn: () => fetchUserList(page, size, search, sortBy, sortOrder, role),
     staleTime: 20000,
   })
+}
+
+export const fetchGeneralSetting = async (): Promise<GeneralSetting> => {
+  return fetchAPI<GeneralSetting>('/admin/general-setting/')
+}
+
+export const useGeneralSetting = (options?: { staleTime?: number }) => {
+  return useQuery<GeneralSetting, Error>({
+    queryKey: ['general-setting'],
+    queryFn: fetchGeneralSetting,
+    staleTime: options?.staleTime || 30000,
+  })
+}
+
+export const updateGeneralSetting = async (
+  data: GeneralSettingUpdateRequest
+): Promise<GeneralSetting> => {
+  return apiClient.put<GeneralSetting>('/admin/general-setting/', data)
 }
 
 export const fetchAuditLogs = async (

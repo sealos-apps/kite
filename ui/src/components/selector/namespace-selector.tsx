@@ -14,11 +14,14 @@ export function NamespaceSelector({
   handleNamespaceChange,
   showAll = false,
   disabled = false,
+  triggerClassName,
 }: {
   selectedNamespace?: string
   handleNamespaceChange: (namespace: string) => void
   showAll?: boolean
   disabled?: boolean
+  triggerClassName?: string
+  modal?: boolean
 }) {
   const { data, isLoading } = useResources('namespaces', undefined, {
     disable: disabled,
@@ -47,7 +50,7 @@ export function NamespaceSelector({
       onValueChange={handleNamespaceChange}
       disabled={disabled}
     >
-      <SelectTrigger className="max-w-48">
+      <SelectTrigger className={triggerClassName || 'max-w-48'}>
         <SelectValue placeholder="Select a namespace" />
       </SelectTrigger>
       <SelectContent>

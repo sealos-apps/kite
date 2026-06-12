@@ -149,11 +149,18 @@ func applyResourceUsageHistoryMetadata(resourceUsageHistory *prometheus.Resource
 func (h *PromHandler) GetPodMetrics(c *gin.Context) {
 	ctx := c.Request.Context()
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	user := c.MustGet("user").(model.User)
 	// Get path parameters
 	namespace := c.Param("namespace")
 	podName := c.Param("podName")
 	if namespace == "" || podName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace and podName are required"})
+		return
+	}
+	if !rbac.CanAccess(user, string(common.Pods), string(common.VerbGet), cs.Name, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": rbac.NoAccess(user.Key(), string(common.VerbGet), string(common.Pods), namespace, cs.Name),
+		})
 		return
 	}
 

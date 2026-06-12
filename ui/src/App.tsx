@@ -1,10 +1,12 @@
 import './App.css'
 
-import { useEffect } from 'react'
+import { ReactNode, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useSearchParams } from 'react-router-dom'
 
+import { AIChatbox, StandaloneAIChatbox } from './components/ai-chat/ai-chatbox'
 import { AppSidebar } from './components/app-sidebar'
+import { FloatingTerminal } from './components/floating-terminal'
 import { GlobalSearch } from './components/global-search'
 import {
   GlobalSearchProvider,
@@ -13,11 +15,13 @@ import {
 import { SiteHeader } from './components/site-header'
 import { SidebarInset, SidebarProvider } from './components/ui/sidebar'
 import { Toaster } from './components/ui/sonner'
+import { AIChatProvider } from './contexts/ai-chat-context'
 import { ClusterProvider } from './contexts/cluster-context'
+import { TerminalProvider, useTerminal } from './contexts/terminal-context'
 import { useCluster } from './hooks/use-cluster'
 import { apiClient } from './lib/api-client'
 
-function ClusterAwareApp() {
+function ClusterGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
   const { currentCluster, isLoading, error } = useCluster()
 
@@ -48,11 +52,12 @@ function ClusterAwareApp() {
     )
   }
 
-  return <AppContent />
+  return <>{children}</>
 }
 
 function AppContent() {
   const { isOpen, closeSearch } = useGlobalSearch()
+  const { isOpen: isTerminalOpen } = useTerminal()
   const [searchParams] = useSearchParams()
   const isIframe = searchParams.get('iframe') === 'true'
 
@@ -76,18 +81,42 @@ function AppContent() {
         </SidebarInset>
       </SidebarProvider>
       <GlobalSearch open={isOpen} onOpenChange={closeSearch} />
+      {isTerminalOpen ? <FloatingTerminal /> : null}
+      <AIChatbox />
       <Toaster />
     </>
   )
 }
 
+function AppProviders({ children }: { children: ReactNode }) {
+  return (
+    <TerminalProvider>
+      <ClusterProvider>
+        <GlobalSearchProvider>
+          <AIChatProvider>{children}</AIChatProvider>
+        </GlobalSearchProvider>
+      </ClusterProvider>
+    </TerminalProvider>
+  )
+}
+
 function App() {
   return (
-    <ClusterProvider>
-      <GlobalSearchProvider>
-        <ClusterAwareApp />
-      </GlobalSearchProvider>
-    </ClusterProvider>
+    <AppProviders>
+      <ClusterGate>
+        <AppContent />
+      </ClusterGate>
+    </AppProviders>
+  )
+}
+
+export function StandaloneAIChatApp() {
+  return (
+    <AppProviders>
+      <ClusterGate>
+        <StandaloneAIChatbox />
+      </ClusterGate>
+    </AppProviders>
   )
 }
 

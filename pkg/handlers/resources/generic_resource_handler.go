@@ -113,7 +113,7 @@ func (h *GenericResourceHandler[T, V]) GetResource(c *gin.Context, namespace, na
 	object := reflect.New(h.objectType).Interface().(T)
 	namespacedName := types.NamespacedName{Name: name}
 	if !h.isClusterScoped {
-		if namespace != "" && namespace != "_all" {
+		if namespace != "" && namespace != common.AllNamespaces {
 			namespacedName.Namespace = namespace
 		}
 	}
@@ -157,7 +157,7 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 	var listOpts []client.ListOption
 	namespace := c.Param("namespace")
 	if !h.isClusterScoped {
-		if namespace != "" && namespace != "_all" {
+		if namespace != "" && namespace != common.AllNamespaces {
 			listOpts = append(listOpts, client.InNamespace(namespace))
 		}
 	}
@@ -247,7 +247,7 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 		if h.Name() == "namespaces" && !rbac.CanAccessNamespace(user, cs.Name, obj.GetName()) {
 			continue
 		}
-		if namespace == "_all" && obj.GetNamespace() != "" && !rbac.CanAccessNamespace(user, cs.Name, obj.GetNamespace()) {
+		if namespace == common.AllNamespaces && obj.GetNamespace() != "" && !rbac.CanAccessNamespace(user, cs.Name, obj.GetNamespace()) {
 			continue
 		}
 		filterItems = append(filterItems, items[i])
@@ -322,7 +322,7 @@ func (h *GenericResourceHandler[T, V]) Update(c *gin.Context) {
 	resource.SetName(name)
 	if !h.isClusterScoped {
 		namespace := c.Param("namespace")
-		if namespace != "" && namespace != "_all" {
+		if namespace != "" && namespace != common.AllNamespaces {
 			resource.SetNamespace(namespace)
 		}
 	}
@@ -359,7 +359,7 @@ func (h *GenericResourceHandler[T, V]) Patch(c *gin.Context) {
 	namespacedName := types.NamespacedName{Name: name}
 	if !h.isClusterScoped {
 		namespace := c.Param("namespace")
-		if namespace != "" && namespace != "_all" {
+		if namespace != "" && namespace != common.AllNamespaces {
 			namespacedName.Namespace = namespace
 		}
 	}
@@ -400,7 +400,7 @@ func (h *GenericResourceHandler[T, V]) Delete(c *gin.Context) {
 	namespacedName := types.NamespacedName{Name: name}
 	if !h.isClusterScoped {
 		namespace := c.Param("namespace")
-		if namespace != "" && namespace != "_all" {
+		if namespace != "" && namespace != common.AllNamespaces {
 			namespacedName.Namespace = namespace
 		}
 	}

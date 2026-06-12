@@ -5,7 +5,7 @@ Kite is a Go backend plus a React/TypeScript frontend.
 
 - `main.go`: backend entrypoint.
 - `internal/`: internal bootstrapping helpers (for example `internal/load.go`).
-- `pkg/`: core backend modules (`auth`, `cluster`, `handlers`, `middleware`, `rbac`, `utils`, etc.).
+- `pkg/`: core backend modules (`ai`, `auth`, `cluster`, `helm`, `helmutil`, `helmguard`, `handlers`, `middleware`, `rbac`, `scheduler`, `terminal`, `utils`, etc.).
 - `ui/`: Vite + React frontend; main code is under `ui/src/` (`components`, `pages`, `hooks`, `i18n`, `styles`, `types`).
 - `docs/`: VitePress documentation site.
 - `charts/kite/`: Helm chart.
@@ -23,6 +23,7 @@ Run from repo root unless noted:
 - `make format`: run `go fmt` and frontend Prettier.
 - `make test`: run backend tests (`go test -v ./...`).
 - `cd ui && pnpm run type-check`: strict TypeScript checks.
+- `cd ui && pnpm run build`: strict TypeScript checks plus Vite/Tailwind production build.
 - `make docs-dev` / `make docs-build`: develop or build docs.
 
 ## Coding Style & Naming Conventions
@@ -50,6 +51,11 @@ Run from repo root unless noted:
 - Do not commit kubeconfig files, tokens, or other secrets.
 - Review `SECURITY.md` before reporting or handling vulnerabilities.
 - Never execute database write operations unless explicitly requested.
+- Helm v4 requires Go 1.26. Keep `go.mod`, Dockerfile, and GitHub Actions `GO_VERSION` in sync.
+- AI resource mutation tools and Helm release operations are write-capable; keep their user-confirmation, rendered-manifest guard, namespace-scope checks, and RBAC gates intact.
+- Helm chart catalog routes are admin-only. Do not expose server-side repository credentials or chart contents to ordinary authenticated users.
+- Kubectl terminal is disabled by default, admin-only, and requires a pre-created `kite-kubectl-admin` ServiceAccount in the agent namespace. Kite must not auto-create cluster-admin RBAC.
+- Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are intentional fork behavior.
 
 ## Auth UI Product Decisions
 - `/login` is an operational fault page, not an interactive sign-in surface. Do not reintroduce username/password forms, OAuth provider buttons, or a dashboard sidebar there unless the product decision changes explicitly.

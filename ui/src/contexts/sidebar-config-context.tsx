@@ -24,6 +24,7 @@ import {
   IconLock,
   IconMap,
   IconNetwork,
+  IconPackage,
   IconPlayerPlay,
   IconProps,
   IconRocket,
@@ -75,6 +76,7 @@ const iconMap = {
   IconBell,
   IconCode,
   IconArrowsHorizontal,
+  IconPackage,
 }
 
 const getIconName = (iconComponent: React.ComponentType): string => {
@@ -136,6 +138,8 @@ const getSidebarGroupID = (groupKey: string): string =>
 
 const BUILTIN_CR_GROUP_KEY = 'sidebar.groups.cr'
 const BUILTIN_CR_GROUP_ID = getSidebarGroupID(BUILTIN_CR_GROUP_KEY)
+const APPLICATION_GROUP_KEY = 'sidebar.groups.application'
+const APPLICATION_GROUP_ID = getSidebarGroupID(APPLICATION_GROUP_KEY)
 const BUILTIN_CRD_NAMES = [
   'apps.app.sealos.io',
   'devboxes.devbox.sealos.io',
@@ -144,6 +148,7 @@ const BUILTIN_CRD_NAMES = [
   'clusters.apps.kubeblocks.io',
 ] as const
 const BUILTIN_CRD_NAME_SET = new Set<string>(BUILTIN_CRD_NAMES)
+const ADMIN_ONLY_SIDEBAR_URLS = new Set(['/charts'])
 
 const buildBuiltinCRSidebarItems = (): SidebarItem[] =>
   BUILTIN_CRD_NAMES.map((crdName, index) => ({
@@ -155,6 +160,93 @@ const buildBuiltinCRSidebarItems = (): SidebarItem[] =>
     pinned: false,
     order: index,
   }))
+
+const buildApplicationSidebarItems = (): SidebarItem[] =>
+  [
+    {
+      titleKey: 'nav.helmReleases',
+      url: '/helmreleases',
+      icon: 'IconPackage',
+    },
+    {
+      titleKey: 'nav.helmCharts',
+      url: '/charts',
+      icon: 'IconPackage',
+    },
+  ].map((item, index) => ({
+    id: `${APPLICATION_GROUP_ID}-${item.url.replace(/[^a-zA-Z0-9]/g, '-')}`,
+    titleKey: item.titleKey,
+    url: item.url,
+    icon: item.icon,
+    visible: true,
+    pinned: false,
+    order: index,
+  }))
+
+const ensureApplicationGroup = (config: SidebarConfig): SidebarConfig => {
+  const applicationItems = buildApplicationSidebarItems()
+  const existingGroupIndex = config.groups.findIndex(
+    (group) => group.id === APPLICATION_GROUP_ID
+  )
+
+  if (existingGroupIndex === -1) {
+    const groups = [
+      {
+        id: APPLICATION_GROUP_ID,
+        nameKey: APPLICATION_GROUP_KEY,
+        items: applicationItems,
+        visible: true,
+        collapsed: false,
+        order: 0,
+      },
+      ...config.groups,
+    ].map((group, index) => ({ ...group, order: index }))
+
+    return {
+      ...config,
+      groups,
+      groupOrder: groups.map((group) => group.id),
+    }
+  }
+
+  const groups = config.groups.map((group) => {
+    if (group.id !== APPLICATION_GROUP_ID) {
+      return group
+    }
+
+    const existingItemIDs = new Set(group.items.map((item) => item.id))
+    const missingItems = applicationItems.filter(
+      (item) => !existingItemIDs.has(item.id)
+    )
+
+    if (missingItems.length === 0 && group.nameKey === APPLICATION_GROUP_KEY) {
+      return group
+    }
+
+    return {
+      ...group,
+      nameKey: APPLICATION_GROUP_KEY,
+      items:
+        missingItems.length === 0
+          ? group.items
+          : [
+              ...group.items,
+              ...missingItems.map((item, index) => ({
+                ...item,
+                order: group.items.length + index,
+              })),
+            ],
+    }
+  })
+
+  return {
+    ...config,
+    groups,
+    groupOrder: config.groupOrder.includes(APPLICATION_GROUP_ID)
+      ? config.groupOrder
+      : [APPLICATION_GROUP_ID, ...config.groupOrder],
+  }
+}
 
 const ensureBuiltinCRGroup = (config: SidebarConfig): SidebarConfig => {
   const builtinItems = buildBuiltinCRSidebarItems()
@@ -233,6 +325,10 @@ const getCRDNameFromSidebarURL = (url: string): string | null => {
 }
 
 const defaultMenus: DefaultMenus = {
+  [APPLICATION_GROUP_KEY]: [
+    { titleKey: 'nav.helmReleases', url: '/helmreleases', icon: IconPackage },
+    { titleKey: 'nav.helmCharts', url: '/charts', icon: IconPackage },
+  ],
   'sidebar.groups.workloads': [
     { titleKey: 'nav.pods', url: '/pods', icon: IconBox },
     { titleKey: 'nav.deployments', url: '/deployments', icon: IconRocket },
@@ -315,15 +411,17 @@ const defaultMenus: DefaultMenus = {
   })),
 }
 
-const CURRENT_CONFIG_VERSION = 1
+const CURRENT_CONFIG_VERSION = 2
 
 const sanitizeSidebarConfig = (
   config: SidebarConfig,
   options?: {
     canViewCustomCRDGroups?: boolean
+    canViewAdminItems?: boolean
   }
 ): SidebarConfig => {
   const canViewCustomCRDGroups = options?.canViewCustomCRDGroups ?? true
+  const canViewAdminItems = options?.canViewAdminItems ?? false
   const removedItemIds = new Set<string>()
   const removedGroupIds = new Set<string>()
 
@@ -339,7 +437,9 @@ const sanitizeSidebarConfig = (
     .map((group) => {
       const items = group.items
         .filter((item) => {
-          const shouldHide = isSidebarPathHidden(item.url)
+          const shouldHide =
+            isSidebarPathHidden(item.url) ||
+            (!canViewAdminItems && ADMIN_ONLY_SIDEBAR_URLS.has(item.url))
           if (shouldHide) {
             removedItemIds.add(item.id)
           }
@@ -421,6 +521,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       disable: !user,
     })
   const sidebarPreference = user?.sidebar_preference || ''
+  const canViewAdminItems = user?.isAdmin() ?? false
   const canCreateCustomCRDGroupPermission =
     user?.capabilities?.canCreateCustomCRDGroup ?? user?.isAdmin() ?? false
   const builtinCRDByName = useMemo(
@@ -484,7 +585,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
 
   const loadConfig = useCallback(() => {
     const normalizedPreference = sidebarPreference.trim()
-    const loadCacheKey = `${canCreateCustomCRDGroupPermission ? '1' : '0'}:${normalizedPreference}`
+    const loadCacheKey = `${canCreateCustomCRDGroupPermission ? '1' : '0'}:${canViewAdminItems ? '1' : '0'}:${normalizedPreference}`
 
     if (lastLoadedPreferenceRef.current === loadCacheKey) {
       return
@@ -494,10 +595,11 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     if (normalizedPreference) {
       try {
         const userConfig = ensureBuiltinCRGroup(
-          JSON.parse(normalizedPreference)
+          ensureApplicationGroup(JSON.parse(normalizedPreference))
         )
         const sanitizedConfig = sanitizeSidebarConfig(userConfig, {
           canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
+          canViewAdminItems,
         })
         setConfig(sanitizedConfig)
 
@@ -509,14 +611,22 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       }
     }
     setHasUpdate(false)
-    setConfig(defaultConfigs())
-  }, [sidebarPreference, canCreateCustomCRDGroupPermission])
+    setConfig(
+      sanitizeSidebarConfig(defaultConfigs(), {
+        canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
+        canViewAdminItems,
+      })
+    )
+  }, [sidebarPreference, canCreateCustomCRDGroupPermission, canViewAdminItems])
 
   const saveConfig = useCallback(
     async (newConfig: SidebarConfig) => {
-      const configWithBuiltinCRGroup = ensureBuiltinCRGroup(newConfig)
+      const configWithBuiltinCRGroup = ensureBuiltinCRGroup(
+        ensureApplicationGroup(newConfig)
+      )
       const sanitizedConfig = sanitizeSidebarConfig(configWithBuiltinCRGroup, {
         canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
+        canViewAdminItems,
       })
 
       if (!user) {
@@ -554,7 +664,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
         console.error('Failed to save sidebar config to server:', error)
       }
     },
-    [user, canCreateCustomCRDGroupPermission]
+    [user, canCreateCustomCRDGroupPermission, canViewAdminItems]
   )
 
   const updateConfig = useCallback(

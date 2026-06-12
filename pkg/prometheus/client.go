@@ -288,6 +288,16 @@ func IsForbiddenError(err error) bool {
 	return IsClientErrorStatus(err, http.StatusForbidden)
 }
 
+// Query executes an instant query against Prometheus.
+func (c *Client) Query(ctx context.Context, query string, ts time.Time, opts ...v1.Option) (model.Value, v1.Warnings, error) {
+	return c.client.Query(ctx, query, ts, opts...)
+}
+
+// QueryRange executes a range query against Prometheus.
+func (c *Client) QueryRange(ctx context.Context, query string, r v1.Range, opts ...v1.Option) (model.Value, v1.Warnings, error) {
+	return c.client.QueryRange(ctx, query, r, opts...)
+}
+
 // HealthCheck verifies if Prometheus is accessible
 func (c *Client) HealthCheck(ctx context.Context) error {
 	_, err := c.client.Config(ctx)

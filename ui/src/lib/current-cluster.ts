@@ -10,6 +10,8 @@ export const readCurrentCluster = (): string | null => {
   return localStorage.getItem(CURRENT_CLUSTER_STORAGE_KEY)
 }
 
+export const getCurrentCluster = readCurrentCluster
+
 export const writeCurrentCluster = (clusterName: string | null): void => {
   if (clusterName) {
     localStorage.setItem(CURRENT_CLUSTER_STORAGE_KEY, clusterName)
@@ -24,4 +26,18 @@ export const writeCurrentCluster = (clusterName: string | null): void => {
       detail: { clusterName },
     })
   )
+}
+
+export function appendCurrentClusterParam(params: URLSearchParams) {
+  const currentCluster = readCurrentCluster()
+  if (currentCluster) {
+    params.append(CURRENT_CLUSTER_COOKIE_KEY, currentCluster)
+  }
+}
+
+export function appendCurrentClusterHeader(headers: Record<string, string>) {
+  const currentCluster = readCurrentCluster()
+  if (currentCluster) {
+    headers[CURRENT_CLUSTER_COOKIE_KEY] = currentCluster
+  }
 }
