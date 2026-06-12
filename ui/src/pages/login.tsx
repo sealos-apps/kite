@@ -3,7 +3,9 @@ import { useAuth } from '@/contexts/auth-context'
 import {
   AlertTriangle,
   Database,
+  Info,
   KeyRound,
+  Loader2,
   RefreshCcw,
   Server,
 } from 'lucide-react'
@@ -57,8 +59,11 @@ const normalizeReason = (
 
 export function LoginPage() {
   const { t } = useTranslation()
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, sealosSdkAccessStatus } = useAuth()
   const [searchParams] = useSearchParams()
+  const showSealosSdkStatus =
+    sealosSdkAccessStatus === 'checking' ||
+    sealosSdkAccessStatus === 'unavailable'
 
   const reason = normalizeReason(
     searchParams.get('reason'),
@@ -142,6 +147,32 @@ export function LoginPage() {
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                           {t('login.faultHint')}
                         </p>
+                        {showSealosSdkStatus && (
+                          <div className="mt-4 flex max-w-2xl items-start gap-3 rounded-md border bg-muted/30 p-3 text-left">
+                            <div className="mt-0.5 shrink-0 text-muted-foreground">
+                              {sealosSdkAccessStatus === 'checking' ? (
+                                <Loader2
+                                  className="h-4 w-4 animate-spin"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <Info className="h-4 w-4" aria-hidden="true" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-foreground">
+                                {t(
+                                  `login.sealosSdkStatus.${sealosSdkAccessStatus}.title`
+                                )}
+                              </div>
+                              <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {t(
+                                  `login.sealosSdkStatus.${sealosSdkAccessStatus}.description`
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <Button
                           type="button"
                           variant="outline"

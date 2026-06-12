@@ -46,6 +46,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
+  sealosSdkAccessStatus: SealosSdkAccessStatus
   providers: string[]
   login: (provider?: string) => Promise<void>
   loginWithPassword: (username: string, password: string) => Promise<void>
@@ -86,6 +87,25 @@ interface SealosSession {
 }
 
 type SealosLanguage = 'en' | 'zh'
+type SealosSdkAccessStatus =
+  | 'disabled'
+  | 'checking'
+  | 'available'
+  | 'unavailable'
+
+interface SealosAppClient {
+  getSession?: () => Promise<unknown>
+  getLanguage?: () => Promise<unknown>
+  addAppEventListen?: (
+    name: string,
+    fn: (eventData?: unknown) => unknown
+  ) => (() => void) | undefined
+}
+
+interface SealosSessionResult {
+  session: SealosSession | null
+  sdkAccessible: boolean
+}
 
 const SEALOS_PROVIDER = 'sealos'
 const SEALOS_LANGUAGE_CHANGED_EVENT = 'change_i18n'
@@ -100,11 +120,6 @@ const shouldTrySealosAutoLogin = (): boolean => {
   const envFlag = getEnvFlag(import.meta.env.VITE_SEALOS_AUTO_LOGIN)
   if (envFlag !== null) return envFlag
   return true
-}
-
-const isSealosOutside = (): boolean => {
-  if (typeof window === 'undefined') return false
-  return window.self === window.top
 }
 
 const normalizeSealosSession = (raw: unknown): SealosSession | null => {
@@ -153,17 +168,35 @@ const withTimeout = async <T,>(
     }),
   ])
 
+const getSealosAppClient = (): SealosAppClient | null => {
+  // Vite can pre-bundle this SDK subpath as CJS, so the live client may sit on the default export.
+  const sdkModule = sealosDesktopSDK as unknown as {
+    sealosApp?: SealosAppClient
+    default?: {
+      sealosApp?: SealosAppClient
+    }
+  }
+
+  return sdkModule.sealosApp ?? sdkModule.default?.sealosApp ?? null
+}
+
 const getSealosSession = async (
   timeoutMs = 5000
-): Promise<SealosSession | null> => {
-  const cleanup = sealosDesktopSDK.createSealosApp()
+): Promise<SealosSessionResult> => {
+  let cleanup: (() => void) | undefined
   try {
-    // NOTE: Reassign to sidestep the CJS interop quirk where the sealosApp value doesn’t update.
-    const appClient = sealosDesktopSDK.sealosApp
+    cleanup = sealosDesktopSDK.createSealosApp()
+    const appClient = getSealosAppClient()
+    if (typeof appClient?.getSession !== 'function') {
+      return { session: null, sdkAccessible: false }
+    }
     const rawSession = await withTimeout(appClient.getSession(), timeoutMs)
-    return normalizeSealosSession(rawSession)
+    return {
+      session: normalizeSealosSession(rawSession),
+      sdkAccessible: true,
+    }
   } catch {
-    return null
+    return { session: null, sdkAccessible: false }
   } finally {
     if (typeof cleanup === 'function') {
       cleanup()
@@ -174,10 +207,13 @@ const getSealosSession = async (
 const getSealosLanguage = async (
   timeoutMs = 3000
 ): Promise<SealosLanguage | null> => {
-  const cleanup = sealosDesktopSDK.createSealosApp()
+  let cleanup: (() => void) | undefined
   try {
-    // NOTE: Reassign to sidestep the CJS interop quirk where the sealosApp value doesn’t update.
-    const appClient = sealosDesktopSDK.sealosApp
+    cleanup = sealosDesktopSDK.createSealosApp()
+    const appClient = getSealosAppClient()
+    if (typeof appClient?.getLanguage !== 'function') {
+      return null
+    }
     const rawLanguage = await withTimeout(appClient.getLanguage(), timeoutMs)
     return normalizeSealosLanguage(rawLanguage)
   } catch {
@@ -193,9 +229,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [providers, setProviders] = useState<string[]>([])
-  const [isSealosExternalBlocked, setIsSealosExternalBlocked] = useState(false)
+  const [sealosAuthEnabled, setSealosAuthEnabled] = useState(false)
+  const [sealosSdkAccessStatus, setSealosSdkAccessStatus] =
+    useState<SealosSdkAccessStatus>('checking')
   const queryClient = useQueryClient()
   const userRef = useRef<User | null>(null)
+  const sealosAuthEnabledRef = useRef(false)
   const sealosSyncPromiseRef = useRef<Promise<boolean> | null>(null)
 
   useEffect(() => {
@@ -217,14 +256,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const data = await response.json()
         setProviders(data.providers || [])
         const sealosEnabled = data.sealos_auth_enabled === true
-        const blockedOutside = sealosEnabled && isSealosOutside()
-        setIsSealosExternalBlocked(blockedOutside)
-        return blockedOutside
+        sealosAuthEnabledRef.current = sealosEnabled
+        setSealosAuthEnabled(sealosEnabled)
+        if (!sealosEnabled) {
+          setSealosSdkAccessStatus('disabled')
+        }
+        return sealosEnabled
       }
     } catch (error) {
       console.error('Failed to load OAuth providers:', error)
     }
-    setIsSealosExternalBlocked(false)
+    sealosAuthEnabledRef.current = false
+    setSealosAuthEnabled(false)
+    setSealosSdkAccessStatus('disabled')
     return false
   }
 
@@ -280,16 +324,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [checkAuthInternal])
 
   const syncSealosSession = useCallback(
-    async (currentUser: User | null): Promise<boolean> => {
-      if (isSealosExternalBlocked) {
+    async (
+      currentUser: User | null,
+      enabled = sealosAuthEnabledRef.current
+    ): Promise<boolean> => {
+      if (!enabled) {
+        setSealosSdkAccessStatus('disabled')
         return false
       }
       if (!shouldTrySealosAutoLogin()) {
+        setSealosSdkAccessStatus('disabled')
         return false
       }
 
       // Respect explicit non-sealos logins; only auto-sync when unauthenticated or already in sealos mode.
       if (currentUser && currentUser.provider !== SEALOS_PROVIDER) {
+        setSealosSdkAccessStatus('disabled')
         return false
       }
 
@@ -299,7 +349,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const syncPromise = (async (): Promise<boolean> => {
         try {
-          const sealosSession = await getSealosSession()
+          setSealosSdkAccessStatus('checking')
+          const { session: sealosSession, sdkAccessible } =
+            await getSealosSession()
+          setSealosSdkAccessStatus(
+            sdkAccessible ? 'available' : 'unavailable'
+          )
           if (!sealosSession) {
             return false
           }
@@ -383,43 +438,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
     },
-    [checkAuthInternal, isSealosExternalBlocked, queryClient]
+    [checkAuthInternal, queryClient]
   )
 
-  const syncSealosLanguage = useCallback(async (currentUser: User | null) => {
-    if (isSealosExternalBlocked) {
-      return
-    }
-    if (!shouldTrySealosAutoLogin()) {
-      return
-    }
-
-    // Respect explicit non-sealos logins; only auto-sync when unauthenticated or already in sealos mode.
-    if (currentUser && currentUser.provider !== SEALOS_PROVIDER) {
-      return
-    }
-
-    try {
-      const sealosLanguage = await getSealosLanguage()
-      if (!sealosLanguage) {
+  const syncSealosLanguage = useCallback(
+    async (currentUser: User | null, enabled = sealosAuthEnabledRef.current) => {
+      if (!enabled) {
+        return
+      }
+      if (!shouldTrySealosAutoLogin()) {
         return
       }
 
-      const currentLanguage = (i18n.resolvedLanguage ?? i18n.language)
-        .toLowerCase()
-        .trim()
-      if (currentLanguage.startsWith(sealosLanguage)) {
+      // Respect explicit non-sealos logins; only auto-sync when unauthenticated or already in sealos mode.
+      if (currentUser && currentUser.provider !== SEALOS_PROVIDER) {
         return
       }
 
-      await i18n.changeLanguage(sealosLanguage)
-    } catch (error) {
-      console.error('Sealos language sync failed:', error)
-    }
-  }, [isSealosExternalBlocked])
+      try {
+        const sealosLanguage = await getSealosLanguage()
+        if (!sealosLanguage) {
+          return
+        }
+
+        const currentLanguage = (i18n.resolvedLanguage ?? i18n.language)
+          .toLowerCase()
+          .trim()
+        if (currentLanguage.startsWith(sealosLanguage)) {
+          return
+        }
+
+        await i18n.changeLanguage(sealosLanguage)
+      } catch (error) {
+        console.error('Sealos language sync failed:', error)
+      }
+    },
+    []
+  )
 
   useEffect(() => {
-    if (isSealosExternalBlocked) {
+    if (!sealosAuthEnabled) {
       return
     }
     if (!shouldTrySealosAutoLogin()) {
@@ -431,7 +489,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     const cleanup = sealosDesktopSDK.createSealosApp()
-    const appClient = sealosDesktopSDK.sealosApp
+    const appClient = getSealosAppClient()
+    if (typeof appClient?.addAppEventListen !== 'function') {
+      if (typeof cleanup === 'function') {
+        cleanup()
+      }
+      return
+    }
     const removeLanguageListener = appClient.addAppEventListen(
       SEALOS_LANGUAGE_CHANGED_EVENT,
       async (eventData?: unknown) => {
@@ -459,7 +523,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         cleanup()
       }
     }
-  }, [isSealosExternalBlocked, syncSealosLanguage, user])
+  }, [sealosAuthEnabled, syncSealosLanguage, user])
 
   const login = async (provider: string = 'github') => {
     try {
@@ -555,15 +619,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const initAuth = async () => {
       setIsLoading(true)
       try {
-        const blockedOutside = await loadProviders()
-        if (blockedOutside) {
-          setUser(null)
-          return
-        }
+        const sealosEnabled = await loadProviders()
         const currentUser = await checkAuthInternal()
         await Promise.all([
-          syncSealosSession(currentUser),
-          syncSealosLanguage(currentUser),
+          syncSealosSession(currentUser, sealosEnabled),
+          syncSealosLanguage(currentUser, sealosEnabled),
         ])
       } finally {
         setIsLoading(false)
@@ -573,7 +633,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [syncSealosLanguage, syncSealosSession])
 
   useEffect(() => {
-    if (isSealosExternalBlocked) {
+    if (!sealosAuthEnabled) {
       return
     }
     if (user && user.provider !== SEALOS_PROVIDER) {
@@ -595,7 +655,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener('focus', syncOnFocus)
       document.removeEventListener('visibilitychange', syncOnFocus)
     }
-  }, [isSealosExternalBlocked, syncSealosLanguage, syncSealosSession, user])
+  }, [sealosAuthEnabled, syncSealosLanguage, syncSealosSession, user])
 
   useEffect(() => {
     const syncPermissionsByCluster = () => {
@@ -641,32 +701,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value = {
     user,
     isLoading,
+    sealosSdkAccessStatus,
     providers,
     login,
     loginWithPassword,
     logout,
     checkAuth,
     refreshToken,
-  }
-
-  if (isSealosExternalBlocked) {
-    return (
-      <AuthContext.Provider value={value}>
-        <div className="min-h-screen flex items-center justify-center px-6">
-          <div className="w-full max-w-md space-y-3 text-center">
-            <h1 className="text-xl font-semibold">
-              {i18n.t('login.sealosOnlyTitle', 'Sealos Access Required')}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {i18n.t(
-                'login.sealosOnlyDescription',
-                'This instance is in Sealos login mode and cannot be used outside Sealos. Please open it from the Sealos app center.'
-              )}
-            </p>
-          </div>
-        </div>
-      </AuthContext.Provider>
-    )
   }
 
   return (

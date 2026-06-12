@@ -68,6 +68,12 @@ make docs-build
 - `AUTH_COOKIE_SAMESITE` and `AUTH_COOKIE_SECURE`: cookie settings for normal and iframe deployments.
 - `VITE_SEALOS_AUTO_LOGIN`: frontend build-time flag controlling Sealos SDK session login attempts.
 
+Sealos auth notes:
+
+- Kite does not block Sealos auth solely because the app is opened as the top-level window. Standalone local development and `sealos-app-dev-bridge` can still attempt Sealos SDK auto-login when `SEALOS_AUTH_ENABLED=true`.
+- `/login` can show a non-blocking Sealos SDK availability notice when the SDK session channel is unavailable. Treat it as a diagnostic hint for Sealos Desktop or `sealos-app-dev-bridge`, not as an access gate.
+- If Sealos auto-login fails in standalone/local development, verify the bridge or Sealos Desktop session first, then inspect `/api/auth/login/sealos` responses and backend logs.
+
 ## Auth Fault Page
 
 `/login` is now an operational fault page. If a customer sees it, treat it as a signal to inspect server-side state instead of asking them to sign in manually.
