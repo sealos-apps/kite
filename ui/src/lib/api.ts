@@ -331,7 +331,7 @@ export const useHelmReleaseHistory = (
 }
 
 export const fetchHelmRepositories = (): Promise<HelmRepository[]> => {
-  return fetchAPI<HelmRepository[]>('/admin/charts/repositories')
+  return fetchAPI<HelmRepository[]>('/charts/repositories')
 }
 
 export const createHelmRepository = (
@@ -363,7 +363,7 @@ export const fetchHelmCharts = (options?: {
     params.append('q', options.query)
   }
   const query = params.toString()
-  return fetchAPI<HelmChartList>(`/admin/charts${query ? `?${query}` : ''}`)
+  return fetchAPI<HelmChartList>(`/charts${query ? `?${query}` : ''}`)
 }
 
 export const fetchArtifactHubCharts = (options?: {
@@ -387,7 +387,7 @@ export const fetchArtifactHubCharts = (options?: {
   }
   const query = params.toString()
   return fetchAPI<HelmChartList>(
-    `/admin/charts/artifacthub${query ? `?${query}` : ''}`
+    `/charts/artifacthub${query ? `?${query}` : ''}`
   )
 }
 
@@ -404,8 +404,8 @@ export const fetchHelmChart = (
   const query = params.toString()
   const endpoint =
     source === 'artifacthub'
-      ? `/admin/charts/artifacthub/${encodeURIComponent(repository)}/${encodeURIComponent(name)}`
-      : `/admin/charts/${encodeURIComponent(repository)}/${encodeURIComponent(name)}`
+      ? `/charts/artifacthub/${encodeURIComponent(repository)}/${encodeURIComponent(name)}`
+      : `/charts/${encodeURIComponent(repository)}/${encodeURIComponent(name)}`
 
   return fetchAPI<HelmChartDetail>(`${endpoint}${query ? `?${query}` : ''}`)
 }
@@ -424,8 +424,8 @@ export const fetchHelmChartContent = (
   const query = params.toString()
   const endpoint =
     source === 'artifacthub'
-      ? `/admin/charts/artifacthub/${encodeURIComponent(repository)}/${encodeURIComponent(name)}/content/${content}`
-      : `/admin/charts/${encodeURIComponent(repository)}/${encodeURIComponent(name)}/content/${content}`
+      ? `/charts/artifacthub/${encodeURIComponent(repository)}/${encodeURIComponent(name)}/content/${content}`
+      : `/charts/${encodeURIComponent(repository)}/${encodeURIComponent(name)}/content/${content}`
 
   return fetchAPI<HelmChartContent>(`${endpoint}${query ? `?${query}` : ''}`)
 }

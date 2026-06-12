@@ -228,6 +228,7 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 		api.POST("/ai/chat", ai.HandleChat)
 		api.POST("/ai/execute/continue", ai.HandleExecuteContinue)
 		api.POST("/ai/input/continue", ai.HandleInputContinue)
+		helmChartsHandler.RegisterRoutes(api)
 
 		api.Use(middleware.RBACMiddleware())
 		resources.RegisterRoutes(api)

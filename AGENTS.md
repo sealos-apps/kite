@@ -53,7 +53,7 @@ Run from repo root unless noted:
 - Never execute database write operations unless explicitly requested.
 - Helm v4 requires Go 1.26. Keep `go.mod`, Dockerfile, and GitHub Actions `GO_VERSION` in sync.
 - AI resource mutation tools and Helm release operations are write-capable; keep their user-confirmation, rendered-manifest guard, namespace-scope checks, and RBAC gates intact.
-- Helm chart catalog routes are admin-only. Do not expose server-side repository credentials or chart contents to ordinary authenticated users.
+- Helm chart catalog read routes are available to authenticated users under `/api/v1/charts`; repository create/delete and other catalog management routes stay admin-only under `/api/v1/admin/charts`. Do not expose stored repository credentials in responses.
 - Kubectl terminal is disabled by default, admin-only, and requires a pre-created `kite-kubectl-admin` ServiceAccount in the agent namespace. Kite must not auto-create cluster-admin RBAC.
 - Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are intentional fork behavior.
 

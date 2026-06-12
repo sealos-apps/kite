@@ -128,7 +128,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 ## Helm Operations
 
-- Chart catalog and repository APIs live under `/api/v1/admin/charts` and are admin-only because Kite may use stored repository credentials to fetch index files and chart content.
+- Chart catalog read APIs live under `/api/v1/charts` for authenticated users. Repository create/delete and catalog management APIs remain admin-only under `/api/v1/admin/charts`; stored repository credentials must not be exposed in responses.
 - Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
 - Helm install, upgrade, rollback, uninstall, and auto-upgrade render target manifests before writing. Added resources require `create`, retained resources require `update`, and removed resources require `delete` on the rendered Kubernetes resource.
 - Cluster-scoped rendered resources such as CRDs, Namespaces, ClusterRoles, and ClusterRoleBindings require the Kite admin role and are rejected on namespace-scoped Sealos clusters.
