@@ -8,7 +8,7 @@ Kite is a Go backend plus a React/TypeScript frontend.
 - `pkg/`: core backend modules (`ai`, `auth`, `cluster`, `helm`, `helmutil`, `helmguard`, `handlers`, `middleware`, `rbac`, `scheduler`, `terminal`, `utils`, etc.).
 - `ui/`: Vite + React frontend; main code is under `ui/src/` (`components`, `pages`, `hooks`, `i18n`, `styles`, `types`).
 - `docs/`: VitePress documentation site.
-- `charts/kite/`: Helm chart.
+- `deploy/charts/kite/`: Helm chart used by Sealos packaging and release scripts.
 - `deploy/`: Kubernetes manifests for direct install.
 - `scripts/`: release/version helper scripts.
 
