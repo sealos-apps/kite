@@ -13,7 +13,7 @@ Kite's RBAC system supports:
 
 ## Configuration
 
-Users with the **admin** role can access the settings entry in the upper right corner of the page.
+The current Kite app shell does not expose RBAC management from the visible Settings page. RBAC administration remains available through the admin API and any deployment-specific administrator tooling.
 
 The system provides two default roles that cannot be edited or deleted:
 

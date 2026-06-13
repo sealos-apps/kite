@@ -15,7 +15,7 @@
 
 ## 配置
 
-在具有 **admin** 角色用户界面中，页面右上角上角将显示设置入口。
+当前 Kite 应用壳不再从可见设置页暴露 OAuth Provider 管理入口。OAuth Provider 管理能力仍可通过管理员 API 或部署侧管理员工具完成。
 
 遵循页面中的指示填写基本信息即使用 OAuth 登录。
 ![OAuth](../../screenshots/oauth.png)
@@ -30,7 +30,7 @@
 
 ### 如何将 OAuth 用户映射到 RBAC 角色？
 
-您可以在设置中配置 OAuth 用户与 RBAC 角色之间的映射关系。具体步骤请参考 [RBAC 配置指南](./rbac-config)。
+您可以通过 RBAC 管理员工具配置 OAuth 用户与 RBAC 角色之间的映射关系。具体步骤请参考 [RBAC 配置指南](./rbac-config)。
 
 ### 登录失败
 

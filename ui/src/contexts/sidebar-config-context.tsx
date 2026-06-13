@@ -31,7 +31,6 @@ import {
   IconRoute,
   IconRouter,
   IconServer2,
-  IconSettings,
   IconShield,
   IconShieldCheck,
   IconStack2,
@@ -78,7 +77,6 @@ const iconMap = {
   IconCode,
   IconArrowsHorizontal,
   IconPackage,
-  IconSettings,
 }
 
 const getIconName = (iconComponent: React.ComponentType): string => {
@@ -150,7 +148,6 @@ const BUILTIN_CRD_NAMES = [
   'clusters.apps.kubeblocks.io',
 ] as const
 const BUILTIN_CRD_NAME_SET = new Set<string>(BUILTIN_CRD_NAMES)
-const ADMIN_ONLY_SIDEBAR_URLS = new Set<string>()
 
 const buildBuiltinCRSidebarItems = (): SidebarItem[] =>
   BUILTIN_CRD_NAMES.map((crdName, index) => ({
@@ -330,7 +327,6 @@ const defaultMenus: DefaultMenus = {
   [APPLICATION_GROUP_KEY]: [
     { titleKey: 'nav.helmReleases', url: '/helmreleases', icon: IconPackage },
     { titleKey: 'nav.helmCharts', url: '/charts', icon: IconPackage },
-    { titleKey: 'settings.nav', url: '/settings', icon: IconSettings },
   ],
   'sidebar.groups.workloads': [
     { titleKey: 'nav.pods', url: '/pods', icon: IconBox },
@@ -420,11 +416,9 @@ const sanitizeSidebarConfig = (
   config: SidebarConfig,
   options?: {
     canViewCustomCRDGroups?: boolean
-    canViewAdminItems?: boolean
   }
 ): SidebarConfig => {
   const canViewCustomCRDGroups = options?.canViewCustomCRDGroups ?? true
-  const canViewAdminItems = options?.canViewAdminItems ?? false
   const removedItemIds = new Set<string>()
   const removedGroupIds = new Set<string>()
 
@@ -440,9 +434,7 @@ const sanitizeSidebarConfig = (
     .map((group) => {
       const items = group.items
         .filter((item) => {
-          const shouldHide =
-            isSidebarPathHidden(item.url) ||
-            (!canViewAdminItems && ADMIN_ONLY_SIDEBAR_URLS.has(item.url))
+          const shouldHide = isSidebarPathHidden(item.url)
           if (shouldHide) {
             removedItemIds.add(item.id)
           }
@@ -524,7 +516,6 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       disable: !user,
     })
   const sidebarPreference = user?.sidebar_preference || ''
-  const canViewAdminItems = user?.isAdmin() ?? false
   const canCreateCustomCRDGroupPermission =
     user?.capabilities?.canCreateCustomCRDGroup ?? user?.isAdmin() ?? false
   const builtinCRDByName = useMemo(
@@ -588,7 +579,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
 
   const loadConfig = useCallback(() => {
     const normalizedPreference = sidebarPreference.trim()
-    const loadCacheKey = `${canCreateCustomCRDGroupPermission ? '1' : '0'}:${canViewAdminItems ? '1' : '0'}:${normalizedPreference}`
+    const loadCacheKey = `${canCreateCustomCRDGroupPermission ? '1' : '0'}:${normalizedPreference}`
 
     if (lastLoadedPreferenceRef.current === loadCacheKey) {
       return
@@ -602,7 +593,6 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
         )
         const sanitizedConfig = sanitizeSidebarConfig(userConfig, {
           canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
-          canViewAdminItems,
         })
         setConfig(sanitizedConfig)
 
@@ -617,10 +607,9 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
     setConfig(
       sanitizeSidebarConfig(defaultConfigs(), {
         canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
-        canViewAdminItems,
       })
     )
-  }, [sidebarPreference, canCreateCustomCRDGroupPermission, canViewAdminItems])
+  }, [sidebarPreference, canCreateCustomCRDGroupPermission])
 
   const saveConfig = useCallback(
     async (newConfig: SidebarConfig) => {
@@ -629,7 +618,6 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
       )
       const sanitizedConfig = sanitizeSidebarConfig(configWithBuiltinCRGroup, {
         canViewCustomCRDGroups: canCreateCustomCRDGroupPermission,
-        canViewAdminItems,
       })
 
       if (!user) {
@@ -667,7 +655,7 @@ export const SidebarConfigProvider: React.FC<SidebarConfigProviderProps> = ({
         console.error('Failed to save sidebar config to server:', error)
       }
     },
-    [user, canCreateCustomCRDGroupPermission, canViewAdminItems]
+    [user, canCreateCustomCRDGroupPermission]
   )
 
   const updateConfig = useCallback(

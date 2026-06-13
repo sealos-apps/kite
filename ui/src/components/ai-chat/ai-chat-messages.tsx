@@ -337,13 +337,11 @@ function MessageBubble({
   onConfirm,
   onDeny,
   onSubmitInput,
-  onConfigure,
 }: {
   message: ChatMessage
   onConfirm?: (id: string) => void
   onDeny?: (id: string) => void
   onSubmitInput?: (id: string, values: Record<string, unknown>) => void
-  onConfigure?: () => void
 }) {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -393,16 +391,6 @@ function MessageBubble({
                   ? t('aiChat.configuration.adminDescription')
                   : t('aiChat.configuration.userDescription')}
               </p>
-              {isAdmin && (
-                <Button
-                  size="sm"
-                  className="mt-3 h-8"
-                  onClick={onConfigure}
-                >
-                  <Settings className="mr-1.5 h-3.5 w-3.5" />
-                  {t('aiChat.actions.configure')}
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -556,7 +544,6 @@ export function AIChatMessages({
   onDeny,
   onSubmitInput,
   onPromptSelect,
-  onConfigure,
   messagesEndRef,
 }: {
   messages: ChatMessage[]
@@ -567,7 +554,6 @@ export function AIChatMessages({
   onDeny?: (id: string) => void
   onSubmitInput?: (id: string, values: Record<string, unknown>) => void
   onPromptSelect: (prompt: string) => void
-  onConfigure?: () => void
   messagesEndRef: RefObject<HTMLDivElement | null>
 }) {
   return (
@@ -583,7 +569,6 @@ export function AIChatMessages({
               onConfirm={onConfirm}
               onDeny={onDeny}
               onSubmitInput={onSubmitInput}
-              onConfigure={onConfigure}
             />
           ))}
           {isLoading && !hasActiveToolExecution && (

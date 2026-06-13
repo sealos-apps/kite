@@ -133,7 +133,7 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 
 ## AI 助手运维
 
-- AI 助手 UI 在新安装中默认启用。所有已登录用户都能看到设置入口，但只有 Kite 管理员可以编辑设置页第一个 Tab，且该 Tab 只显示 AI Agent 设置。
+- AI 助手 UI 在新安装中默认启用。可见设置入口只保留在 AI 聊天面板的配置按钮里；只有 Kite 管理员可以编辑设置页，且该页面只显示 AI Agent 设置。
 - 聊天请求需要 OpenAI-compatible 或 Anthropic-compatible provider 配置和 API Key。缺少 API Key 时，运行时会把 AI 视为未启用。
 - 只读工具仍使用当前认证用户、集群和命名空间作用域。
 - 变更资源的工具需要同时满足 Kite RBAC，并经过显式继续/确认步骤。Pending session 会绑定同一用户和集群。

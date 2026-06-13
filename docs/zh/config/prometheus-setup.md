@@ -47,7 +47,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
 
 ## 连接 Kite 到 Prometheus
 
-拥有 **admin** 角色的用户，可在页面右上角进入设置入口，进入集群管理界面。
+当前 Kite 应用壳不再从可见设置页暴露集群管理入口。Prometheus 地址可通过集群管理员工具或管理员集群 API 配置。
 
 选中需要配置的集群，填写 Prometheus 地址。
 

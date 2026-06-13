@@ -282,7 +282,6 @@ export function AIChatPanel({
         onDeny={denyAction}
         onSubmitInput={submitInput}
         onPromptSelect={handlePromptSelect}
-        onConfigure={openSettings}
         messagesEndRef={messagesEndRef}
       />
 

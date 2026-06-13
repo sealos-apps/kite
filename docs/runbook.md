@@ -204,7 +204,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 ## AI Assistant Operations
 
-- The AI assistant UI is enabled by default for new installs. All authenticated users can find the Settings entry, but only Kite admins can edit the first Settings tab, which only shows AI Agent settings.
+- The AI assistant UI is enabled by default for new installs. The visible settings entry is the configure button in the AI chat panel; only Kite admins can edit the Settings page, which only shows AI Agent settings.
 - Chat requests require an OpenAI-compatible or Anthropic-compatible provider configuration with an API key. If the API key is missing, the runtime treats AI as not enabled.
 - Read-only tools still use the current authenticated user, cluster, and namespace scope.
 - Mutating tools require both Kite RBAC and an explicit continue/confirmation step. Pending sessions are scoped to the same user and cluster.

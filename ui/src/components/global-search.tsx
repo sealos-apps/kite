@@ -15,7 +15,6 @@ import {
   IconRouter,
   IconServer,
   IconServer2,
-  IconSettings,
   IconStar,
   IconStarFilled,
   IconSun,
@@ -142,16 +141,6 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         Icon: IconLayoutDashboard,
         groupLabel: undefined,
         searchText: `${overviewTitle} overview dashboard /`.toLowerCase(),
-        isPinned: false,
-      },
-      {
-        id: 'settings',
-        title: t('settings.nav', 'Settings'),
-        url: '/settings',
-        Icon: IconSettings,
-        groupLabel: 'Settings',
-        searchText:
-          `${t('settings.nav', 'Settings')} ${t('settings.tabs.aiAgent', 'AI Agent')}`.toLowerCase(),
         isPinned: false,
       },
     ]

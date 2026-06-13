@@ -12,7 +12,7 @@ For how to configure OAuth, see [OAuth Configuration Guide](./oauth-setup)
 
 ## User Management
 
-Users with the **admin** role can access the settings entry in the upper right corner of the page to enter the user and permission management interface.
+The current Kite app shell does not expose user and permission management from the visible Settings page. User administration remains available through the admin API and any deployment-specific administrator tooling.
 
 In this interface, you can:
 

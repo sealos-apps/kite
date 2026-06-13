@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useTerminal } from '@/contexts/terminal-context'
-import { Plus, Settings, TerminalSquare } from 'lucide-react'
+import { Plus, TerminalSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Button } from '@/components/ui/button'
@@ -19,7 +18,6 @@ import { UserMenu } from './user-menu'
 
 export function SiteHeader() {
   const isMobile = useIsMobile()
-  const navigate = useNavigate()
   const { user, capabilities } = useAuth()
   const { toggleTerminal, isOpen } = useTerminal()
   const { t } = useTranslation()
@@ -71,15 +69,6 @@ export function SiteHeader() {
                   orientation="vertical"
                   className="mx-2 data-[orientation=vertical]:h-4"
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => navigate('/settings')}
-                  className="hidden sm:flex"
-                >
-                  <Settings className="h-5 w-5" />
-                  <span className="sr-only">{t('settings.nav')}</span>
-                </Button>
                 <LanguageToggle />
                 <ModeToggle />
               </>
