@@ -71,17 +71,15 @@ export function SiteHeader() {
                   orientation="vertical"
                   className="mx-2 data-[orientation=vertical]:h-4"
                 />
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate('/settings')}
-                    className="hidden sm:flex"
-                  >
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">{t('settings.nav')}</span>
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/settings')}
+                  className="hidden sm:flex"
+                >
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">{t('settings.nav')}</span>
+                </Button>
                 <LanguageToggle />
                 <ModeToggle />
               </>

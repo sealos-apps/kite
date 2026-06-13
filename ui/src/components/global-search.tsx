@@ -1,5 +1,4 @@
 import { ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
-import { useAuth } from '@/contexts/auth-context'
 import { useSidebarConfig } from '@/contexts/sidebar-config-context'
 import {
   IconArrowsHorizontal,
@@ -109,7 +108,6 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const [results, setResults] = useState<SearchResult[] | null>([])
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
-  const { user } = useAuth()
   const {
     config,
     getIconComponent,
@@ -146,20 +144,16 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         searchText: `${overviewTitle} overview dashboard /`.toLowerCase(),
         isPinned: false,
       },
-      ...(user?.isAdmin()
-        ? [
-            {
-              id: 'settings',
-              title: t('settings.nav', 'Settings'),
-              url: '/settings',
-              Icon: IconSettings,
-              groupLabel: 'Settings',
-              searchText:
-                `${t('settings.nav', 'Settings')} ${t('settings.tabs.aiAgent', 'AI Agent')} admin`.toLowerCase(),
-              isPinned: false,
-            },
-          ]
-        : []),
+      {
+        id: 'settings',
+        title: t('settings.nav', 'Settings'),
+        url: '/settings',
+        Icon: IconSettings,
+        groupLabel: 'Settings',
+        searchText:
+          `${t('settings.nav', 'Settings')} ${t('settings.tabs.aiAgent', 'AI Agent')}`.toLowerCase(),
+        isPinned: false,
+      },
     ]
 
     if (!config) {
@@ -221,7 +215,6 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     resolveSidebarItemTitle,
     shouldShowSidebarItem,
     t,
-    user,
   ])
 
   const sidebarResults = useMemo(() => {

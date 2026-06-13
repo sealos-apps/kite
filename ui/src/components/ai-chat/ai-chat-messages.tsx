@@ -3,10 +3,12 @@ import {
   Bot,
   CheckCircle2,
   ChevronRight,
+  Settings,
   Loader2,
   Wrench,
   XCircle,
 } from 'lucide-react'
+import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -335,13 +337,16 @@ function MessageBubble({
   onConfirm,
   onDeny,
   onSubmitInput,
+  onConfigure,
 }: {
   message: ChatMessage
   onConfirm?: (id: string) => void
   onDeny?: (id: string) => void
   onSubmitInput?: (id: string, values: Record<string, unknown>) => void
+  onConfigure?: () => void
 }) {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
 
   if (message.role === 'tool') {
@@ -359,9 +364,50 @@ function MessageBubble({
   const hasThinking =
     !isUser && typeof message.thinking === 'string' && message.thinking !== ''
   const hasContent = message.content !== ''
+  const isAIConfigError =
+    !isUser &&
+    /(ai (is not enabled|agent is not configured)|api key)/i.test(
+      message.content
+    )
 
   if (!isUser && !hasThinking && !hasContent) {
     return null
+  }
+
+  if (isAIConfigError) {
+    const isAdmin = user?.isAdmin() ?? false
+
+    return (
+      <div className="mx-3 my-2 flex justify-start">
+        <div className="w-full max-w-[92%] rounded-lg border border-border bg-muted/60 p-3 text-sm">
+          <div className="flex items-start gap-2">
+            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
+              <Settings className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-foreground">
+                {t('aiChat.configuration.title')}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {isAdmin
+                  ? t('aiChat.configuration.adminDescription')
+                  : t('aiChat.configuration.userDescription')}
+              </p>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  className="mt-3 h-8"
+                  onClick={onConfigure}
+                >
+                  <Settings className="mr-1.5 h-3.5 w-3.5" />
+                  {t('aiChat.actions.configure')}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -510,6 +556,7 @@ export function AIChatMessages({
   onDeny,
   onSubmitInput,
   onPromptSelect,
+  onConfigure,
   messagesEndRef,
 }: {
   messages: ChatMessage[]
@@ -520,6 +567,7 @@ export function AIChatMessages({
   onDeny?: (id: string) => void
   onSubmitInput?: (id: string, values: Record<string, unknown>) => void
   onPromptSelect: (prompt: string) => void
+  onConfigure?: () => void
   messagesEndRef: RefObject<HTMLDivElement | null>
 }) {
   return (
@@ -535,6 +583,7 @@ export function AIChatMessages({
               onConfirm={onConfirm}
               onDeny={onDeny}
               onSubmitInput={onSubmitInput}
+              onConfigure={onConfigure}
             />
           ))}
           {isLoading && !hasActiveToolExecution && (

@@ -843,7 +843,8 @@
   },
   "settings": {
     "title": "设置",
-    "description": "管理集群、角色和权限",
+    "description": "管理 AI 助手开关和模型服务端点",
+    "aiAgentRequiresAdmin": "AI 助手设置由 Kite 管理员维护。请联系管理员配置 API Key 和模型服务端点后再使用对话。",
     "tabs": {
       "general": "通用",
       "aiAgent": "AI 助手",
@@ -1561,12 +1562,18 @@
     "actions": {
       "newChat": "新建聊天",
       "openInNewTab": "在新标签页打开",
+      "configure": "配置 AI 助手",
       "continue": "继续",
       "confirm": "确认"
     },
     "thinking": "思考中",
     "selectOption": "选择一个选项",
     "disclaimer": "AI 回复仅供参考，请仔细核实。",
+    "configuration": {
+      "title": "AI 助手需要配置",
+      "adminDescription": "请先在 AI 助手设置里填写 API Key 和模型服务端点，然后再开始对话。",
+      "userDescription": "AI 助手入口已经可见，但还需要管理员配置 API Key 和模型服务端点。"
+    },
     "messages": {
       "count": "{{count}} 条消息",
       "count_other": "{{count}} 条消息",

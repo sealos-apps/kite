@@ -150,7 +150,7 @@ const BUILTIN_CRD_NAMES = [
   'clusters.apps.kubeblocks.io',
 ] as const
 const BUILTIN_CRD_NAME_SET = new Set<string>(BUILTIN_CRD_NAMES)
-const ADMIN_ONLY_SIDEBAR_URLS = new Set<string>(['/settings'])
+const ADMIN_ONLY_SIDEBAR_URLS = new Set<string>()
 
 const buildBuiltinCRSidebarItems = (): SidebarItem[] =>
   BUILTIN_CRD_NAMES.map((crdName, index) => ({

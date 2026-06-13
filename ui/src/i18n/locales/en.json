@@ -817,7 +817,8 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Manage clusters, roles and permissions",
+    "description": "Manage AI Agent availability and model endpoint",
+    "aiAgentRequiresAdmin": "AI Agent settings are managed by Kite administrators. Ask an administrator to configure the API key and model endpoint before using chat.",
     "tabs": {
       "general": "General",
       "aiAgent": "AI Agent",
@@ -1561,12 +1562,18 @@
     "actions": {
       "newChat": "New chat",
       "openInNewTab": "Open in new tab",
+      "configure": "Configure AI Agent",
       "continue": "Continue",
       "confirm": "Confirm"
     },
     "thinking": "Thinking",
     "selectOption": "Select an option",
     "disclaimer": "AI may make mistakes. Please verify carefully before use.",
+    "configuration": {
+      "title": "AI Agent needs configuration",
+      "adminDescription": "Add an API key and model endpoint in AI Agent settings before starting a chat.",
+      "userDescription": "The AI Agent is visible, but an administrator still needs to configure its API key and model endpoint."
+    },
     "messages": {
       "count": "{{count}} message",
       "count_other": "{{count}} messages",

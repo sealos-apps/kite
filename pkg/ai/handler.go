@@ -10,6 +10,8 @@ import (
 	"github.com/zxh326/kite/pkg/model"
 )
 
+const aiNotConfiguredMessage = "AI Agent is not configured. Please configure an API key in AI Agent settings."
+
 // HandleChat handles the SSE streaming chat endpoint.
 func HandleChat(c *gin.Context) {
 	cfg, err := LoadRuntimeConfig()
@@ -18,7 +20,7 @@ func HandleChat(c *gin.Context) {
 		return
 	}
 	if !cfg.Enabled {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "AI is not enabled"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": aiNotConfiguredMessage})
 		return
 	}
 
@@ -79,7 +81,7 @@ func HandleExecuteContinue(c *gin.Context) {
 		return
 	}
 	if !cfg.Enabled {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "AI is not enabled"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": aiNotConfiguredMessage})
 		return
 	}
 
@@ -130,7 +132,7 @@ func HandleInputContinue(c *gin.Context) {
 		return
 	}
 	if !cfg.Enabled {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "AI is not enabled"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": aiNotConfiguredMessage})
 		return
 	}
 

@@ -6,8 +6,16 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { useAIChatContext } from '@/contexts/ai-chat-context'
-import { Bot, Clock, ExternalLink, MessageSquarePlus, X } from 'lucide-react'
+import {
+  Bot,
+  Clock,
+  ExternalLink,
+  MessageSquarePlus,
+  Settings,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 import { withSubPath } from '@/lib/subpath'
 import { useAIChat } from '@/hooks/use-ai-chat'
@@ -33,6 +41,7 @@ export function AIChatPanel({
   onClose: () => void
 }) {
   const { i18n, t } = useTranslation()
+  const navigate = useNavigate()
   const { closeChat, pageContext } = useAIChatContext()
   const {
     messages,
@@ -151,6 +160,13 @@ export function AIChatPanel({
     setInput('')
   }, [newSession])
 
+  const openSettings = useCallback(() => {
+    navigate('/settings')
+    if (!standalone) {
+      closeChat()
+    }
+  }, [closeChat, navigate, standalone])
+
   const shouldCloseStandalone = standalone ? onClose : closeChat
 
   return (
@@ -191,6 +207,22 @@ export function AIChatPanel({
             </TooltipTrigger>
             <TooltipContent side="top">
               {t('aiChat.actions.newChat')}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={openSettings}
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {t('aiChat.actions.configure')}
             </TooltipContent>
           </Tooltip>
 
@@ -250,6 +282,7 @@ export function AIChatPanel({
         onDeny={denyAction}
         onSubmitInput={submitInput}
         onPromptSelect={handlePromptSelect}
+        onConfigure={openSettings}
         messagesEndRef={messagesEndRef}
       />
 
