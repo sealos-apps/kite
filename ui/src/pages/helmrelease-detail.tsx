@@ -531,7 +531,7 @@ function HelmReleaseRollbackButton({
             onClick={() => setOpen(false)}
             disabled={disabled}
           >
-            {t('common.actions.cancel')}
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -858,7 +858,7 @@ function HelmReleaseChartVersionDetail({
 }) {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const canReadChartCatalog = user?.isAdmin() ?? false
+  const canReadChartCatalog = Boolean(user)
   const canCheck = Boolean(
     canReadChartCatalog && chartName && currentVersion && currentVersion !== '-'
   )
@@ -972,7 +972,7 @@ function UpgradeHelmReleaseDialog({
 }) {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const canReadChartCatalog = user?.isAdmin() ?? false
+  const canReadChartCatalog = Boolean(user)
   const chartName = release.spec?.chartName || release.spec?.chart || ''
   const currentVersion = release.spec?.chartVersion || ''
   const [selectedRepository, setSelectedRepository] = useState('')
@@ -1442,7 +1442,7 @@ function UpgradeHelmReleaseDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={isUpgrading || isDryRunning}
               >
-                {t('common.actions.cancel')}
+                {t('common.cancel')}
               </Button>
             )}
             {!dryRunPreview ? (
@@ -1489,7 +1489,7 @@ export function HelmReleaseDetail(props: { namespace: string; name: string }) {
   const { namespace, name } = props
   const { t } = useTranslation()
   const { user } = useAuth()
-  const canReadChartCatalog = user?.isAdmin() ?? false
+  const canManageHelmAutomation = user?.isAdmin() ?? false
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false)
   const [autoUpgradeDialogOpen, setAutoUpgradeDialogOpen] = useState(false)
   const { data, isLoading, error, refetch } = useResource(
@@ -1498,7 +1498,7 @@ export function HelmReleaseDetail(props: { namespace: string; name: string }) {
     namespace
   )
   const autoUpgradeQuery = useHelmReleaseAutoUpgrade(namespace, name, {
-    enabled: canReadChartCatalog && !!data,
+    enabled: canManageHelmAutomation && !!data,
     staleTime: 30_000,
   })
   const isAutoUpgradeEnabled = autoUpgradeQuery.data?.enabled === true
@@ -1668,7 +1668,7 @@ export function HelmReleaseDetail(props: { namespace: string; name: string }) {
       showDelete
       headerActions={
         <>
-          {canReadChartCatalog ? (
+          {canManageHelmAutomation ? (
             <Button
               variant="outline"
               size="sm"
@@ -1701,7 +1701,7 @@ export function HelmReleaseDetail(props: { namespace: string; name: string }) {
               onComplete={refetch}
             />
           ) : null}
-          {canReadChartCatalog && data && autoUpgradeDialogOpen ? (
+          {canManageHelmAutomation && data && autoUpgradeDialogOpen ? (
             <HelmReleaseAutoUpgradeDialog
               release={data}
               open={autoUpgradeDialogOpen}

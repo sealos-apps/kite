@@ -91,16 +91,16 @@ export function ServiceOverview({
               resourceType="endpoints"
               resources={endpoints}
               isLoading={isEndpointsLoading}
-              loadingText="Loading endpoints..."
-              emptyText="No endpoints found"
+              loadingText={t('common.messages.loadingEndpoints')}
+              emptyText={t('common.messages.noEndpoints')}
             />
             <ServiceEndpointResourceCard
               title="EndpointSlices"
               resourceType="endpointslices"
               resources={endpointSlices}
               isLoading={isEndpointSlicesLoading}
-              loadingText="Loading endpoint slices..."
-              emptyText="No endpoint slices found"
+              loadingText={t('common.messages.loadingEndpointSlices')}
+              emptyText={t('common.messages.noEndpointSlices')}
             />
           </div>
           <ServiceInformationCard service={service} namespace={namespace} />
@@ -147,10 +147,11 @@ function ServiceEndpointResourceCard({
   loadingText: ReactNode
   emptyText: string
 }) {
+  const { t } = useTranslation()
   const columns = useMemo(
     (): Column<ServiceEndpointResource>[] => [
       {
-        header: 'Name',
+        header: t('common.fields.name'),
         accessor: (resource) => resource.metadata,
         cell: (value: unknown) => {
           const metadata = value as ServiceEndpointResource['metadata']
@@ -166,7 +167,7 @@ function ServiceEndpointResourceCard({
         align: 'left',
       },
       {
-        header: 'Created',
+        header: t('common.fields.created'),
         accessor: (resource) => resource.metadata?.creationTimestamp || '',
         cell: (value: unknown) => (
           <span className="text-sm text-muted-foreground">
@@ -175,7 +176,7 @@ function ServiceEndpointResourceCard({
         ),
       },
     ],
-    [resourceType]
+    [resourceType, t]
   )
   const data = resources || []
 

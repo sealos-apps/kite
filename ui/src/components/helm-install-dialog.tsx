@@ -360,7 +360,7 @@ export function HelmInstallDialog({
                   onClick={() => onOpenChange(false)}
                   disabled={isInstalling || isDryRunning}
                 >
-                  {t('common.actions.cancel')}
+                  {t('common.cancel')}
                 </Button>
               )}
               {!dryRunPreview ? (

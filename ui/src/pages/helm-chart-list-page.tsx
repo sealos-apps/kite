@@ -264,10 +264,10 @@ function AddRepositoryDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              {t('common.actions.cancel')}
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {t('common.actions.add')}
+              {t('sidebar.add')}
             </Button>
           </DialogFooter>
         </form>
@@ -609,7 +609,7 @@ export function HelmChartListPage() {
               variant="outline"
               size="icon"
               disabled={isFetching}
-              aria-label={t('common.actions.refresh')}
+              aria-label={t('common.refresh')}
               onClick={() => void refetchCharts()}
             >
               <RefreshCw className="size-4" />
@@ -633,7 +633,7 @@ export function HelmChartListPage() {
                   size="icon"
                   onClick={() => updateSearchQuery('')}
                   className="size-9"
-                  aria-label={t('common.actions.close')}
+                  aria-label={t('common.close')}
                 >
                   <XCircle className="size-4" />
                 </Button>
@@ -653,13 +653,15 @@ export function HelmChartListPage() {
                   <Button
                     variant="outline"
                     size="icon"
-                    aria-label="Toggle columns"
+                    aria-label={t('resourceTable.toggleColumns')}
                   >
                     <Settings2 className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                  <DropdownMenuLabel>
+                    {t('resourceTable.toggleColumns')}
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {table
                     .getAllLeafColumns()

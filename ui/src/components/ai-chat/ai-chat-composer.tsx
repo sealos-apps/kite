@@ -41,7 +41,7 @@ export function AIChatComposer({
         <textarea
           ref={inputRef}
           className="flex-1 min-w-0 resize-none rounded-md border bg-background px-3 py-2 text-base leading-5 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
-          placeholder="Ask about your cluster..."
+          placeholder={t('aiChat.placeholder')}
           rows={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}

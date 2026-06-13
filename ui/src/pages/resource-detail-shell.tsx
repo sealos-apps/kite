@@ -263,7 +263,7 @@ export function ResourceDetailShell<T>({
                 onClick={handleRefresh}
               >
                 <IconRefresh className="h-4 w-4" />
-                {t('common.actions.refresh')}
+                {t('common.refresh')}
               </Button>
               {showDescribe ? (
                 <DescribeDialog
@@ -280,7 +280,7 @@ export function ResourceDetailShell<T>({
                   onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <IconTrash className="h-4 w-4" />
-                  {t('common.actions.delete')}
+                  {t('common.delete')}
                 </Button>
               )}
             </div>

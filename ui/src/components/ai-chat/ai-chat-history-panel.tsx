@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button'
 
 import { ChatSession } from './ai-chat-types'
 
-function formatRelativeDate(timestamp: number) {
+function formatRelativeDate(
+  timestamp: number,
+  t: ReturnType<typeof useTranslation>['t']
+) {
   const date = new Date(timestamp)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
@@ -13,10 +16,10 @@ function formatRelativeDate(timestamp: number) {
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffMins < 1) return t('aiChat.messages.justNow')
+  if (diffMins < 60) return t('aiChat.messages.minutesAgo', { count: diffMins })
+  if (diffHours < 24) return t('aiChat.messages.hoursAgo', { count: diffHours })
+  if (diffDays < 7) return t('aiChat.messages.daysAgo', { count: diffDays })
   return date.toLocaleDateString()
 }
 
@@ -64,7 +67,7 @@ export function AIChatHistoryPanel({
           }}
         >
           <MessageSquarePlus className="h-4 w-4" />
-          {t('common.actions.newChat', 'New Chat')}
+          {t('aiChat.actions.newChat')}
         </Button>
       </div>
 
@@ -98,9 +101,13 @@ export function AIChatHistoryPanel({
                     {session.title}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{formatRelativeDate(session.updatedAt)}</span>
+                    <span>{formatRelativeDate(session.updatedAt, t)}</span>
                     <span>•</span>
-                    <span>{session.messages.length} messages</span>
+                    <span>
+                      {t('aiChat.messages.count', {
+                        count: session.messages.length,
+                      })}
+                    </span>
                     {session.clusterName && (
                       <>
                         <span>•</span>

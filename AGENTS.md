@@ -32,11 +32,13 @@ Run from repo root unless noted:
 - Frontend uses TypeScript with strict settings and `@/*` path alias.
 - Frontend formatting is Prettier-based: 2 spaces, single quotes, no semicolons, trailing commas (`es5`).
 - Keep TS/TSX file names kebab-case (example: `node-status-icon.tsx`); export components in PascalCase.
+- Frontend i18n must preserve existing flat `common.*` keys. Do not convert string keys such as `common.actions` into nested objects; wire new UI to existing flat keys or add non-conflicting feature/nested keys instead.
 
 ## Testing Guidelines
 - Place Go tests beside implementation files using `*_test.go`.
 - Current CI enforces build, lint, and backend tests; no fixed coverage gate is defined.
 - Add or update tests for any changed backend logic, middleware behavior, or API handlers.
+- When syncing upstream UI, run a literal translation-key scan for the touched scopes in addition to `cd ui && pnpm run type-check` and `cd ui && pnpm run build`, so raw keys such as `common.fields.description` do not leak into the interface.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat:`, `fix:`, `chore(deps):`, `release vX.Y.Z`.

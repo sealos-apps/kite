@@ -48,7 +48,118 @@
     "disabled": "Disabled",
     "enabled": "Enabled",
     "update": "Update",
-    "all": "All"
+    "all": "All",
+    "fields": {
+      "actions": "Actions",
+      "active": "Active",
+      "age": "Age",
+      "allContainers": "All containers",
+      "annotations": "Annotations",
+      "available": "Available",
+      "chatHistory": "Chat history",
+      "clusterIP": "Cluster IP",
+      "completed": "Completed",
+      "container": "Container",
+      "containers": "Containers",
+      "cpu": "CPU",
+      "created": "Created",
+      "current": "Current",
+      "currentRevision": "Current revision",
+      "description": "Description",
+      "desired": "Desired",
+      "details": "Details",
+      "env": "Environment",
+      "envFrom": "Environment sources",
+      "error": "Error",
+      "errorDetails": "Error details",
+      "externalIP": "External IP",
+      "failed": "Failed",
+      "from": "From",
+      "images": "Images",
+      "information": "Information",
+      "job": "Job",
+      "jobs": "Jobs",
+      "labels": "Labels",
+      "maxSurge": "Max surge",
+      "maxUnavailable": "Max unavailable",
+      "memory": "Memory",
+      "message": "Message",
+      "minReadySeconds": "Min ready seconds",
+      "mounts": "Mounts",
+      "name": "Name",
+      "namespace": "Namespace",
+      "node": "Node",
+      "observedGeneration": "Observed generation",
+      "owner": "Owner",
+      "password": "Password",
+      "paused": "Paused",
+      "persistentVolumeClaims": "Persistent volume claims",
+      "podIP": "Pod IP",
+      "pods": "Pods",
+      "ports": "Ports",
+      "progressDeadline": "Progress deadline",
+      "ready": "Ready",
+      "reason": "Reason",
+      "relatedResources": "Related resources",
+      "replicas": "Replicas",
+      "resourceVersion": "Resource version",
+      "resources": "Resources",
+      "restart": "Restart",
+      "restartCount": "Restart count",
+      "revision": "Revision",
+      "selector": "Selector",
+      "serviceAccount": "Service account",
+      "serviceName": "Service name",
+      "source": "Source",
+      "started": "Started",
+      "state": "State",
+      "status": "Status",
+      "strategy": "Strategy",
+      "succeeded": "Succeeded",
+      "template": "Template",
+      "type": "Type",
+      "uid": "UID",
+      "upToDate": "Up to date",
+      "updateRevision": "Update revision",
+      "updated": "Updated",
+      "username": "Username",
+      "variables": "Variables",
+      "volumeMounts": "Volume mounts",
+      "volumes": "Volumes",
+      "yamlConfiguration": "YAML configuration"
+    },
+    "messages": {
+      "loading": "Loading...",
+      "loadingEndpoints": "Loading endpoints...",
+      "loadingEndpointSlices": "Loading endpoint slices...",
+      "loadingPods": "Loading pods...",
+      "noChatHistory": "No chat history yet",
+      "noData": "No data",
+      "noEndpoints": "No endpoints found",
+      "noEndpointSlices": "No endpoint slices found",
+      "noPods": "No pods found",
+      "noPorts": "No ports defined",
+      "notCreated": "Not created",
+      "notStarted": "Not started",
+      "startedAgo": "Started {{time}} ago",
+      "startedShort": "Started",
+      "timeAgo": "{{time}} ago"
+    },
+    "tabs": {
+      "history": "History",
+      "logs": "Logs",
+      "overview": "Overview",
+      "terminal": "Terminal",
+      "yaml": "YAML"
+    },
+    "units": {
+      "pods": "pods"
+    },
+    "values": {
+      "no": "No",
+      "none": "None",
+      "yes": "Yes"
+    }
   },
   "globalSearch": {
     "title": "Global Search",
@@ -191,10 +302,21 @@
       "uploadSuccess": "Uploaded {{name}} successfully"
     },
     "initContainer": "init",
+    "dnsPolicy": "DNS policy",
+    "hostNetwork": "Host network",
+    "loadingRelatedResources": "Loading related resources...",
     "noContainersFound": "No containers found.",
     "noPodsFound": "No pods found.",
+    "noRelatedResources": "No related resources found",
+    "nodeSelector": "Node selector",
+    "priorityClass": "Priority class",
+    "qosClass": "QoS class",
+    "restartPolicy": "Restart policy",
+    "runtimeClass": "Runtime class",
+    "scheduler": "Scheduler",
     "searchContainers": "Search containers...",
-    "searchPods": "Search pods..."
+    "searchPods": "Search pods...",
+    "terminationGrace": "Termination grace"
   },
   "deployments": {
     "title": "Deployments",
@@ -273,7 +395,9 @@
     "lastSeen": "Last Seen",
     "count": "Count",
     "source": "Source",
+    "loading": "Loading events...",
     "noEventsFound": "No events found",
+    "noRecentEvents": "No recent events",
     "involvedObject": "Involved Object",
     "reporter": "Reporter"
   },
@@ -293,7 +417,8 @@
     "terminating": "Terminating",
     "crashLoopBackOff": "CrashLoopBackOff",
     "containerCreating": "ContainerCreating",
-    "imagePullBackOff": "ImagePullBackOff"
+    "imagePullBackOff": "ImagePullBackOff",
+    "enabled": "Enabled"
   },
   "monitoring": {
     "cpuUsage": "CPU Usage",
@@ -708,7 +833,14 @@
   },
   "terminal": {
     "kubectlTerminal": "Kubectl Terminal",
-    "toggleKubectlTerminal": "Toggle Kubectl Terminal"
+    "toggleKubectlTerminal": "Toggle Kubectl Terminal",
+    "enterFullscreen": "Enter fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "exitFullscreenEsc": "Exit fullscreen (ESC)",
+    "fullscreen": "Fullscreen",
+    "restore": "Restore",
+    "minimize": "Minimize",
+    "closeEndsSession": "Close (ends session)"
   },
   "generalManagement": {
     "title": "General",
@@ -1433,8 +1565,29 @@
     "updateStrategy": "Update Strategy",
     "volumes": "Volumes"
   },
+  "statefulsets": {
+    "podManagementPolicy": "Pod management policy"
+  },
   "aiChat": {
+    "title": "AI Assistant",
+    "placeholder": "Ask about your cluster...",
+    "actions": {
+      "newChat": "New chat",
+      "openInNewTab": "Open in new tab",
+      "continue": "Continue",
+      "confirm": "Confirm"
+    },
+    "thinking": "Thinking",
+    "selectOption": "Select an option",
     "disclaimer": "AI may make mistakes. Please verify carefully before use.",
+    "messages": {
+      "count": "{{count}} message",
+      "count_other": "{{count}} messages",
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
     "suggestedPrompts": {
       "hint": "Start with a focused check",
       "fallback": {
@@ -1518,6 +1671,30 @@
     "placeholders": {
       "search": "Search charts..."
     }
+  },
+  "jobs": {
+    "activeDeadline": "Active deadline",
+    "backoffLimit": "Backoff limit",
+    "completions": "Completions",
+    "parallelism": "Parallelism",
+    "target": "Target",
+    "ttlAfterFinished": "TTL after finished"
+  },
+  "cronjobs": {
+    "activeJobs": "Active jobs",
+    "clusterDefault": "Cluster default",
+    "concurrencyPolicy": "Concurrency policy",
+    "cronJobInformation": "CronJob information",
+    "failedJobsHistoryLimit": "Failed jobs history limit",
+    "lastSchedule": "Last schedule",
+    "lastSuccessful": "Last successful",
+    "loadingJobs": "Loading jobs...",
+    "noJobs": "No jobs found for this CronJob",
+    "schedule": "Schedule",
+    "startingDeadline": "Starting deadline",
+    "successfulJobsHistoryLimit": "Successful jobs history limit",
+    "suspend": "Suspend",
+    "timeZone": "Time zone"
   },
   "helm": {
     "actions": {

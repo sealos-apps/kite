@@ -600,7 +600,9 @@ export function Terminal({
                   {/* Terminal Theme Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="terminal-theme">Terminal Theme</Label>
+                      <Label htmlFor="terminal-theme">
+                        {t('terminalPanel.terminalTheme')}
+                      </Label>
                       <Select
                         value={terminalTheme}
                         onValueChange={handleThemeChange}
@@ -669,7 +671,9 @@ export function Terminal({
                   {/* Font Size Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="font-size">Font Size</Label>
+                      <Label htmlFor="font-size">
+                        {t('terminalPanel.fontSize')}
+                      </Label>
                       <Select
                         value={fontSize.toString()}
                         onValueChange={(value) =>
@@ -699,7 +703,9 @@ export function Terminal({
                   {/* Cursor Style Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="cursor-style">Cursor Style</Label>
+                      <Label htmlFor="cursor-style">
+                        {t('terminalPanel.cursorStyle')}
+                      </Label>
                       <Select
                         value={cursorStyle}
                         onValueChange={handleCursorStyleChange}
@@ -708,9 +714,15 @@ export function Terminal({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="block">Block</SelectItem>
-                          <SelectItem value="underline">Underline</SelectItem>
-                          <SelectItem value="bar">Bar</SelectItem>
+                          <SelectItem value="block">
+                            {t('terminalPanel.cursorStyles.block')}
+                          </SelectItem>
+                          <SelectItem value="underline">
+                            {t('terminalPanel.cursorStyles.underline')}
+                          </SelectItem>
+                          <SelectItem value="bar">
+                            {t('terminalPanel.cursorStyles.bar')}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -54,6 +54,68 @@ Run the full frontend production build:
 cd ui && COREPACK_ENABLE_AUTO_PIN=0 pnpm run build
 ```
 
+When syncing upstream UI features, also scan the touched frontend scopes for
+literal i18n keys that are missing from either locale. This one-off command
+checks the Helm, AI chat, terminal/log, and overview surfaces:
+
+```bash
+node <<'NODE'
+const fs = require('fs')
+const path = require('path')
+function flatten(obj, prefix = '', out = {}) {
+  for (const [key, value] of Object.entries(obj)) {
+    const next = prefix ? `${prefix}.${key}` : key
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      flatten(value, next, out)
+    } else {
+      out[next] = value
+    }
+  }
+  return out
+}
+const en = flatten(JSON.parse(fs.readFileSync('ui/src/i18n/locales/en.json', 'utf8')))
+const zh = flatten(JSON.parse(fs.readFileSync('ui/src/i18n/locales/zh.json', 'utf8')))
+const files = []
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'dist') continue
+    const current = path.join(dir, entry.name)
+    if (entry.isDirectory()) walk(current)
+    else if (/\.(tsx?|jsx?)$/.test(entry.name)) files.push(current)
+  }
+}
+walk('ui/src')
+const scopes = {
+  helm: /helm/i,
+  ai: /ai-chat|aiChat/i,
+  terminal: /terminal|log-viewer/i,
+  overview: /overview|resource-detail-shell|cronjob-detail/i,
+}
+const calls = []
+const pattern = /\bt\(\s*(['"])([A-Za-z0-9_.-]+)\1/g
+for (const file of files) {
+  const source = fs.readFileSync(file, 'utf8')
+  let match
+  while ((match = pattern.exec(source))) {
+    calls.push({ file, key: match[2] })
+  }
+}
+let missing = 0
+for (const [name, scope] of Object.entries(scopes)) {
+  const scoped = calls.filter(({ file, key }) => scope.test(file) || scope.test(key))
+  const unique = new Map()
+  for (const call of scoped) {
+    if (!(call.key in en) || !(call.key in zh)) {
+      unique.set(`${call.key}:${call.file}`, call)
+    }
+  }
+  console.log(`${name}: ${unique.size}`)
+  missing += unique.size
+}
+process.exit(missing === 0 ? 0 : 1)
+NODE
+```
+
 Build documentation:
 
 ```bash

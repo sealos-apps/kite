@@ -32,7 +32,7 @@ export function AIChatPanel({
   sessionId?: string
   onClose: () => void
 }) {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
   const { closeChat, pageContext } = useAIChatContext()
   const {
     messages,
@@ -158,7 +158,7 @@ export function AIChatPanel({
       <div className="flex h-11 shrink-0 items-center justify-between border-b bg-muted/50 px-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Bot className="h-4 w-4" />
-          AI Assistant
+          {t('aiChat.title')}
         </div>
 
         <div className="flex items-center gap-0.5">
@@ -173,7 +173,9 @@ export function AIChatPanel({
                 <Clock className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Chat history</TooltipContent>
+            <TooltipContent side="top">
+              {t('common.fields.chatHistory')}
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -187,7 +189,9 @@ export function AIChatPanel({
                 <MessageSquarePlus className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">New chat</TooltipContent>
+            <TooltipContent side="top">
+              {t('aiChat.actions.newChat')}
+            </TooltipContent>
           </Tooltip>
 
           {!standalone && (
@@ -202,7 +206,9 @@ export function AIChatPanel({
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Open in new tab</TooltipContent>
+              <TooltipContent side="top">
+                {t('aiChat.actions.openInNewTab')}
+              </TooltipContent>
             </Tooltip>
           )}
 
@@ -219,7 +225,7 @@ export function AIChatPanel({
                 <X className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Close</TooltipContent>
+            <TooltipContent side="top">{t('common.close')}</TooltipContent>
           </Tooltip>
         </div>
       </div>

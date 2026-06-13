@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useTerminal } from '@/contexts/terminal-context'
 import { ChevronDown, ChevronUp, Maximize2, Minimize2, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -16,6 +17,7 @@ const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT_VH = 40
 
 export function FloatingTerminal() {
+  const { t } = useTranslation()
   const { user, capabilities } = useAuth()
   const { isOpen, isMinimized, closeTerminal, minimizeTerminal, openTerminal } =
     useTerminal()
@@ -109,7 +111,7 @@ export function FloatingTerminal() {
           onClick={handleMinimize}
         >
           <span className="h-2.5 w-2.5 rounded-full bg-green-500 shadow-sm" />
-          Kubectl Terminal
+          {t('terminal.kubectlTerminal')}
         </button>
 
         <div className="flex items-center">
@@ -130,7 +132,9 @@ export function FloatingTerminal() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
-              {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              {isFullscreen
+                ? t('terminal.exitFullscreen')
+                : t('terminal.fullscreen')}
             </TooltipContent>
           </Tooltip>
 
@@ -152,7 +156,7 @@ export function FloatingTerminal() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
-              {isMinimized ? 'Restore' : 'Minimize'}
+              {isMinimized ? t('terminal.restore') : t('terminal.minimize')}
             </TooltipContent>
           </Tooltip>
 
@@ -169,7 +173,9 @@ export function FloatingTerminal() {
                 <X className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Close (ends session)</TooltipContent>
+            <TooltipContent side="top">
+              {t('terminal.closeEndsSession')}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>

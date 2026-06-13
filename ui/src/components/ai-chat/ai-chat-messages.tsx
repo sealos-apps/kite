@@ -100,7 +100,7 @@ function ToolCallMessage({
       }
       const value = formValues[field.name]
       if (typeof value !== 'string' || value.trim() === '') {
-        nextErrors[field.name] = t('common.values.required', 'Required')
+        nextErrors[field.name] = t('common.required')
       }
     }
 
@@ -237,7 +237,7 @@ function ToolCallMessage({
                             >
                               <SelectValue
                                 placeholder={
-                                  field.placeholder || 'Select an option'
+                                  field.placeholder || t('aiChat.selectOption')
                                 }
                               />
                             </SelectTrigger>
@@ -281,7 +281,7 @@ function ToolCallMessage({
               })}
               <div className="flex items-center gap-2">
                 <Button size="sm" className="h-8" onClick={submitForm}>
-                  {inputRequest.submitLabel || 'Continue'}
+                  {inputRequest.submitLabel || t('aiChat.actions.continue')}
                 </Button>
                 <Button
                   size="sm"
@@ -289,7 +289,7 @@ function ToolCallMessage({
                   className="h-8"
                   onClick={() => onDeny?.(message.id)}
                 >
-                  {t('common.actions.cancel', 'Cancel')}
+                  {t('common.cancel')}
                 </Button>
               </div>
             </div>
@@ -312,7 +312,7 @@ function ToolCallMessage({
               onClick={() => onConfirm?.(message.id)}
             >
               <CheckCircle2 className="mr-1 h-3 w-3" />
-              Confirm
+              {t('aiChat.actions.confirm')}
             </Button>
             <Button
               size="sm"
@@ -321,7 +321,7 @@ function ToolCallMessage({
               onClick={() => onDeny?.(message.id)}
             >
               <XCircle className="mr-1 h-3 w-3" />
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -341,6 +341,7 @@ function MessageBubble({
   onDeny?: (id: string) => void
   onSubmitInput?: (id: string, values: Record<string, unknown>) => void
 }) {
+  const { t } = useTranslation()
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
 
   if (message.role === 'tool') {
@@ -387,7 +388,7 @@ function MessageBubble({
                   <ChevronRight
                     className={`h-3 w-3 transition-transform ${thinkingExpanded ? 'rotate-90' : ''}`}
                   />
-                  Thinking
+                  {t('aiChat.thinking')}
                 </button>
                 {thinkingExpanded && (
                   <div className="rounded border border-dashed bg-background/60 p-2 text-xs text-muted-foreground">

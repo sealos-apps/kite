@@ -40,7 +40,7 @@ export function HelmReleaseAutoUpgradeDialog({
 }) {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const canReadChartCatalog = user?.isAdmin() ?? false
+  const canReadChartCatalog = Boolean(user)
   const chartName = release.spec?.chartName || release.spec?.chart || ''
   const currentVersion = release.spec?.chartVersion || ''
   const [enabled, setEnabled] = useState(false)
@@ -397,11 +397,11 @@ export function HelmReleaseAutoUpgradeDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSaving}
             >
-              {t('common.actions.cancel')}
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={!canSave}>
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
-              {t('common.actions.save')}
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </form>

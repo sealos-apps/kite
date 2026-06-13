@@ -49,7 +49,118 @@
     "disabled": "已禁用",
     "enabled": "已启用",
     "update": "更新",
-    "all": "全部"
+    "all": "全部",
+    "fields": {
+      "actions": "操作",
+      "active": "活跃",
+      "age": "运行时间",
+      "allContainers": "全部容器",
+      "annotations": "注解",
+      "available": "可用",
+      "chatHistory": "聊天历史",
+      "clusterIP": "集群 IP",
+      "completed": "完成时间",
+      "container": "容器",
+      "containers": "容器",
+      "cpu": "CPU",
+      "created": "创建时间",
+      "current": "当前",
+      "currentRevision": "当前版本",
+      "description": "描述",
+      "desired": "期望",
+      "details": "详情",
+      "env": "环境变量",
+      "envFrom": "环境变量来源",
+      "error": "错误",
+      "errorDetails": "错误详情",
+      "externalIP": "外部 IP",
+      "failed": "失败",
+      "from": "来源",
+      "images": "镜像",
+      "information": "信息",
+      "job": "任务",
+      "jobs": "任务",
+      "labels": "标签",
+      "maxSurge": "最大超量",
+      "maxUnavailable": "最大不可用",
+      "memory": "内存",
+      "message": "消息",
+      "minReadySeconds": "最短就绪时间",
+      "mounts": "挂载",
+      "name": "名称",
+      "namespace": "命名空间",
+      "node": "节点",
+      "observedGeneration": "已观测版本",
+      "owner": "所属资源",
+      "password": "密码",
+      "paused": "已暂停",
+      "persistentVolumeClaims": "持久卷声明",
+      "podIP": "Pod IP",
+      "pods": "Pod",
+      "ports": "端口",
+      "progressDeadline": "进度截止时间",
+      "ready": "就绪",
+      "reason": "原因",
+      "relatedResources": "关联资源",
+      "replicas": "副本",
+      "resourceVersion": "资源版本",
+      "resources": "资源",
+      "restart": "重启",
+      "restartCount": "重启次数",
+      "revision": "修订版本",
+      "selector": "选择器",
+      "serviceAccount": "服务账户",
+      "serviceName": "服务名称",
+      "source": "来源",
+      "started": "开始时间",
+      "state": "状态",
+      "status": "状态",
+      "strategy": "策略",
+      "succeeded": "成功",
+      "template": "模板",
+      "type": "类型",
+      "uid": "UID",
+      "upToDate": "已更新",
+      "updateRevision": "更新版本",
+      "updated": "更新时间",
+      "username": "用户名",
+      "variables": "变量",
+      "volumeMounts": "卷挂载",
+      "volumes": "卷",
+      "yamlConfiguration": "YAML 配置"
+    },
+    "messages": {
+      "loading": "加载中...",
+      "loadingEndpoints": "正在加载 Endpoints...",
+      "loadingEndpointSlices": "正在加载 EndpointSlices...",
+      "loadingPods": "正在加载 Pod...",
+      "noChatHistory": "暂无聊天历史",
+      "noData": "暂无数据",
+      "noEndpoints": "未找到 Endpoints",
+      "noEndpointSlices": "未找到 EndpointSlices",
+      "noPods": "未找到 Pod",
+      "noPorts": "未定义端口",
+      "notCreated": "未创建",
+      "notStarted": "未开始",
+      "startedAgo": "{{time}} 前启动",
+      "startedShort": "已启动",
+      "timeAgo": "{{time}} 前"
+    },
+    "tabs": {
+      "history": "历史",
+      "logs": "日志",
+      "overview": "概览",
+      "terminal": "终端",
+      "yaml": "YAML"
+    },
+    "units": {
+      "pods": "个 Pod"
+    },
+    "values": {
+      "no": "否",
+      "none": "无",
+      "yes": "是"
+    }
   },
   "globalSearch": {
     "title": "全局搜索",
@@ -123,8 +234,8 @@
     "clusterroles": "集群角色",
     "clusterrolebindings": "集群角色绑定",
     "horizontalpodautoscalers": "Pod 水平自动扩缩",
-    "helmReleases": "Helm Release",
-    "helmCharts": "App Catalog"
+    "helmReleases": "Helm 发布",
+    "helmCharts": "应用目录"
   },
   "sidebar": {
     "groups": {
@@ -217,10 +328,21 @@
       "uploadSuccess": "已成功上传 {{name}}"
     },
     "initContainer": "初始化容器",
+    "dnsPolicy": "DNS 策略",
+    "hostNetwork": "主机网络",
+    "loadingRelatedResources": "正在加载关联资源...",
     "noContainersFound": "未找到容器",
     "noPodsFound": "未找到 Pod",
+    "noRelatedResources": "未找到关联资源",
+    "nodeSelector": "节点选择器",
+    "priorityClass": "优先级类",
+    "qosClass": "QoS 等级",
+    "restartPolicy": "重启策略",
+    "runtimeClass": "运行时类",
+    "scheduler": "调度器",
     "searchContainers": "搜索容器...",
-    "searchPods": "搜索 Pod..."
+    "searchPods": "搜索 Pod...",
+    "terminationGrace": "终止宽限期"
   },
   "deployments": {
     "title": "部署",
@@ -299,7 +421,9 @@
     "lastSeen": "最后出现",
     "count": "次数",
     "source": "来源",
+    "loading": "正在加载事件...",
     "noEventsFound": "未找到事件",
+    "noRecentEvents": "暂无最近事件",
     "involvedObject": "关联对象",
     "reporter": "报告者"
   },
@@ -319,7 +443,8 @@
     "terminating": "终止中",
     "crashLoopBackOff": "崩溃循环退避",
     "containerCreating": "容器创建中",
-    "imagePullBackOff": "镜像拉取退避"
+    "imagePullBackOff": "镜像拉取退避",
+    "enabled": "已启用"
   },
   "monitoring": {
     "cpuUsage": "CPU使用率",
@@ -734,7 +859,14 @@
   },
   "terminal": {
     "kubectlTerminal": "Kubectl 终端",
-    "toggleKubectlTerminal": "切换 Kubectl 终端"
+    "toggleKubectlTerminal": "切换 Kubectl 终端",
+    "enterFullscreen": "进入全屏",
+    "exitFullscreen": "退出全屏",
+    "exitFullscreenEsc": "退出全屏（ESC）",
+    "fullscreen": "全屏",
+    "restore": "恢复",
+    "minimize": "最小化",
+    "closeEndsSession": "关闭（结束会话）"
   },
   "generalManagement": {
     "title": "通用",
@@ -1433,8 +1565,29 @@
     "updateStrategy": "更新策略",
     "volumes": "卷"
   },
+  "statefulsets": {
+    "podManagementPolicy": "Pod 管理策略"
+  },
   "aiChat": {
+    "title": "AI 助手",
+    "placeholder": "询问集群相关问题...",
+    "actions": {
+      "newChat": "新建聊天",
+      "openInNewTab": "在新标签页打开",
+      "continue": "继续",
+      "confirm": "确认"
+    },
+    "thinking": "思考中",
+    "selectOption": "选择一个选项",
     "disclaimer": "AI 回复仅供参考，请仔细核实。",
+    "messages": {
+      "count": "{{count}} 条消息",
+      "count_other": "{{count}} 条消息",
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
+    },
     "suggestedPrompts": {
       "hint": "从一个具体的问题开始",
       "fallback": {
@@ -1480,49 +1633,73 @@
   },
   "helmCharts": {
     "actions": {
-      "addRepository": "添加 Helm Repository",
-      "deleteRepository": "删除 Helm Repository",
+      "addRepository": "添加 Helm 仓库",
+      "deleteRepository": "删除 Helm 仓库",
       "install": "安装"
     },
     "fields": {
-      "repository": "Repository",
+      "repository": "仓库",
       "deprecated": "已废弃",
       "sources": "源码",
       "keywords": "关键词",
       "versions": "版本",
-      "defaultValues": "默认 Values",
-      "customValues": "自定义 Values",
+      "defaultValues": "默认配置值",
+      "customValues": "自定义配置值",
       "updatedAt": "更新时间"
     },
     "filters": {
-      "allRepositories": "全部 Repository",
+      "allRepositories": "全部仓库",
       "artifactHub": "Artifact Hub",
-      "repositories": "Repository",
-      "verifiedPublisher": "Verified Publisher"
+      "repositories": "仓库",
+      "verifiedPublisher": "已验证发布者"
     },
     "messages": {
-      "addRepositoryDescription": "添加 Helm Repository 后，它的 Charts 会显示在列表中。",
-      "repositoryAdded": "Repository 已添加",
-      "repositoryDeleted": "Repository 已删除",
-      "deleteRepositoryDescription": "这里只会从 Kite 移除这个受管理的 Chart 来源，不会删除远端 Chart，也不会卸载已安装的 Helm Release。",
+      "addRepositoryDescription": "添加 Helm 仓库后，它的 Chart 会显示在列表中。",
+      "repositoryAdded": "仓库已添加",
+      "repositoryDeleted": "仓库已删除",
+      "deleteRepositoryDescription": "这里只会从 Kite 移除这个受管理的 Chart 来源，不会删除远端 Chart，也不会卸载已安装的 Helm 发布。",
       "noCharts": "未找到 Chart",
       "noReadme": "未找到 README",
-      "noValues": "未找到 Values",
+      "noValues": "未找到配置值",
       "noTemplates": "未找到模板",
       "noVersions": "未找到版本",
       "noChartUrl": "缺少 Chart 包 URL。",
-      "invalidValues": "Values 必须是 YAML 对象。",
+      "invalidValues": "配置值必须是 YAML 对象。",
       "artifactHubTrafficNotice": "从该来源搜索或查看 Chart 信息时，Kite 会访问 <artifactHub>Artifact Hub</artifactHub>。Kite 仅展示第三方数据，不对其中内容负责。",
-      "installed": "Helm Release 已安装"
+      "installed": "Helm 发布已安装"
     },
     "placeholders": {
       "search": "搜索 Chart..."
     }
   },
+  "jobs": {
+    "activeDeadline": "活动截止时间",
+    "backoffLimit": "重试上限",
+    "completions": "完成数",
+    "parallelism": "并行度",
+    "target": "目标",
+    "ttlAfterFinished": "完成后 TTL"
+  },
+  "cronjobs": {
+    "activeJobs": "活跃任务",
+    "clusterDefault": "集群默认",
+    "concurrencyPolicy": "并发策略",
+    "cronJobInformation": "CronJob 信息",
+    "failedJobsHistoryLimit": "失败任务历史保留",
+    "lastSchedule": "上次调度",
+    "lastSuccessful": "上次成功",
+    "loadingJobs": "正在加载任务...",
+    "noJobs": "未找到该 CronJob 创建的任务",
+    "schedule": "调度计划",
+    "startingDeadline": "启动截止时间",
+    "successfulJobsHistoryLimit": "成功任务历史保留",
+    "suspend": "暂停",
+    "timeZone": "时区"
+  },
   "helm": {
     "actions": {
       "backToValues": "上一步",
-      "dryRun": "Dry Run",
+      "dryRun": "试运行",
       "upgrade": "升级",
       "rollback": "回滚",
       "autoUpgrade": "自动升级"
@@ -1533,9 +1710,9 @@
       "appVersion": "App 版本",
       "publishedAt": "发布日期",
       "kubeVersion": "Kubernetes 版本",
-      "releaseName": "Release 名称",
-      "createNamespace": "创建 Namespace",
-      "dryRunPreview": "Dry Run 预览",
+      "releaseName": "发布名称",
+      "createNamespace": "创建命名空间",
+      "dryRunPreview": "试运行预览",
       "ignoreLabelsAnnotationsChanges": "忽略标签/注解变更（仅 Diff）",
       "forceConflicts": "force-conflicts",
       "wait": "wait",
@@ -1563,20 +1740,20 @@
       "unchanged": "未变化"
     },
     "tabs": {
-      "manifest": "Manifest",
-      "values": "Values",
-      "notes": "Notes"
+      "manifest": "清单",
+      "values": "配置值",
+      "notes": "说明"
     },
     "messages": {
       "noResources": "未找到资源",
-      "noDryRunResources": "Dry Run 没有渲染出资源。",
+      "noDryRunResources": "试运行没有渲染出资源。",
       "noHistory": "未找到历史记录",
       "rollbackStarted": "已发起回滚",
       "rollbackConfirmTitle": "确认回滚 Release？",
       "rollbackConfirmDescription": "将 {{namespace}}/{{name}} 回滚到 revision {{revision}}。",
-      "chartNotFound": "在已管理的 Helm Repository 和 Artifact Hub 中均未找到这个 Chart。",
-      "chartSourceManagedRepository": "当前使用已管理的 Chart Repository：{{repository}}。",
-      "chartSourceArtifactHubVerified": "当前使用 Artifact Hub Chart：{{repository}}（Verified Publisher）。",
+      "chartNotFound": "在已管理的 Helm 仓库和 Artifact Hub 中均未找到这个 Chart。",
+      "chartSourceManagedRepository": "当前使用已管理的 Chart 仓库：{{repository}}。",
+      "chartSourceArtifactHubVerified": "当前使用 Artifact Hub Chart：{{repository}}（已验证发布者）。",
       "chartSourceArtifactHubVerifiedShort": "Artifact Hub（已验证）",
       "chartSourceArtifactHub": "当前使用 Artifact Hub Chart：{{repository}}。",
       "chartDetailsLink": "Chart 详情",
@@ -1586,7 +1763,7 @@
       "loadingChart": "正在加载 Chart...",
       "loadingVersions": "正在加载版本...",
       "loadingChartPackage": "正在加载 Chart 包...",
-      "loadingValues": "正在加载 Values...",
+      "loadingValues": "正在加载配置值...",
       "autoUpgradeSaved": "自动升级配置已保存",
       "autoUpgradeDescription": "发现新 Chart 版本时升级。",
       "autoUpgradeChartDescription": "用于检查版本的 Chart 来源。",
