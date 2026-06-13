@@ -3,9 +3,12 @@ package auth
 import (
 	"testing"
 
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/model"
+	"gorm.io/gorm"
 )
 
 func Test_buildSealosClusterUpdates(t *testing.T) {
@@ -85,5 +88,56 @@ func Test_buildSealosRoleNamespaces(t *testing.T) {
 			"ns-admin": {},
 		}
 		assert.Equal(t, []string{"*"}, buildSealosRoleNamespaces(" NS-ADMIN "))
+	})
+}
+
+func TestEnsureSealosAdminRoleAssignmentIfExempt(t *testing.T) {
+	useTestSealosAuthDB(t)
+
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+
+	require.NoError(t, model.InitDefaultRole())
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{
+		"ns-admin": {},
+	}
+
+	require.NoError(t, ensureSealosAdminRoleAssignmentIfExempt("ns-admin", "sealos-admin"))
+
+	adminRole, err := model.GetRoleByName(model.DefaultAdminRole.Name)
+	require.NoError(t, err)
+
+	var adminAssignments int64
+	require.NoError(t, model.DB.Model(&model.RoleAssignment{}).Where(
+		"role_id = ? AND subject_type = ? AND subject = ?",
+		adminRole.ID,
+		model.SubjectTypeUser,
+		"sealos-admin",
+	).Count(&adminAssignments).Error)
+	assert.EqualValues(t, 1, adminAssignments)
+
+	require.NoError(t, ensureSealosAdminRoleAssignmentIfExempt("default", "sealos-regular"))
+
+	var regularAssignments int64
+	require.NoError(t, model.DB.Model(&model.RoleAssignment{}).Where(
+		"subject = ?",
+		"sealos-regular",
+	).Count(&regularAssignments).Error)
+	assert.EqualValues(t, 0, regularAssignments)
+}
+
+func useTestSealosAuthDB(t *testing.T) {
+	t.Helper()
+
+	originalDB := model.DB
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.Role{}, &model.RoleAssignment{}))
+	model.DB = db
+
+	t.Cleanup(func() {
+		model.DB = originalDB
 	})
 }

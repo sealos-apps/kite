@@ -79,6 +79,7 @@ make docs-build
 - `ANONYMOUS_USER_ENABLED`：跳过普通认证。除非部署环境明确可信，否则不要在生产环境开启。
 - `SEALOS_AUTH_ENABLED`：启用 Sealos 登录接口。
 - `SEALOS_JWT_SECRET`：Sealos 认证校验使用的 JWT 密钥。
+- `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`：逗号分隔的 Sealos 工作空间命名空间列表，表示这些工作空间使用全局/管理员凭据。命中的 Sealos 用户会获得其托管集群下的 `*` 命名空间权限，并被分配 Kite 内置 `admin` 角色。
 - `AUTH_COOKIE_SAMESITE` 和 `AUTH_COOKIE_SECURE`：普通部署和 iframe 部署下的 Cookie 策略。
 - `VITE_SEALOS_AUTO_LOGIN`：构建期前端开关，控制是否自动尝试 Sealos SDK 会话登录。
 
@@ -91,6 +92,7 @@ Sealos 认证说明：
 
 - Kite 不会仅因为应用以顶层窗口打开而阻断 Sealos 认证。`SEALOS_AUTH_ENABLED=true` 时，独立本地开发页面和 `sealos-app-dev-bridge` 仍会优先尝试 Sealos SDK 自动登录。
 - `/login` 可以在 SDK 会话通道不可用时展示非阻断的 Sealos SDK 可用性提示。它只是 Sealos Desktop 或 `sealos-app-dev-bridge` 的诊断线索，不是访问闸门。
+- 显示名是 `admin` 不等于拥有 Kite 管理员权限。需要检查 `/api/auth/user` 或 `role_assignments` 表，确认当前用户拥有内置 `admin` 角色。对于命中 `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES` 的 Sealos 工作空间，下一次 Sealos 登录/同步会自动补齐该角色。
 - 如果独立本地开发中的 Sealos 自动登录失败，先检查 bridge 或 Sealos Desktop 会话，再查看 `/api/auth/login/sealos` 响应和后端日志。
 
 ## 认证故障页
@@ -137,7 +139,7 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 - 聊天请求需要 OpenAI-compatible 或 Anthropic-compatible provider 配置和 API Key。缺少 API Key 时，运行时会把 AI 视为未启用。
 - 只读工具仍使用当前认证用户、集群和命名空间作用域。
 - 变更资源的工具需要同时满足 Kite RBAC，并经过显式继续/确认步骤。Pending session 会绑定同一用户和集群。
-- 如果 AI chat 返回 AI Agent configuration、disabled 或 provider 错误，检查通用设置记录、provider Base URL、API Key 和模型名。
+- 如果 AI chat 返回 AI Agent configuration、disabled 或 provider 错误，检查通用设置记录、provider Base URL、API Key、模型名，以及当前用户编辑 `/settings` 时是否拥有 Kite 内置 `admin` 角色。
 
 ## 生产镜像说明
 

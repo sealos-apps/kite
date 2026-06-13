@@ -57,6 +57,7 @@ Kite runs `AutoMigrate` on startup. When `DB_AUTO_CREATE=true`, the service atte
 
 - `/api/auth/login/sealos` remains available when `SEALOS_AUTH_ENABLED=true`.
 - Sealos SDK auto-login is handled in the frontend auth context and stores the selected cluster in storage plus the `x-cluster-name` cookie/header.
+- Sealos SSO creates or updates a managed cluster, a per-user Sealos role, and a role assignment on login. When the workspace namespace is listed in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`, Kite treats that workspace as global/admin: the Sealos role receives `*` namespaces on its managed cluster, and the user also receives the built-in `admin` role for admin-only app settings such as AI Agent configuration.
 - The frontend does not reject Sealos auth just because it is running as the top-level window. This keeps standalone local development and tools such as `sealos-app-dev-bridge` on the same SDK auto-login path as iframe deployments.
 - `/login` may show a Sealos SDK availability notice when the SDK session channel is unavailable, but the notice is diagnostic-only and does not block the auto-login attempt.
 

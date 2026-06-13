@@ -308,6 +308,17 @@ func ensureSealosRoleAssignment(roleID uint, username string) error {
 	}).Error
 }
 
+func ensureSealosAdminRoleAssignmentIfExempt(namespace, username string) error {
+	if !common.IsNamespaceScopeExempt(namespace) {
+		return nil
+	}
+	role, err := model.GetRoleByName(model.DefaultAdminRole.Name)
+	if err != nil {
+		return err
+	}
+	return ensureSealosRoleAssignment(role.ID, username)
+}
+
 func upsertSealosUser(claims *SealosTokenClaims, sessionUser SealosSessionUser) (*model.User, error) {
 	userID := strings.TrimSpace(claims.UserID)
 	if userID == "" {
@@ -403,6 +414,10 @@ func (h *AuthHandler) SealosLogin(c *gin.Context) {
 
 	if err := ensureSealosRoleAssignment(role.ID, user.Username); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign sealos role"})
+		return
+	}
+	if err := ensureSealosAdminRoleAssignmentIfExempt(workspaceID, user.Username); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign sealos admin role"})
 		return
 	}
 	if err := rbac.ForceSyncRolesConfig(); err != nil {
