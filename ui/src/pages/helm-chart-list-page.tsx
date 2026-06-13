@@ -544,15 +544,21 @@ export function HelmChartListPage() {
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <ToggleGroup
               type="single"
-              variant="outline"
               value={chartSource}
               onValueChange={updateChartSource}
               aria-label={t('common.fields.source')}
+              className="h-9 shrink-0 gap-0 overflow-hidden rounded-md border bg-muted/30 p-0.5 shadow-xs"
             >
-              <ToggleGroupItem value={artifactHubSource} className="px-3">
+              <ToggleGroupItem
+                value={artifactHubSource}
+                className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+              >
                 {t('helmCharts.filters.artifactHub')}
               </ToggleGroupItem>
-              <ToggleGroupItem value={repositoriesSource} className="px-3">
+              <ToggleGroupItem
+                value={repositoriesSource}
+                className="h-8 min-w-[4.25rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+              >
                 {t('helmCharts.filters.repositories')}
               </ToggleGroupItem>
             </ToggleGroup>
