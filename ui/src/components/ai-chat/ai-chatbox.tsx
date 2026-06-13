@@ -7,7 +7,7 @@ import {
 } from 'react'
 import { useAIChatContext } from '@/contexts/ai-chat-context'
 import { useAuth } from '@/contexts/auth-context'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 
 import { useIsMobile } from '@/hooks/use-mobile'
 import { AIChatPanel } from '@/components/ai-chat/ai-chat-panel'
@@ -41,8 +41,6 @@ export function AIChatbox({
   const { isOpen, openChat, closeChat } = useAIChatContext()
   const { capabilities } = useAuth()
   const aiEnabled = capabilities.aiEnabled
-  const { pathname } = useLocation()
-  const shouldShowAIChatbox = standalone || !/^\/settings\/?$/.test(pathname)
 
   const [height, setHeight] = useState(() =>
     Math.round(
@@ -172,7 +170,6 @@ export function AIChatbox({
     widthDragging.current = false
   }, [])
 
-  if (!shouldShowAIChatbox) return null
   if (!aiEnabled) return null
 
   if (!standalone && !isOpen) {

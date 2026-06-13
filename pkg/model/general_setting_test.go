@@ -23,6 +23,13 @@ func TestDefaultGeneralNodeTerminalImageValue(t *testing.T) {
 	}
 }
 
+func TestDefaultGeneralSettingEnablesAIAgent(t *testing.T) {
+	setting := defaultGeneralSetting()
+	if !setting.AIAgentEnabled {
+		t.Fatalf("defaultGeneralSetting().AIAgentEnabled = false, want true")
+	}
+}
+
 func TestNormalizeGeneralAIProvider(t *testing.T) {
 	tests := []struct {
 		name     string

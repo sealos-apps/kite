@@ -820,6 +820,7 @@
     "description": "Manage clusters, roles and permissions",
     "tabs": {
       "general": "General",
+      "aiAgent": "AI Agent",
       "clusters": "Cluster",
       "oauth": "OAuth",
       "rbac": "RBAC",
@@ -887,7 +888,7 @@
       }
     },
     "messages": {
-      "updated": "General settings updated"
+      "updated": "AI Agent settings updated"
     },
     "errors": {
       "modelRequired": "Model is required",

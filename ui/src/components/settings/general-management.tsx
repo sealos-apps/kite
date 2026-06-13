@@ -1,21 +1,13 @@
 import { useEffect, useState } from 'react'
-import {
-  IconMessage,
-  IconRobot,
-  IconSettings,
-  IconTerminal2,
-} from '@tabler/icons-react'
+import { useAuth } from '@/contexts/auth-context'
+import { IconRobot } from '@tabler/icons-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import { useAuth } from '@/contexts/auth-context'
-import {
-  updateGeneralSetting,
-  useGeneralSetting,
-} from '@/lib/api'
-import { translateError } from '@/lib/utils'
 import type { GeneralSettingUpdateRequest } from '@/types/api'
+import { updateGeneralSetting, useGeneralSetting } from '@/lib/api'
+import { translateError } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,7 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-5'
@@ -57,7 +48,7 @@ export function GeneralManagement() {
   const queryClient = useQueryClient()
   const { data, isLoading } = useGeneralSetting()
   const [formData, setFormData] = useState<GeneralSettingsFormData>({
-    aiAgentEnabled: false,
+    aiAgentEnabled: true,
     aiProvider: 'openai',
     aiModel: DEFAULT_MODEL,
     aiApiKey: '',
@@ -103,7 +94,7 @@ export function GeneralManagement() {
           query.queryKey[0] === 'auth',
       })
       toast.success(
-        t('generalManagement.messages.updated', 'General settings updated')
+        t('generalManagement.messages.updated', 'AI Agent settings updated')
       )
     },
     onError: (error) => {
@@ -136,25 +127,6 @@ export function GeneralManagement() {
       )
       return
     }
-    if (formData.kubectlEnabled && !formData.kubectlImage.trim()) {
-      toast.error(
-        t(
-          'generalManagement.errors.kubectlImageRequired',
-          'Kubectl image is required when kubectl is enabled'
-        )
-      )
-      return
-    }
-    if (!formData.nodeTerminalImage.trim()) {
-      toast.error(
-        t(
-          'generalManagement.errors.nodeTerminalImageRequired',
-          'Node terminal image is required'
-        )
-      )
-      return
-    }
-
     const payload: GeneralSettingUpdateRequest = {
       aiAgentEnabled: formData.aiAgentEnabled,
       aiProvider: formData.aiProvider,
@@ -190,8 +162,8 @@ export function GeneralManagement() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <IconSettings className="h-5 w-5" />
-          {t('generalManagement.title', 'General')}
+          <IconRobot className="h-5 w-5" />
+          {t('generalManagement.aiAgent.title', 'AI Agent')}
         </CardTitle>
       </CardHeader>
 
@@ -345,165 +317,6 @@ export function GeneralManagement() {
             </div>
           )}
         </div>
-
-        <div className="rounded-lg border">
-          <div className="flex items-center justify-between gap-4 p-3">
-            <div className="space-y-1">
-              <Label className="flex items-center gap-2 text-sm font-medium">
-                <IconTerminal2 className="h-4 w-4" />
-                {t('generalManagement.kubectl.title', 'Kubectl')}
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {t(
-                  'generalManagement.kubectl.description',
-                  'Enable kubectl terminal and configure runtime image.'
-                )}
-              </p>
-            </div>
-            <Switch
-              checked={formData.kubectlEnabled}
-              onCheckedChange={(checked) =>
-                setFormData((prev) => ({ ...prev, kubectlEnabled: checked }))
-              }
-            />
-          </div>
-
-          {formData.kubectlEnabled && (
-            <div className="space-y-2 border-t p-3">
-              <Label htmlFor="general-kubectl-image">
-                {t('generalManagement.kubectl.form.image', 'Image')}
-              </Label>
-              <Input
-                id="general-kubectl-image"
-                value={formData.kubectlImage}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    kubectlImage: e.target.value,
-                  }))
-                }
-                placeholder={DEFAULT_KUBECTL_IMAGE}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-lg border p-3">
-          <div className="space-y-1">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <IconTerminal2 className="h-4 w-4" />
-              {t('generalManagement.nodeTerminal.title', 'Node Terminal')}
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              {t(
-                'generalManagement.nodeTerminal.description',
-                'Configure runtime image used for node terminal sessions.'
-              )}
-            </p>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            <Label htmlFor="general-node-terminal-image">
-              {t('generalManagement.nodeTerminal.form.image', 'Image')}
-            </Label>
-            <Input
-              id="general-node-terminal-image"
-              value={formData.nodeTerminalImage}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  nodeTerminalImage: e.target.value,
-                }))
-              }
-              placeholder={DEFAULT_NODE_TERMINAL_IMAGE}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-lg border">
-          <div className="p-3">
-            <Label className="text-sm font-medium">
-              {t('generalManagement.runtime.title', 'Runtime')}
-            </Label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t(
-                'generalManagement.runtime.description',
-                'Configure analytics and version checking behavior.'
-              )}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t p-3">
-            <Label htmlFor="general-enable-analytics" className="text-sm">
-              {t(
-                'generalManagement.runtime.form.enableAnalytics',
-                'Enable analytics'
-              )}
-            </Label>
-            <Switch
-              id="general-enable-analytics"
-              checked={formData.enableAnalytics}
-              onCheckedChange={(checked) =>
-                setFormData((prev) => ({ ...prev, enableAnalytics: checked }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t p-3">
-            <Label htmlFor="general-enable-version-check" className="text-sm">
-              {t(
-                'generalManagement.runtime.form.enableVersionCheck',
-                'Enable version check'
-              )}
-            </Label>
-            <Switch
-              id="general-enable-version-check"
-              checked={formData.enableVersionCheck}
-              onCheckedChange={(checked) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  enableVersionCheck: checked,
-                }))
-              }
-            />
-          </div>
-        </div>
-
-        <div className="rounded-lg border p-3">
-          <div className="space-y-1">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              <IconMessage className="h-4 w-4" />
-              {t('generalManagement.loginPrompt.title', 'Login Prompt')}
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              {t(
-                'generalManagement.loginPrompt.description',
-                'Show a custom operator message on the login fault page.'
-              )}
-            </p>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            <Label htmlFor="general-login-prompt">
-              {t('generalManagement.loginPrompt.form.message', 'Message')}
-            </Label>
-            <Textarea
-              id="general-login-prompt"
-              value={formData.loginPrompt}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  loginPrompt: e.target.value,
-                }))
-              }
-              placeholder={t(
-                'generalManagement.loginPrompt.form.placeholder',
-                'Leave empty to hide the login prompt'
-              )}
-            />
-          </div>
-        </div>
-
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={mutation.isPending}>
             {t('common.save', 'Save')}

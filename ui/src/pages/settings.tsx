@@ -31,7 +31,7 @@ export function SettingsPage() {
         tabs={[
           {
             value: 'general',
-            label: t('settings.tabs.general', 'General'),
+            label: t('settings.tabs.aiAgent', 'AI Agent'),
             content: <GeneralManagement />,
           },
           {

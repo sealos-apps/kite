@@ -140,7 +140,7 @@ make docs-build
 
 AI and terminal feature state is stored in the admin general settings record rather than plain environment variables:
 
-- `aiAgentEnabled`, `aiProvider`, `aiModel`, `aiApiKey`, `aiBaseUrl`, and `aiMaxTokens` configure the optional AI assistant.
+- `aiAgentEnabled`, `aiProvider`, `aiModel`, `aiApiKey`, `aiBaseUrl`, and `aiMaxTokens` configure the AI assistant. New installs enable the AI Agent UI by default, but chat requests still require a configured API key.
 - `kubectlEnabled`, `kubectlImage`, and `nodeTerminalImage` configure optional terminal helper pods.
 
 Sealos auth notes:
@@ -189,7 +189,8 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 ## AI Assistant Operations
 
-- The AI assistant is disabled until an admin enables it in general settings and provides an OpenAI-compatible or Anthropic-compatible provider configuration.
+- The AI assistant UI is enabled by default for new installs. Admins configure it from the first Settings tab, which only shows AI Agent settings.
+- Chat requests require an OpenAI-compatible or Anthropic-compatible provider configuration with an API key. If the API key is missing, the runtime treats AI as not enabled.
 - Read-only tools still use the current authenticated user, cluster, and namespace scope.
 - Mutating tools require both Kite RBAC and an explicit continue/confirmation step. Pending sessions are scoped to the same user and cluster.
 - If AI chat returns a disabled/provider error, check the general settings record, provider base URL, API key, and model name.

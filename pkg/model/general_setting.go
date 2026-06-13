@@ -12,6 +12,7 @@ const DefaultGeneralAIModel = "gpt-4o-mini"
 const DefaultGeneralAnthropicModel = "claude-sonnet-4-5"
 const DefaultGeneralKubectlImage = "zzde/kubectl:latest"
 const DefaultGeneralNodeTerminalImage = "busybox:latest"
+const DefaultGeneralAIAgentEnabled = true
 
 const GeneralAIProviderOpenAI = "openai"
 const GeneralAIProviderAnthropic = "anthropic"
@@ -27,7 +28,7 @@ func DefaultGeneralNodeTerminalImageValue() string {
 
 type GeneralSetting struct {
 	Model
-	AIAgentEnabled          bool         `json:"aiAgentEnabled" gorm:"column:ai_agent_enabled;type:boolean;not null;default:false"`
+	AIAgentEnabled          bool         `json:"aiAgentEnabled" gorm:"column:ai_agent_enabled;type:boolean;not null;default:true"`
 	AIProvider              string       `json:"aiProvider" gorm:"column:ai_provider;type:varchar(50);not null;default:'openai'"`
 	AIModel                 string       `json:"aiModel" gorm:"column:ai_model;type:varchar(255);not null;default:'gpt-4o-mini'"`
 	AIAPIKey                SecretString `json:"aiApiKey" gorm:"column:ai_api_key;type:text"`
@@ -107,18 +108,7 @@ func GetGeneralSetting() (*GeneralSetting, error) {
 		return nil, err
 	}
 
-	setting = GeneralSetting{
-		Model:              Model{ID: 1},
-		AIAgentEnabled:     false,
-		AIProvider:         DefaultGeneralAIProvider,
-		AIModel:            DefaultGeneralAIModel,
-		AIMaxTokens:        4096,
-		KubectlEnabled:     false,
-		KubectlImage:       DefaultGeneralKubectlImage,
-		NodeTerminalImage:  DefaultGeneralNodeTerminalImageValue(),
-		EnableAnalytics:    common.EnableAnalytics,
-		EnableVersionCheck: common.EnableVersionCheck,
-	}
+	setting = defaultGeneralSetting()
 	if err := DB.Create(&setting).Error; err != nil {
 		return nil, err
 	}
@@ -139,6 +129,21 @@ func UpdateGeneralSetting(updates map[string]interface{}) (*GeneralSetting, erro
 	}
 	applyRuntimeGeneralSetting(setting)
 	return setting, nil
+}
+
+func defaultGeneralSetting() GeneralSetting {
+	return GeneralSetting{
+		Model:              Model{ID: 1},
+		AIAgentEnabled:     DefaultGeneralAIAgentEnabled,
+		AIProvider:         DefaultGeneralAIProvider,
+		AIModel:            DefaultGeneralAIModel,
+		AIMaxTokens:        4096,
+		KubectlEnabled:     false,
+		KubectlImage:       DefaultGeneralKubectlImage,
+		NodeTerminalImage:  DefaultGeneralNodeTerminalImageValue(),
+		EnableAnalytics:    common.EnableAnalytics,
+		EnableVersionCheck: common.EnableVersionCheck,
+	}
 }
 
 func applyRuntimeGeneralSetting(setting *GeneralSetting) {
