@@ -76,8 +76,7 @@ export function defineMonacoBackgroundThemes(
 
 export function useMonacoBackgroundColor(
   variable: string,
-  themeMode: 'dark' | 'light',
-  _colorTheme: string
+  themeMode: 'dark' | 'light'
 ) {
   return getCssVariableColor(variable, themeMode === 'dark' ? '#18181b' : '#fff')
 }
