@@ -34,7 +34,7 @@ When `?iframe=true` is present, the app renders the route outlet without the sta
 | Route | Purpose |
 | --- | --- |
 | `/` and `/dashboard` | Cluster overview. |
-| `/settings` | Admin settings. The first tab is AI Agent-only configuration, followed by clusters, OAuth providers, RBAC, users, API keys, templates, and audit logs. |
+| `/settings` | Admin-only AI Agent settings page for enabling the assistant and configuring the model endpoint. |
 | `/crds/:crd` | Generic Custom Resource list page for a selected CRD. |
 | `/crds/:resource/:namespace/:name` | Namespaced Custom Resource detail page. |
 | `/crds/:resource/:name` | Cluster-scoped Custom Resource detail page. |

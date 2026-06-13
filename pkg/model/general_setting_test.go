@@ -3,7 +3,9 @@ package model
 import (
 	"testing"
 
+	"github.com/glebarez/sqlite"
 	"github.com/zxh326/kite/pkg/common"
+	"gorm.io/gorm"
 )
 
 func TestDefaultGeneralNodeTerminalImageValue(t *testing.T) {
@@ -27,6 +29,58 @@ func TestDefaultGeneralSettingEnablesAIAgent(t *testing.T) {
 	setting := defaultGeneralSetting()
 	if !setting.AIAgentEnabled {
 		t.Fatalf("defaultGeneralSetting().AIAgentEnabled = false, want true")
+	}
+	if !setting.AIAgentConfigured {
+		t.Fatalf("defaultGeneralSetting().AIAgentConfigured = false, want true")
+	}
+}
+
+func TestGetGeneralSettingUpgradesUnconfiguredAIAgentDefault(t *testing.T) {
+	useTestGeneralSettingDB(t)
+
+	legacySetting := defaultGeneralSetting()
+	if err := DB.Create(&legacySetting).Error; err != nil {
+		t.Fatalf("create legacy general setting: %v", err)
+	}
+	if err := DB.Model(&GeneralSetting{}).Where("id = ?", legacySetting.ID).Updates(map[string]interface{}{
+		"ai_agent_enabled":    false,
+		"ai_agent_configured": false,
+	}).Error; err != nil {
+		t.Fatalf("force legacy AI agent state: %v", err)
+	}
+
+	setting, err := GetGeneralSetting()
+	if err != nil {
+		t.Fatalf("GetGeneralSetting() error = %v", err)
+	}
+	if !setting.AIAgentEnabled {
+		t.Fatalf("GetGeneralSetting().AIAgentEnabled = false, want true")
+	}
+	if !setting.AIAgentConfigured {
+		t.Fatalf("GetGeneralSetting().AIAgentConfigured = false, want true")
+	}
+
+	var persisted GeneralSetting
+	if err := DB.First(&persisted, 1).Error; err != nil {
+		t.Fatalf("load persisted general setting: %v", err)
+	}
+	if !persisted.AIAgentEnabled {
+		t.Fatalf("persisted AIAgentEnabled = false, want true")
+	}
+	if !persisted.AIAgentConfigured {
+		t.Fatalf("persisted AIAgentConfigured = false, want true")
+	}
+}
+
+func TestUpdateGeneralSettingMarksAIAgentConfigured(t *testing.T) {
+	updates := map[string]interface{}{
+		"ai_agent_enabled": false,
+	}
+
+	markAIAgentConfigured(updates)
+
+	if configured, ok := updates["ai_agent_configured"].(bool); !ok || !configured {
+		t.Fatalf("ai_agent_configured = %#v, want true", updates["ai_agent_configured"])
 	}
 }
 
@@ -125,4 +179,20 @@ func TestApplyRuntimeGeneralSetting(t *testing.T) {
 	if !common.DisableVersionCheck {
 		t.Fatalf("nil setting changed DisableVersionCheck")
 	}
+}
+
+func useTestGeneralSettingDB(t *testing.T) {
+	t.Helper()
+	originalDB := DB
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open test database: %v", err)
+	}
+	if err := db.AutoMigrate(&GeneralSetting{}); err != nil {
+		t.Fatalf("migrate test database: %v", err)
+	}
+	DB = db
+	t.Cleanup(func() {
+		DB = originalDB
+	})
 }

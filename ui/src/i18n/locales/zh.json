@@ -923,20 +923,6 @@
       "nodeTerminalImageRequired": "节点终端镜像不能为空"
     }
   },
-  "settingsHint": {
-    "title": "完成设置",
-    "description": "配置基本设置以获得最佳体验",
-    "p8s": {
-      "description": "配置 Prometheus"
-    },
-    "oauth": {
-      "description": "设置 OAuth 提供商进行身份验证"
-    },
-    "rbac": {
-      "description": "配置角色和权限"
-    },
-    "viewAll": "查看所有设置"
-  },
   "clusterManagement": {
     "title": "集群管理",
     "actions": {

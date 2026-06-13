@@ -31,6 +31,7 @@ import {
   IconRoute,
   IconRouter,
   IconServer2,
+  IconSettings,
   IconShield,
   IconShieldCheck,
   IconStack2,
@@ -77,6 +78,7 @@ const iconMap = {
   IconCode,
   IconArrowsHorizontal,
   IconPackage,
+  IconSettings,
 }
 
 const getIconName = (iconComponent: React.ComponentType): string => {
@@ -148,7 +150,7 @@ const BUILTIN_CRD_NAMES = [
   'clusters.apps.kubeblocks.io',
 ] as const
 const BUILTIN_CRD_NAME_SET = new Set<string>(BUILTIN_CRD_NAMES)
-const ADMIN_ONLY_SIDEBAR_URLS = new Set<string>()
+const ADMIN_ONLY_SIDEBAR_URLS = new Set<string>(['/settings'])
 
 const buildBuiltinCRSidebarItems = (): SidebarItem[] =>
   BUILTIN_CRD_NAMES.map((crdName, index) => ({
@@ -328,6 +330,7 @@ const defaultMenus: DefaultMenus = {
   [APPLICATION_GROUP_KEY]: [
     { titleKey: 'nav.helmReleases', url: '/helmreleases', icon: IconPackage },
     { titleKey: 'nav.helmCharts', url: '/charts', icon: IconPackage },
+    { titleKey: 'settings.nav', url: '/settings', icon: IconSettings },
   ],
   'sidebar.groups.workloads': [
     { titleKey: 'nav.pods', url: '/pods', icon: IconBox },

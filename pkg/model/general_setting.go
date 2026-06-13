@@ -29,6 +29,7 @@ func DefaultGeneralNodeTerminalImageValue() string {
 type GeneralSetting struct {
 	Model
 	AIAgentEnabled          bool         `json:"aiAgentEnabled" gorm:"column:ai_agent_enabled;type:boolean;not null;default:true"`
+	AIAgentConfigured       bool         `json:"-" gorm:"column:ai_agent_configured;type:boolean;not null;default:false"`
 	AIProvider              string       `json:"aiProvider" gorm:"column:ai_provider;type:varchar(50);not null;default:'openai'"`
 	AIModel                 string       `json:"aiModel" gorm:"column:ai_model;type:varchar(255);not null;default:'gpt-4o-mini'"`
 	AIAPIKey                SecretString `json:"aiApiKey" gorm:"column:ai_api_key;type:text"`
@@ -73,6 +74,12 @@ func GetGeneralSetting() (*GeneralSetting, error) {
 	err := DB.First(&setting, 1).Error
 	if err == nil {
 		updates := map[string]interface{}{}
+		if !setting.AIAgentConfigured {
+			setting.AIAgentEnabled = DefaultGeneralAIAgentEnabled
+			setting.AIAgentConfigured = true
+			updates["ai_agent_enabled"] = DefaultGeneralAIAgentEnabled
+			updates["ai_agent_configured"] = true
+		}
 		if setting.AIProvider == "" {
 			setting.AIProvider = DefaultGeneralAIProvider
 			updates["ai_provider"] = DefaultGeneralAIProvider
@@ -121,6 +128,7 @@ func UpdateGeneralSetting(updates map[string]interface{}) (*GeneralSetting, erro
 	if err != nil {
 		return nil, err
 	}
+	markAIAgentConfigured(updates)
 	if err := DB.Model(setting).Updates(updates).Error; err != nil {
 		return nil, err
 	}
@@ -135,6 +143,7 @@ func defaultGeneralSetting() GeneralSetting {
 	return GeneralSetting{
 		Model:              Model{ID: 1},
 		AIAgentEnabled:     DefaultGeneralAIAgentEnabled,
+		AIAgentConfigured:  true,
 		AIProvider:         DefaultGeneralAIProvider,
 		AIModel:            DefaultGeneralAIModel,
 		AIMaxTokens:        4096,
@@ -143,6 +152,12 @@ func defaultGeneralSetting() GeneralSetting {
 		NodeTerminalImage:  DefaultGeneralNodeTerminalImageValue(),
 		EnableAnalytics:    common.EnableAnalytics,
 		EnableVersionCheck: common.EnableVersionCheck,
+	}
+}
+
+func markAIAgentConfigured(updates map[string]interface{}) {
+	if _, ok := updates["ai_agent_enabled"]; ok {
+		updates["ai_agent_configured"] = true
 	}
 }
 
