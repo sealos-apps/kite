@@ -55,9 +55,11 @@ Run from repo root unless noted:
 - AI resource mutation tools and Helm release operations are write-capable; keep their user-confirmation, rendered-manifest guard, namespace-scope checks, and RBAC gates intact.
 - Helm chart catalog read routes are available to authenticated users under `/api/v1/charts`; repository create/delete and other catalog management routes stay admin-only under `/api/v1/admin/charts`. Do not expose stored repository credentials in responses.
 - Kubectl terminal is disabled by default, admin-only, and requires a pre-created `kite-kubectl-admin` ServiceAccount in the agent namespace. Kite must not auto-create cluster-admin RBAC.
-- Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are intentional fork behavior.
+- Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, standalone/local dev bridge auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are all intentional fork behavior.
 
 ## Auth UI Product Decisions
 - `/login` is an operational fault page, not an interactive sign-in surface. Do not reintroduce username/password forms, OAuth provider buttons, or a dashboard sidebar there unless the product decision changes explicitly.
 - Auth/session failures should redirect to `/login?reason=<code>` and explain that the likely cause is server-side configuration, database, or authentication-service trouble. Keep the page standalone, use the real Kite logo asset, and keep the remediation copy operator-focused.
+- Sealos auth must not block solely because Kite is running as the top-level window. Standalone local development, including `sealos-app-dev-bridge`, should be allowed to attempt Sealos SDK auto-login first.
+- `/login` may show a small Sealos SDK availability notice when the SDK session channel is unavailable, but that notice is diagnostic-only and must not replace or block the auto-login attempt.
 - The interactive authentication APIs still exist (`/api/auth/login/password`, `/api/auth/login`, `/api/auth/callback`, `/api/auth/login/sealos`) for backend/session flows and admin-managed auth configuration.

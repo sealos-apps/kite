@@ -53,6 +53,13 @@ Kite runs `AutoMigrate` on startup. When `DB_AUTO_CREATE=true`, the service atte
 - `pkg/handlers/resources/helmrelease_handler.go` registers `helmreleases` as the canonical resource route, with a legacy `helmrelease` alias for compatibility. Helm install, upgrade, rollback, uninstall, and auto-upgrade pass through rendered-manifest authorization in `pkg/helmguard` before Helm writes resources.
 - `pkg/scheduler` runs background scheduled tasks such as Helm release auto-upgrade. Tasks reload their creator and due/enabled state before execution.
 
+## Sealos Compatibility Layer
+
+- `/api/auth/login/sealos` remains available when `SEALOS_AUTH_ENABLED=true`.
+- Sealos SDK auto-login is handled in the frontend auth context and stores the selected cluster in storage plus the `x-cluster-name` cookie/header.
+- The frontend does not reject Sealos auth just because it is running as the top-level window. This keeps standalone local development and tools such as `sealos-app-dev-bridge` on the same SDK auto-login path as iframe deployments.
+- `/login` may show a Sealos SDK availability notice when the SDK session channel is unavailable, but the notice is diagnostic-only and does not block the auto-login attempt.
+
 ## Static Assets And Base Path
 
 `KITE_BASE` configures a subpath deployment. The Go server redirects `/` to the base path when needed, injects the base into the built HTML, serves `/assets/*` with static caching, and returns the SPA entrypoint for non-API unknown routes.
