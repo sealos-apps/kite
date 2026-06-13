@@ -18,6 +18,10 @@ Run from repo root unless noted:
 - `make deps`: install frontend dependencies (`pnpm`) and download Go modules.
 - `make build`: build frontend static assets and backend binary (`./kite`).
 - `make dev`: run backend and Vite dev server together.
+  This target starts the backend with `DISABLE_CACHE=true` so local development
+  does not spin up controller-runtime informer caches for every saved cluster.
+  If a manual backend run is needed during development, set `DISABLE_CACHE=true`
+  unless cache behavior is the thing being tested.
 - `make run`: start the built backend binary.
 - `make lint`: run `go vet`, `golangci-lint`, and frontend ESLint.
 - `make format`: run `go fmt` and frontend Prettier.

@@ -14,6 +14,20 @@ make deps
 make dev
 ```
 
+`make dev` 启动后端时会带上 `DISABLE_CACHE=true`。本地开发默认走直接
+Kubernetes API client 路径，不为每个已保存集群启动 controller-runtime
+informer cache。若本地 CPU 飙高，先查后端进程：
+
+```bash
+ps -Ao pid,ppid,pcpu,pmem,etime,command | sort -nrk3 | head
+go tool pprof -top 'http://localhost:6060/debug/pprof/profile?seconds=10'
+```
+
+如果 profile 主要落在
+`sigs.k8s.io/controller-runtime/pkg/manager.(*runnableGroup).Start`，确认进程是
+通过 `make dev` 启动的，或本地手动运行 `./kite` 时显式设置
+`DISABLE_CACHE=true`。
+
 默认本地入口：
 
 - 后端：`http://localhost:8080`

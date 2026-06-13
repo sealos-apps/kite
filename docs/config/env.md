@@ -25,6 +25,10 @@ Kite supports several environment variables by default to change the default val
 - **ENABLE_ANALYTICS**: Enable data analytics functionality, default value is `false`. When enabled, Kite will collect limited data to help improve the product.
 
 - **PORT**: Port on which Kite runs, default value is `8080`.
+- **DISABLE_CACHE**: Set to `true` to use the direct Kubernetes API client
+  instead of the controller-runtime informer cache. `make dev` sets this by
+  default for local development to avoid high CPU when cached cluster clients
+  repeatedly fail to sync.
 
 Optional frontend environment variables (build-time):
 

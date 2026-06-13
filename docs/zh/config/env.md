@@ -25,6 +25,9 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 - **ENABLE_ANALYTICS**：启用数据分析功能，默认值为 `false`。当启用后，Kite 将收集有限数据以帮助改进产品。
 
 - **PORT**：Kite 运行的端口，默认值为 `8080`。
+- **DISABLE_CACHE**：设置为 `true` 时使用直接 Kubernetes API client，
+  不启动 controller-runtime informer cache。`make dev` 会在本地开发时默认设置
+  该变量，避免集群 client cache 反复同步失败时造成高 CPU。
 
 可选前端环境变量（构建时生效）：
 

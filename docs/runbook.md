@@ -14,6 +14,21 @@ Run backend and Vite together:
 make dev
 ```
 
+`make dev` starts the backend with `DISABLE_CACHE=true`. This keeps local
+development on the direct Kubernetes API client path instead of starting a
+controller-runtime informer cache for every saved cluster. If local CPU usage
+spikes, check the backend first:
+
+```bash
+ps -Ao pid,ppid,pcpu,pmem,etime,command | sort -nrk3 | head
+go tool pprof -top 'http://localhost:6060/debug/pprof/profile?seconds=10'
+```
+
+If the profile is dominated by
+`sigs.k8s.io/controller-runtime/pkg/manager.(*runnableGroup).Start`, make sure
+the process was started through `make dev` or set `DISABLE_CACHE=true` manually
+when running `./kite` for local development.
+
 Default local endpoints:
 
 - Backend: `http://localhost:8080`
