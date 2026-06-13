@@ -331,8 +331,6 @@
     "signInWithPassword": "Sign In with Password",
     "orContinueWith": "Or continue with",
     "signInWith": "Sign in with {{provider}}",
-    "sealosOnlyTitle": "Sealos Access Required",
-    "sealosOnlyDescription": "This instance is in Sealos login mode and cannot be used outside Sealos. Please open it from the Sealos app center.",
     "tryAgainDifferentAccount": "Try Again with Different Account",
     "tryAgainHint": "You can try logging in with a different account that has the required permissions.",
     "noLoginMethods": "No login methods configured",
@@ -342,6 +340,16 @@
     "sessionStatus": "Access session",
     "actionRequiredTitle": "Operator action required",
     "faultHint": "The login entry has been disabled. Ask an operator to fix the server-side issue, then refresh this page.",
+    "sealosSdkStatus": {
+      "checking": {
+        "title": "Checking Sealos session channel",
+        "description": "Kite is trying the Sealos Desktop SDK, including local bridge extensions, before falling back to this fault page."
+      },
+      "unavailable": {
+        "title": "Sealos session channel not detected",
+        "description": "Open from Sealos, sign in to Sealos Desktop, or enable the local dev bridge. This notice does not block bridge-based development."
+      }
+    },
     "operatorCheckTitle": "Suggested checks",
     "operatorCheckLabels": {
       "database": "Database",

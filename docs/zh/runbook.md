@@ -68,6 +68,12 @@ make docs-build
 - `AUTH_COOKIE_SAMESITE` 和 `AUTH_COOKIE_SECURE`：普通部署和 iframe 部署下的 Cookie 策略。
 - `VITE_SEALOS_AUTO_LOGIN`：构建期前端开关，控制是否自动尝试 Sealos SDK 会话登录。
 
+Sealos 认证说明：
+
+- Kite 不会仅因为应用以顶层窗口打开而阻断 Sealos 认证。`SEALOS_AUTH_ENABLED=true` 时，独立本地开发页面和 `sealos-app-dev-bridge` 仍会优先尝试 Sealos SDK 自动登录。
+- `/login` 可以在 SDK 会话通道不可用时展示非阻断的 Sealos SDK 可用性提示。它只是 Sealos Desktop 或 `sealos-app-dev-bridge` 的诊断线索，不是访问闸门。
+- 如果独立本地开发中的 Sealos 自动登录失败，先检查 bridge 或 Sealos Desktop 会话，再查看 `/api/auth/login/sealos` 响应和后端日志。
+
 ## 认证故障页
 
 `/login` 现在是运维故障页。客户看到该页时，应优先检查服务端状态，而不是要求客户手动登录。

@@ -357,8 +357,6 @@
     "signInWithPassword": "使用密码登录",
     "orContinueWith": "或继续使用",
     "signInWith": "使用 {{provider}} 登录",
-    "sealosOnlyTitle": "仅支持在 Sealos 内访问",
-    "sealosOnlyDescription": "当前实例已启用 Sealos 登录模式，不允许在 Sealos 外部使用。请从 Sealos 应用中心打开。",
     "tryAgainDifferentAccount": "尝试使用其他账户",
     "tryAgainHint": "您可以尝试使用具有所需权限的其他账户登录。",
     "noLoginMethods": "未配置登录方式",
@@ -368,6 +366,16 @@
     "sessionStatus": "访问会话",
     "actionRequiredTitle": "需要运维处理",
     "faultHint": "登录入口已关闭。请运维人员修复服务端问题后刷新页面。",
+    "sealosSdkStatus": {
+      "checking": {
+        "title": "正在检测 Sealos 会话通道",
+        "description": "Kite 正在尝试通过 Sealos Desktop SDK 获取会话，包括本地开发桥接插件，然后才展示此故障页。"
+      },
+      "unavailable": {
+        "title": "未检测到 Sealos 会话通道",
+        "description": "请从 Sealos 打开、登录 Sealos Desktop，或启用本地开发桥接插件。这个提示不会阻挡 bridge 开发。"
+      }
+    },
     "operatorCheckTitle": "建议检查",
     "operatorCheckLabels": {
       "database": "数据库",

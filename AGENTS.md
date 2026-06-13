@@ -50,8 +50,11 @@ Run from repo root unless noted:
 - Do not commit kubeconfig files, tokens, or other secrets.
 - Review `SECURITY.md` before reporting or handling vulnerabilities.
 - Never execute database write operations unless explicitly requested.
+- Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, standalone/local dev bridge auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are all intentional fork behavior.
 
 ## Auth UI Product Decisions
 - `/login` is an operational fault page, not an interactive sign-in surface. Do not reintroduce username/password forms, OAuth provider buttons, or a dashboard sidebar there unless the product decision changes explicitly.
 - Auth/session failures should redirect to `/login?reason=<code>` and explain that the likely cause is server-side configuration, database, or authentication-service trouble. Keep the page standalone, use the real Kite logo asset, and keep the remediation copy operator-focused.
+- Sealos auth must not block solely because Kite is running as the top-level window. Standalone local development, including `sealos-app-dev-bridge`, should be allowed to attempt Sealos SDK auto-login first.
+- `/login` may show a small Sealos SDK availability notice when the SDK session channel is unavailable, but that notice is diagnostic-only and must not replace or block the auto-login attempt.
 - The interactive authentication APIs still exist (`/api/auth/login/password`, `/api/auth/login`, `/api/auth/callback`, `/api/auth/login/sealos`) for backend/session flows and admin-managed auth configuration.

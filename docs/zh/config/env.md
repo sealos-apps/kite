@@ -28,4 +28,4 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 
 可选前端环境变量（构建时生效）：
 
-- **VITE_SEALOS_AUTO_LOGIN**：`true` 或 `false`，控制前端是否自动尝试 Sealos SDK 会话登录，默认 `true`。
+- **VITE_SEALOS_AUTO_LOGIN**：`true` 或 `false`，控制前端是否自动尝试 Sealos SDK 会话登录，默认 `true`。Sealos 自动登录同时允许 iframe 部署和顶层独立/本地开发窗口，包括通过 `sealos-app-dev-bridge` 使用的场景；`/login` 上的 SDK 可用性提示仅用于诊断，不会阻断自动登录尝试。

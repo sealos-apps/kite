@@ -45,6 +45,13 @@ Kite runs `AutoMigrate` on startup. When `DB_AUTO_CREATE=true`, the service atte
 - Custom Resources are handled through `pkg/handlers/resources/cr_handler.go` and frontend routes under `/crds/...`.
 - Search, logs, web terminal, node terminal, image tags, templates, Prometheus metrics, and proxy routes are registered under `/api/v1`.
 
+## Sealos Compatibility Layer
+
+- `/api/auth/login/sealos` remains available when `SEALOS_AUTH_ENABLED=true`.
+- Sealos SDK auto-login is handled in the frontend auth context and stores the selected cluster in storage plus the `x-cluster-name` cookie/header.
+- The frontend does not reject Sealos auth just because it is running as the top-level window. This keeps standalone local development and tools such as `sealos-app-dev-bridge` on the same SDK auto-login path as iframe deployments.
+- `/login` may show a Sealos SDK availability notice when the SDK session channel is unavailable, but the notice is diagnostic-only and does not block the auto-login attempt.
+
 ## Static Assets And Base Path
 
 `KITE_BASE` configures a subpath deployment. The Go server redirects `/` to the base path when needed, injects the base into the built HTML, serves `/assets/*` with static caching, and returns the SPA entrypoint for non-API unknown routes.
