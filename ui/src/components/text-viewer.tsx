@@ -9,12 +9,14 @@ interface TextViewerProps {
   value: string
   title?: string
   className?: string
+  fillHeight?: boolean
 }
 
 export function TextViewer({
   value,
   title = 'Text',
   className,
+  fillHeight = false,
 }: TextViewerProps) {
   const [editorValue, setEditorValue] = useState(value)
   const { actualTheme } = useAppearance()
@@ -39,7 +41,13 @@ export function TextViewer({
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <div className="overflow-hidden h-[calc(100vh-300px)]">
+          <div
+            className={
+              fillHeight
+                ? 'h-full min-h-[24rem] overflow-hidden'
+                : 'h-[calc(100vh-300px)] overflow-hidden'
+            }
+          >
             <Editor
               language="yaml"
               theme={actualTheme === 'dark' ? 'custom-dark' : 'custom-vs'}

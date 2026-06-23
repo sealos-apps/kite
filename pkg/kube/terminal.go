@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
-	"golang.org/x/net/websocket"
+	"github.com/zxh326/kite/pkg/common"
+	"github.com/zxh326/kite/pkg/wsutil"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
@@ -17,7 +17,7 @@ const EndOfTransmission = "\u0004"
 
 // TerminalMessage represents messages sent over the WebSocket
 type TerminalMessage struct {
-	Type string `json:"type"` // "stdin", "resize", "ping"
+	Type string `json:"type"`
 	Data string `json:"data"`
 	Rows uint16 `json:"rows,omitempty"`
 	Cols uint16 `json:"cols,omitempty"`
@@ -26,16 +26,14 @@ type TerminalMessage struct {
 // TerminalSession manages a WebSocket connection for terminal communication
 type TerminalSession struct {
 	k8sClient *K8sClient
-	conn      *websocket.Conn
+	conn      *wsutil.Conn
 	sizeChan  chan *remotecommand.TerminalSize
 	namespace string
 	podName   string
 	container string
-
-	lastHeartbeat time.Time // Track last heartbeat for ping/pong
 }
 
-func NewTerminalSession(client *K8sClient, conn *websocket.Conn, namespace, podName, container string) *TerminalSession {
+func NewTerminalSession(client *K8sClient, conn *wsutil.Conn, namespace, podName, container string) *TerminalSession {
 	return &TerminalSession{
 		k8sClient: client,
 		conn:      conn,
@@ -48,7 +46,7 @@ func NewTerminalSession(client *K8sClient, conn *websocket.Conn, namespace, podN
 
 func (session *TerminalSession) Start(ctx context.Context, subResource string) error {
 	req := session.k8sClient.ClientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
+		Resource(string(common.Pods)).
 		Name(session.podName).
 		Namespace(session.namespace).
 		SubResource(subResource)
@@ -75,7 +73,6 @@ func (session *TerminalSession) Start(ctx context.Context, subResource string) e
 	// Send initial connection success message
 	session.SendMessage("connected", "Terminal connected successfully")
 
-	go session.checkHeartbeat(ctx)
 	// Start the exec session
 	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:             session,
@@ -94,15 +91,12 @@ func (session *TerminalSession) Start(ctx context.Context, subResource string) e
 }
 
 func (session *TerminalSession) Close() {
-	if err := session.conn.Close(); err != nil {
-		klog.Errorf("WebSocket close error %s: %v", session.conn.RemoteAddr(), err)
-	}
 	close(session.sizeChan)
 }
 
 func (session *TerminalSession) Read(p []byte) (int, error) {
 	var msg TerminalMessage
-	err := websocket.JSON.Receive(session.conn, &msg)
+	err := session.conn.ReadJSON(&msg)
 	if err != nil {
 		return copy(p, EndOfTransmission), err
 	}
@@ -121,9 +115,6 @@ func (session *TerminalSession) Read(p []byte) (int, error) {
 			default:
 			}
 		}
-	case "ping":
-		session.lastHeartbeat = time.Now()
-		session.SendMessage("pong", "")
 	default:
 		return copy(p, EndOfTransmission), fmt.Errorf("unknown message type: %s", msg.Type)
 	}
@@ -131,11 +122,7 @@ func (session *TerminalSession) Read(p []byte) (int, error) {
 }
 
 func (session *TerminalSession) Write(p []byte) (int, error) {
-	msg := TerminalMessage{
-		Type: "stdout",
-		Data: string(p),
-	}
-	err := websocket.JSON.Send(session.conn, msg)
+	err := wsutil.SendMessage(session.conn, "stdout", string(p))
 	if err != nil {
 		log.Printf("Write stdout error: %v", err)
 		return 0, err
@@ -148,36 +135,11 @@ func (session *TerminalSession) Next() *remotecommand.TerminalSize {
 }
 
 func (session *TerminalSession) SendMessage(msgType, data string) {
-	msg := TerminalMessage{
-		Type: msgType,
-		Data: data,
-	}
-	err := websocket.JSON.Send(session.conn, msg)
-	if err != nil {
+	if err := wsutil.SendMessage(session.conn, msgType, data); err != nil {
 		klog.Errorf("Send message error: %v", err)
 	}
 }
 
 func (session *TerminalSession) SendErrorMessage(errMsg string) {
-	session.SendMessage("error", errMsg)
-}
-
-func (session *TerminalSession) checkHeartbeat(ctx context.Context) {
-	session.lastHeartbeat = time.Now()
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if time.Since(session.lastHeartbeat) > 1*time.Minute {
-				if err := session.conn.Close(); err != nil {
-					klog.Errorf("WebSocket close error: %v", err)
-				}
-				return
-			}
-		}
-	}
+	wsutil.SendErrorMessage(session.conn, errMsg)
 }

@@ -6,6 +6,7 @@ import * as yaml from 'js-yaml'
 import { editor as monacoEditor } from 'monaco-editor'
 
 import { ResourceType, ResourceTypeMap } from '@/types/api'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -32,6 +33,8 @@ interface YamlEditorProps<T extends ResourceType> {
   isSaving?: boolean
   /** Custom class name for the card */
   className?: string
+  /** Fill the parent height instead of using the default viewport-based height */
+  fillHeight?: boolean
 }
 
 export function YamlEditor<T extends ResourceType>({
@@ -44,6 +47,7 @@ export function YamlEditor<T extends ResourceType>({
   onCancel,
   isSaving = false,
   className,
+  fillHeight = false,
 }: YamlEditorProps<T>) {
   const [isEditing, setIsEditing] = useState(true)
   const [editorValue, setEditorValue] = useState(value)
@@ -136,7 +140,9 @@ export function YamlEditor<T extends ResourceType>({
   const effectiveReadOnly = readOnly || !isEditing
 
   return (
-    <Card className={className}>
+    <Card
+      className={cn(className, fillHeight && 'flex min-h-0 flex-1 flex-col')}
+    >
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="space-y-1">
           <CardTitle>{title}</CardTitle>
@@ -183,14 +189,24 @@ export function YamlEditor<T extends ResourceType>({
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
+      <CardContent className={fillHeight ? 'min-h-0 flex-1' : undefined}>
+        <div
+          className={
+            fillHeight ? 'flex h-full min-h-0 flex-col gap-2' : 'space-y-2'
+          }
+        >
           {!isValidYaml && validationError && (
             <div className="px-3 py-2 bg-destructive/10 border border-destructive/20 rounded-md">
               <p className="text-sm text-destructive">{validationError}</p>
             </div>
           )}
-          <div className="overflow-hidden h-[calc(100vh-300px)]">
+          <div
+            className={
+              fillHeight
+                ? 'min-h-0 flex-1 overflow-hidden'
+                : 'h-[calc(100vh-300px)] overflow-hidden'
+            }
+          >
             <Editor
               key={`yaml-editor-${colorTheme}-${actualTheme}`} // Force remount on theme change
               language="yaml"

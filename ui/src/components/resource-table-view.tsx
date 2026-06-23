@@ -38,6 +38,9 @@ interface ResourceTableViewProps<T> {
   searchQuery: string
   pagination: PaginationState
   setPagination: React.Dispatch<React.SetStateAction<PaginationState>>
+  fitViewportHeight?: boolean
+  shrinkFirstColumn?: boolean
+  showAllPageSize?: boolean
 }
 
 export function ResourceTableView<T>({
@@ -55,6 +58,8 @@ export function ResourceTableView<T>({
   searchQuery,
   pagination,
   setPagination,
+  fitViewportHeight = false,
+  showAllPageSize = true,
 }: ResourceTableViewProps<T>) {
   const { t } = useTranslation()
 
@@ -88,7 +93,10 @@ export function ResourceTableView<T>({
   }
 
   const dataLength = data?.length ?? 0
-  const resolvedAllPageSize = allPageSize ?? dataLength
+  const resolvedAllPageSize = showAllPageSize ? allPageSize ?? dataLength : 0
+  const bodyHeightClassName = fitViewportHeight
+    ? 'max-h-[calc(100vh-260px)]'
+    : maxBodyHeightClassName
 
   return (
     <div className={containerClassName}>
@@ -100,7 +108,7 @@ export function ResourceTableView<T>({
         >
           {emptyState || (
             <div
-              className={`relative ${maxBodyHeightClassName} overflow-auto scrollbar-hide`}
+              className={`relative ${bodyHeightClassName} overflow-auto scrollbar-hide`}
             >
               <Table>
                 <TableHeader className="bg-muted">

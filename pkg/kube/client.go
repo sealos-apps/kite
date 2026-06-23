@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,17 +23,68 @@ import (
 	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	gatewayapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 var runtimeScheme = runtime.NewScheme()
 
+const cacheSyncTimeout = 10 * time.Second
+
 func init() {
-	ctrllog.SetLogger(klog.NewKlogr())
+	ctrllog.SetLogger(controllerRuntimeLogger(klog.NewKlogr()))
 	_ = scheme.AddToScheme(runtimeScheme)
 	_ = apiextensionsv1.AddToScheme(runtimeScheme)
 	_ = gatewayapiv1.Install(runtimeScheme)
 	_ = metricsv1.AddToScheme(runtimeScheme)
+}
+
+func controllerRuntimeLogger(logger logr.Logger) logr.Logger {
+	return logr.New(controllerRuntimeLogSink{sink: logger.GetSink()})
+}
+
+type controllerRuntimeLogSink struct {
+	sink logr.LogSink
+}
+
+func (l controllerRuntimeLogSink) Init(info logr.RuntimeInfo) {
+	l.sink.Init(info)
+}
+
+func (l controllerRuntimeLogSink) Enabled(level int) bool {
+	return klog.V(2).Enabled() && l.sink.Enabled(level)
+}
+
+func (l controllerRuntimeLogSink) Info(level int, msg string, keysAndValues ...any) {
+	if !klog.V(2).Enabled() {
+		return
+	}
+	l.sink.Info(level, msg, keysAndValues...)
+}
+
+func (l controllerRuntimeLogSink) Error(err error, msg string, keysAndValues ...any) {
+	if !klog.V(2).Enabled() {
+		return
+	}
+	l.sink.Error(err, msg, keysAndValues...)
+}
+
+func (l controllerRuntimeLogSink) WithValues(keysAndValues ...any) logr.LogSink {
+	l.sink = l.sink.WithValues(keysAndValues...)
+	return l
+}
+
+func (l controllerRuntimeLogSink) WithName(name string) logr.LogSink {
+	l.sink = l.sink.WithName(name)
+	return l
+}
+
+func (l controllerRuntimeLogSink) WithCallDepth(depth int) logr.LogSink {
+	if sink, ok := l.sink.(logr.CallDepthLogSink); ok {
+		l.sink = sink.WithCallDepth(depth)
+	}
+	return l
 }
 
 // K8sClient holds the Kubernetes client instances
@@ -42,10 +93,9 @@ type K8sClient struct {
 	ClientSet     *kubernetes.Clientset
 	Configuration *rest.Config
 	MetricsClient *metricsclient.Clientset
+	CacheEnabled  bool // true when using controller-runtime informer cache
 
 	cancel context.CancelFunc
-	done   <-chan struct{}
-	once   sync.Once
 }
 
 // NewClient creates a K8sClient from a rest.Config
@@ -61,107 +111,57 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
-	newDirectClient := func() (client.Client, error) {
-		return client.New(config, client.Options{
-			Scheme: runtimeScheme,
-		})
-	}
+	cacheEnabled := os.Getenv("DISABLE_CACHE") != "true"
 
 	var c client.Client
-	var done <-chan struct{}
-	if os.Getenv("DISABLE_CACHE") == "true" {
-		c, err = newDirectClient()
+	if !cacheEnabled {
+		c, err = client.New(config, client.Options{
+			Scheme: runtimeScheme,
+		})
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 	} else {
-		k8sCache, err := cache.New(config, cache.Options{
-			Scheme: runtimeScheme,
-			DefaultWatchErrorHandler: func(ctx context.Context, r *toolscache.Reflector, err error) {
+		mgr, err := manager.New(config, manager.Options{
+			Scheme:         runtimeScheme,
+			LeaderElection: false,
+			Metrics: metricsserver.Options{
+				BindAddress: "0", // Disable metrics server
+			},
+			Cache: cache.Options{
+				DefaultWatchErrorHandler: func(ctx context.Context, r *toolscache.Reflector, err error) {
+				},
 			},
 		})
 		if err != nil {
-			klog.Warningf("failed to create k8s cache, falling back to direct client: %v", err)
-			c, err = newDirectClient()
-			if err != nil {
-				cancel()
-				return nil, fmt.Errorf("failed to create fallback direct client: %w", err)
-			}
-			return &K8sClient{
-				Client:        c,
-				ClientSet:     clientset,
-				Configuration: config,
-				MetricsClient: metricsClient,
-				cancel:        cancel,
-			}, nil
+			cancel()
+			return nil, err
 		}
 
 		// Add field indexer for Pod spec.nodeName to enable efficient querying by node
-		if err := k8sCache.IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
 			pod := rawObj.(*corev1.Pod)
 			if pod.Spec.NodeName == "" {
 				return nil
 			}
 			return []string{pod.Spec.NodeName}
 		}); err != nil {
-			klog.Warningf("failed to create field indexer, falling back to direct client: %v", err)
 			cancel()
-			ctx, cancel = context.WithCancel(context.Background())
-			c, err = newDirectClient()
-			if err != nil {
-				cancel()
-				return nil, fmt.Errorf("failed to create fallback direct client: %w", err)
-			}
-			return &K8sClient{
-				Client:        c,
-				ClientSet:     clientset,
-				Configuration: config,
-				MetricsClient: metricsClient,
-				cancel:        cancel,
-			}, nil
+			return nil, fmt.Errorf("failed to create field indexer for spec.nodeName: %w", err)
 		}
-
-		cacheDone := make(chan struct{})
 		go func() {
-			defer close(cacheDone)
-			if err := k8sCache.Start(ctx); err != nil {
-				klog.Warningf("failed to run k8s cache: %v", err)
+			if err := mgr.Start(ctx); err != nil {
+				fmt.Printf("Error starting manager: %v\n", err)
 			}
 		}()
-		cacheSyncCtx, cacheSyncCancel := context.WithTimeout(ctx, 8*time.Second)
-		defer cacheSyncCancel()
-		if !k8sCache.WaitForCacheSync(cacheSyncCtx) {
-			klog.Warningf("failed to sync cached client within timeout, falling back to direct client")
+		syncCtx, syncCancel := context.WithTimeout(ctx, cacheSyncTimeout)
+		defer syncCancel()
+		if !mgr.GetCache().WaitForCacheSync(syncCtx) {
 			cancel()
-			waitForCacheStop(cacheDone)
-			ctx, cancel = context.WithCancel(context.Background())
-			c, err = newDirectClient()
-			if err != nil {
-				cancel()
-				return nil, fmt.Errorf("failed to create fallback direct client: %w", err)
-			}
-			return &K8sClient{
-				Client:        c,
-				ClientSet:     clientset,
-				Configuration: config,
-				MetricsClient: metricsClient,
-				cancel:        cancel,
-			}, nil
+			return nil, fmt.Errorf("failed to wait for cache sync")
 		}
-		c, err = client.New(config, client.Options{
-			Scheme: runtimeScheme,
-			Cache: &client.CacheOptions{
-				Reader: k8sCache,
-			},
-		})
-		if err != nil {
-			cancel()
-			waitForCacheStop(cacheDone)
-			return nil, fmt.Errorf("failed to create cached client: %w", err)
-		}
-		done = cacheDone
+		c = mgr.GetClient()
 	}
 
 	return &K8sClient{
@@ -169,29 +169,14 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 		ClientSet:     clientset,
 		Configuration: config,
 		MetricsClient: metricsClient,
+		CacheEnabled:  cacheEnabled,
 		cancel:        cancel,
-		done:          done,
 	}, nil
 }
 
 func (c *K8sClient) Stop(name string) {
 	klog.Infof("Stopping K8s client for %s", name)
-	c.once.Do(func() {
-		c.cancel()
-		waitForCacheStop(c.done)
-	})
-}
-
-func waitForCacheStop(done <-chan struct{}) {
-	if done == nil {
-		return
-	}
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		klog.Warningf("timed out waiting for k8s cache to stop")
-	}
+	c.cancel()
 }
 
 // GetScheme returns the runtime scheme used by the client

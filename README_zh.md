@@ -6,7 +6,7 @@
 
 _一个现代化、直观的 Kubernetes Dashboard_
 
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![React](https://img.shields.io/badge/React-19+-61DAFB?style=flat&logo=react)](https://reactjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/License-Apache-green.svg)](LICENSE)
@@ -51,15 +51,17 @@ _全面的集群概览，包含实时指标和资源统计_
 - 🏷️ **镜像标签快速选择器** - 基于 Docker 和容器镜像仓库 API，轻松选择和更改容器镜像标签
 - 🎨 **自定义侧边栏** - 自定义侧边栏的可见性和顺序，并添加 CRD 以方便快速访问
 - 🔌 **Kube Proxy** - 通过 Kite 直接访问 Pods 或 Services，无需 `kubectl port-forward`
+- 📦 **Helm 管理** - 浏览管理员登记的 Chart 仓库，安装 Chart，查看 Release，dry-run 升级、回滚并管理历史记录
 
 ### 📈 **监控与可观测性**
 
 - 📊 **实时指标** - 由 Prometheus 驱动的 CPU、内存、磁盘 I/O 和网络使用情况图表
 - 📋 **集群概览** - 全面的集群健康状况和资源统计仪表板
 - 📝 **实时日志** - 实时流式传输 Pod 日志，支持过滤和搜索
-- 💻 **网页终端** - 直接在浏览器中进入 Pod/Node 执行命令
+- 💻 **Pod/Node/Kubectl 终端** - 直接在浏览器中进入 Pod、Node，或使用由运维启用的 kubectl 会话
 - 📈 **节点监控** - 详细的节点级别性能指标和利用率
 - 📊 **Pod 监控** - 单个 Pod 资源使用情况和性能跟踪
+- 🤖 **AI 助手** - 可选的 OpenAI/Anthropic compatible 聊天面板，支持集群巡检、日志、Prometheus 查询和需确认的资源操作
 
 ### 🔐 **安全**
 

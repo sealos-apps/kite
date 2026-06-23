@@ -177,7 +177,7 @@ func (h *CRHandler) List(c *gin.Context) {
 	// Handle namespace parameter for namespaced resources
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		namespace := c.Param("namespace")
-		if namespace != "" && namespace != "_all" {
+		if namespace != "" && namespace != common.AllNamespaces {
 			opts.Namespace = namespace
 		}
 	}
@@ -228,7 +228,7 @@ func (h *CRHandler) Get(c *gin.Context) {
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		namespace := c.Param("namespace")
 		// Handle both regular namespace and _all routing
-		if namespace == "_all" {
+		if namespace == common.AllNamespaces {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace/:name endpoint"})
 			return
 		}
@@ -300,7 +300,7 @@ func (h *CRHandler) Create(c *gin.Context) {
 	// Set namespace for namespaced resources
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		namespace := c.Param("namespace")
-		if namespace == "_all" {
+		if namespace == common.AllNamespaces {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace endpoint"})
 			return
 		}
@@ -364,7 +364,7 @@ func (h *CRHandler) Update(c *gin.Context) {
 	var namespacedName types.NamespacedName
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		namespace := c.Param("namespace")
-		if namespace == "_all" {
+		if namespace == common.AllNamespaces {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace/:name endpoint"})
 			return
 		}
@@ -442,7 +442,7 @@ func (h *CRHandler) ListHistory(c *gin.Context) {
 		return
 	}
 
-	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped && (namespace == "" || namespace == "_all") {
+	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped && (namespace == "" || namespace == common.AllNamespaces) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace is required for namespaced custom resources"})
 		return
 	}
@@ -465,7 +465,7 @@ func (h *CRHandler) ListHistory(c *gin.Context) {
 		if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 			return query.Where("namespace = ?", namespace)
 		}
-		return query.Where("namespace IN ?", []string{"", "_all"})
+		return query.Where("namespace IN ?", []string{"", common.AllNamespaces})
 	}
 
 	var total int64
@@ -533,7 +533,7 @@ func (h *CRHandler) Delete(c *gin.Context) {
 	var namespacedName types.NamespacedName
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		namespace := c.Param("namespace")
-		if namespace == "_all" {
+		if namespace == common.AllNamespaces {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace/:name endpoint"})
 			return
 		}

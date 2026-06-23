@@ -47,7 +47,7 @@ Follow the official documentation for each component for detailed installation i
 
 ## Connecting Kite to Prometheus
 
-Users with the **admin** role can access the settings entry in the upper right corner of the page to enter the cluster management interface.
+The current Kite app shell does not expose cluster management from the visible Settings page. Configure the Prometheus address through cluster administrator tooling or the admin cluster API.
 
 Select the cluster that needs to be configured and fill in the Prometheus address.
 

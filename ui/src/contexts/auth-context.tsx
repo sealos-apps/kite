@@ -12,15 +12,17 @@ import i18n from '@/i18n'
 import { useQueryClient } from '@tanstack/react-query'
 import * as sealosDesktopSDK from 'sealos-desktop-sdk/app'
 
+import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
 import {
   CURRENT_CLUSTER_CHANGE_EVENT,
   readCurrentCluster,
   writeCurrentCluster,
 } from '@/lib/current-cluster'
-import { readAuthToken, writeAuthToken } from '@/lib/auth-token'
 import { withSubPath } from '@/lib/subpath'
 
 interface UserCapabilities {
+  aiEnabled?: boolean
+  kubectlEnabled?: boolean
   canCreateCustomCRDGroup?: boolean
 }
 
@@ -48,6 +50,10 @@ interface AuthContextType {
   isLoading: boolean
   sealosSdkAccessStatus: SealosSdkAccessStatus
   providers: string[]
+  capabilities: Required<
+    Pick<UserCapabilities, 'aiEnabled' | 'kubectlEnabled'>
+  > &
+    Pick<UserCapabilities, 'canCreateCustomCRDGroup'>
   login: (provider?: string) => Promise<void>
   loginWithPassword: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -109,6 +115,10 @@ interface SealosSessionResult {
 
 const SEALOS_PROVIDER = 'sealos'
 const SEALOS_LANGUAGE_CHANGED_EVENT = 'change_i18n'
+const DEFAULT_CAPABILITIES = {
+  aiEnabled: false,
+  kubectlEnabled: false,
+}
 
 const getEnvFlag = (value: string | undefined): boolean | null => {
   if (value === 'true') return true
@@ -703,6 +713,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     sealosSdkAccessStatus,
     providers,
+    capabilities: {
+      ...DEFAULT_CAPABILITIES,
+      ...user?.capabilities,
+    },
     login,
     loginWithPassword,
     logout,

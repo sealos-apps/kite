@@ -12,7 +12,7 @@ on:
     types: [opened, synchronize, reopened]
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   NODE_VERSION: '24'
   LOCAL_REGISTRY: '127.0.0.1:5000/kite-pr'
 

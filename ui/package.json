@@ -50,11 +50,13 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-i18next": "^16.5.2",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.12.0",
     "recharts": "2.15.4",
+    "remark-gfm": "^4.0.1",
     "sealos-desktop-sdk": "0.1.14",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.0",
+    "tailwind-merge": "^2.6.0",
     "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
@@ -80,5 +82,10 @@
     "typescript-eslint": "^8.52.0",
     "vite": "^7.3.1",
     "vite-plugin-dynamic-base": "^1.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

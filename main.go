@@ -19,14 +19,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zxh326/kite/internal"
+	"github.com/zxh326/kite/pkg/ai"
 	"github.com/zxh326/kite/pkg/auth"
 	"github.com/zxh326/kite/pkg/cluster"
 	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/handlers"
 	"github.com/zxh326/kite/pkg/handlers/resources"
+	"github.com/zxh326/kite/pkg/helm"
 	"github.com/zxh326/kite/pkg/middleware"
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/rbac"
+	"github.com/zxh326/kite/pkg/scheduler"
+	"github.com/zxh326/kite/pkg/terminal"
 	"github.com/zxh326/kite/pkg/utils"
 	"github.com/zxh326/kite/pkg/version"
 	"k8s.io/klog/v2"
@@ -96,6 +100,7 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 	r.GET("/api/v1/version", version.GetVersion)
 	// Auth routes (no auth required)
 	authHandler := auth.NewAuthHandler(cm)
+	helmChartsHandler := helm.NewHelmChartHandler()
 	authGroup := r.Group("/api/auth")
 	{
 		authGroup.GET("/providers", authHandler.GetProviders)
@@ -174,6 +179,14 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 			templateAPI.PUT("/:id", handlers.UpdateTemplate)
 			templateAPI.DELETE("/:id", handlers.DeleteTemplate)
 		}
+
+		generalSettingAPI := adminAPI.Group("/general-setting")
+		{
+			generalSettingAPI.GET("/", ai.HandleGetGeneralSetting)
+			generalSettingAPI.PUT("/", ai.HandleUpdateGeneralSetting)
+		}
+
+		helmChartsHandler.RegisterAdminRoutes(adminAPI)
 	}
 
 	// API routes group (protected)
@@ -196,6 +209,9 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 		nodeTerminalHandler := handlers.NewNodeTerminalHandler()
 		api.GET("/node-terminal/:nodeName/ws", nodeTerminalHandler.HandleNodeTerminalWebSocket)
 
+		kubectlTerminalHandler := terminal.NewKubectlTerminalHandler()
+		api.GET("/kubectl-terminal/ws", kubectlTerminalHandler.HandleKubectlTerminalWebSocket)
+
 		searchHandler := handlers.NewSearchHandler()
 		api.GET("/search", searchHandler.GlobalSearch)
 
@@ -208,6 +224,11 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 
 		proxyHandler := handlers.NewProxyHandler()
 		proxyHandler.RegisterRoutes(api)
+
+		api.POST("/ai/chat", ai.HandleChat)
+		api.POST("/ai/execute/continue", ai.HandleExecuteContinue)
+		api.POST("/ai/input/continue", ai.HandleInputContinue)
+		helmChartsHandler.RegisterRoutes(api)
 
 		api.Use(middleware.RBACMiddleware())
 		resources.RegisterRoutes(api)
@@ -236,6 +257,9 @@ func main() {
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS())
 	model.InitDB()
+	if _, err := model.GetGeneralSetting(); err != nil {
+		log.Fatalf("Failed to initialize general setting: %v", err)
+	}
 	if rows, err := auth.SyncSealosPrometheusDefaults(); err != nil {
 		klog.Warningf("Failed to sync default Prometheus URL for Sealos clusters: %v", err)
 	} else if rows > 0 {
@@ -249,6 +273,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create ClusterManager: %v", err)
 	}
+	appCtx, cancelApp := context.WithCancel(context.Background())
+	defer cancelApp()
+	scheduler.Start(appCtx, cm)
 
 	base := r.Group(common.Base)
 	// Setup router

@@ -48,7 +48,118 @@
     "disabled": "Disabled",
     "enabled": "Enabled",
     "update": "Update",
-    "all": "All"
+    "all": "All",
+    "fields": {
+      "actions": "Actions",
+      "active": "Active",
+      "age": "Age",
+      "allContainers": "All containers",
+      "annotations": "Annotations",
+      "available": "Available",
+      "chatHistory": "Chat history",
+      "clusterIP": "Cluster IP",
+      "completed": "Completed",
+      "container": "Container",
+      "containers": "Containers",
+      "cpu": "CPU",
+      "created": "Created",
+      "current": "Current",
+      "currentRevision": "Current revision",
+      "description": "Description",
+      "desired": "Desired",
+      "details": "Details",
+      "env": "Environment",
+      "envFrom": "Environment sources",
+      "error": "Error",
+      "errorDetails": "Error details",
+      "externalIP": "External IP",
+      "failed": "Failed",
+      "from": "From",
+      "images": "Images",
+      "information": "Information",
+      "job": "Job",
+      "jobs": "Jobs",
+      "labels": "Labels",
+      "maxSurge": "Max surge",
+      "maxUnavailable": "Max unavailable",
+      "memory": "Memory",
+      "message": "Message",
+      "minReadySeconds": "Min ready seconds",
+      "mounts": "Mounts",
+      "name": "Name",
+      "namespace": "Namespace",
+      "node": "Node",
+      "observedGeneration": "Observed generation",
+      "owner": "Owner",
+      "password": "Password",
+      "paused": "Paused",
+      "persistentVolumeClaims": "Persistent volume claims",
+      "podIP": "Pod IP",
+      "pods": "Pods",
+      "ports": "Ports",
+      "progressDeadline": "Progress deadline",
+      "ready": "Ready",
+      "reason": "Reason",
+      "relatedResources": "Related resources",
+      "replicas": "Replicas",
+      "resourceVersion": "Resource version",
+      "resources": "Resources",
+      "restart": "Restart",
+      "restartCount": "Restart count",
+      "revision": "Revision",
+      "selector": "Selector",
+      "serviceAccount": "Service account",
+      "serviceName": "Service name",
+      "source": "Source",
+      "started": "Started",
+      "state": "State",
+      "status": "Status",
+      "strategy": "Strategy",
+      "succeeded": "Succeeded",
+      "template": "Template",
+      "type": "Type",
+      "uid": "UID",
+      "upToDate": "Up to date",
+      "updateRevision": "Update revision",
+      "updated": "Updated",
+      "username": "Username",
+      "variables": "Variables",
+      "volumeMounts": "Volume mounts",
+      "volumes": "Volumes",
+      "yamlConfiguration": "YAML configuration"
+    },
+    "messages": {
+      "loading": "Loading...",
+      "loadingEndpoints": "Loading endpoints...",
+      "loadingEndpointSlices": "Loading endpoint slices...",
+      "loadingPods": "Loading pods...",
+      "noChatHistory": "No chat history yet",
+      "noData": "No data",
+      "noEndpoints": "No endpoints found",
+      "noEndpointSlices": "No endpoint slices found",
+      "noPods": "No pods found",
+      "noPorts": "No ports defined",
+      "notCreated": "Not created",
+      "notStarted": "Not started",
+      "startedAgo": "Started {{time}} ago",
+      "startedShort": "Started",
+      "timeAgo": "{{time}} ago"
+    },
+    "tabs": {
+      "history": "History",
+      "logs": "Logs",
+      "overview": "Overview",
+      "terminal": "Terminal",
+      "yaml": "YAML"
+    },
+    "units": {
+      "pods": "pods"
+    },
+    "values": {
+      "no": "No",
+      "none": "None",
+      "yes": "Yes"
+    }
   },
   "globalSearch": {
     "title": "Global Search",
@@ -73,7 +184,8 @@
       "other": "other",
       "cr": "CR",
       "security": "Security",
-      "workloads": "Workloads"
+      "workloads": "Workloads",
+      "application": "Application"
     },
     "short": {
       "pvcs": "PVCs",
@@ -140,7 +252,9 @@
     "clusterrolebindings": "Cluster Role Bindings",
     "horizontalpodautoscalers": "HPA",
     "settings": "Settings",
-    "workloads": "Workloads"
+    "workloads": "Workloads",
+    "helmReleases": "Helm Release",
+    "helmCharts": "App Catalog"
   },
   "overview": {
     "title": "Overview",
@@ -188,10 +302,21 @@
       "uploadSuccess": "Uploaded {{name}} successfully"
     },
     "initContainer": "init",
+    "dnsPolicy": "DNS policy",
+    "hostNetwork": "Host network",
+    "loadingRelatedResources": "Loading related resources...",
     "noContainersFound": "No containers found.",
     "noPodsFound": "No pods found.",
+    "noRelatedResources": "No related resources found",
+    "nodeSelector": "Node selector",
+    "priorityClass": "Priority class",
+    "qosClass": "QoS class",
+    "restartPolicy": "Restart policy",
+    "runtimeClass": "Runtime class",
+    "scheduler": "Scheduler",
     "searchContainers": "Search containers...",
-    "searchPods": "Search pods..."
+    "searchPods": "Search pods...",
+    "terminationGrace": "Termination grace"
   },
   "deployments": {
     "title": "Deployments",
@@ -270,7 +395,9 @@
     "lastSeen": "Last Seen",
     "count": "Count",
     "source": "Source",
+    "loading": "Loading events...",
     "noEventsFound": "No events found",
+    "noRecentEvents": "No recent events",
     "involvedObject": "Involved Object",
     "reporter": "Reporter"
   },
@@ -290,7 +417,8 @@
     "terminating": "Terminating",
     "crashLoopBackOff": "CrashLoopBackOff",
     "containerCreating": "ContainerCreating",
-    "imagePullBackOff": "ImagePullBackOff"
+    "imagePullBackOff": "ImagePullBackOff",
+    "enabled": "Enabled"
   },
   "monitoring": {
     "cpuUsage": "CPU Usage",
@@ -689,8 +817,11 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Manage clusters, roles and permissions",
+    "description": "Manage AI Agent availability and model endpoint",
+    "aiAgentRequiresAdmin": "AI Agent settings are managed by Kite administrators. Ask an administrator to configure the API key and model endpoint before using chat.",
     "tabs": {
+      "general": "General",
+      "aiAgent": "AI Agent",
       "clusters": "Cluster",
       "oauth": "OAuth",
       "rbac": "RBAC",
@@ -702,19 +833,70 @@
     },
     "nav": "Settings"
   },
-  "settingsHint": {
-    "title": "Complete Your Setup",
-    "description": "Configure essential settings to get the most out of Kite",
-    "p8s": {
-      "description": "Configure Prometheus"
+  "terminal": {
+    "kubectlTerminal": "Kubectl Terminal",
+    "toggleKubectlTerminal": "Toggle Kubectl Terminal",
+    "enterFullscreen": "Enter fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "exitFullscreenEsc": "Exit fullscreen (ESC)",
+    "fullscreen": "Fullscreen",
+    "restore": "Restore",
+    "minimize": "Minimize",
+    "closeEndsSession": "Close (ends session)"
+  },
+  "generalManagement": {
+    "title": "General",
+    "aiAgent": {
+      "title": "AI Agent",
+      "description": "Enable AI assistant and configure model endpoint.",
+      "form": {
+        "provider": "Provider",
+        "model": "Model",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "Leave empty to keep current API key",
+        "baseUrl": "Base URL",
+        "maxTokens": "Max Tokens"
+      }
     },
-    "oauth": {
-      "description": "Set up OAuth providers for authentication"
+    "kubectl": {
+      "title": "Kubectl",
+      "description": "Enable kubectl terminal and configure runtime image.",
+      "form": {
+        "image": "Image"
+      }
     },
-    "rbac": {
-      "description": "Configure roles and permissions"
+    "nodeTerminal": {
+      "title": "Node Terminal",
+      "description": "Configure runtime image used for node terminal sessions.",
+      "form": {
+        "image": "Image"
+      }
     },
-    "viewAll": "View All Settings"
+    "runtime": {
+      "title": "Runtime",
+      "description": "Configure analytics and version checking behavior.",
+      "form": {
+        "enableAnalytics": "Enable analytics",
+        "enableVersionCheck": "Enable version check"
+      }
+    },
+    "loginPrompt": {
+      "title": "Login Prompt",
+      "description": "Show a custom operator message on the login fault page.",
+      "form": {
+        "message": "Message",
+        "placeholder": "Leave empty to hide the login prompt"
+      }
+    },
+    "messages": {
+      "updated": "AI Agent settings updated"
+    },
+    "errors": {
+      "modelRequired": "Model is required",
+      "apiKeyRequired": "API key is required when AI Agent is enabled",
+      "kubectlImageRequired": "Kubectl image is required when kubectl is enabled",
+      "nodeTerminalImageRequired": "Node terminal image is required"
+    }
   },
   "clusterManagement": {
     "title": "Cluster Management",
@@ -1370,5 +1552,226 @@
     "scaleTitle": "Scale StatefulSet",
     "updateStrategy": "Update Strategy",
     "volumes": "Volumes"
+  },
+  "statefulsets": {
+    "podManagementPolicy": "Pod management policy"
+  },
+  "aiChat": {
+    "title": "AI Assistant",
+    "placeholder": "Ask about your cluster...",
+    "actions": {
+      "newChat": "New chat",
+      "openInNewTab": "Open in new tab",
+      "configure": "Configure AI Agent",
+      "continue": "Continue",
+      "confirm": "Confirm"
+    },
+    "thinking": "Thinking",
+    "selectOption": "Select an option",
+    "disclaimer": "AI may make mistakes. Please verify carefully before use.",
+    "configuration": {
+      "title": "AI Agent needs configuration",
+      "adminDescription": "Add an API key and model endpoint in AI Agent settings before starting a chat.",
+      "userDescription": "The AI Agent is visible, but an administrator still needs to configure its API key and model endpoint."
+    },
+    "messages": {
+      "count": "{{count}} message",
+      "count_other": "{{count}} messages",
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "suggestedPrompts": {
+      "hint": "Start with a focused check",
+      "fallback": {
+        "resource": "this resource",
+        "namespace": "this namespace"
+      },
+      "overview": {
+        "clusterHealth": "Run a cluster health check and highlight top risks",
+        "errorPods": "List error pods with probable causes and priority",
+        "namespaceSummary": "Summarize health and anomalies by namespace"
+      },
+      "podDetail": {
+        "rootCause": "Analyze {{resourceKind}}/{{resourceName}} using status, events, and logs",
+        "riskCheck": "Check restart, OOM, and probe failures for {{resourceKind}}/{{resourceName}}",
+        "troubleshoot": "Give a prioritized troubleshooting path for {{resourceKind}}/{{resourceName}} in {{namespace}}"
+      },
+      "deploymentDetail": {
+        "releaseCheck": "Check release progress and rollout blockers for {{resourceKind}}/{{resourceName}}",
+        "replicaGap": "Explain desired vs available replica gap for {{resourceKind}}/{{resourceName}}",
+        "recentEvents": "Review recent events for {{resourceKind}}/{{resourceName}} and suggest fixes"
+      },
+      "nodeDetail": {
+        "health": "Check node health, pressure conditions, and critical alerts",
+        "workloadRisk": "Analyze workload risks on {{resourceKind}}/{{resourceName}}",
+        "actions": "Provide prioritized remediation actions for {{resourceKind}}/{{resourceName}}"
+      },
+      "detail": {
+        "summary": "Summarize current status and key conditions for {{resourceKind}}/{{resourceName}}",
+        "anomaly": "Identify anomalies and likely root causes for {{resourceKind}}/{{resourceName}}",
+        "nextSteps": "Give minimal-impact next actions for {{resourceKind}}/{{resourceName}} in {{namespace}}"
+      },
+      "list": {
+        "anomalies": "Find abnormal resources on this page and sort by impact",
+        "namespaceHotspots": "Highlight namespaces with the most issues on this page",
+        "nextActions": "Give a short action list for the current resource list"
+      },
+      "default": {
+        "healthCheck": "Run a quick cluster check and list top 3 risks",
+        "workloadIssues": "List problematic workloads and probable root causes",
+        "runbook": "Provide a prioritized troubleshooting runbook"
+      }
+    }
+  },
+  "helmCharts": {
+    "actions": {
+      "addRepository": "Add Repository",
+      "deleteRepository": "Delete Repository",
+      "install": "Install"
+    },
+    "fields": {
+      "repository": "Repository",
+      "deprecated": "Deprecated",
+      "sources": "Sources",
+      "keywords": "Keywords",
+      "versions": "Versions",
+      "defaultValues": "Default values",
+      "customValues": "Custom values",
+      "updatedAt": "Updated"
+    },
+    "filters": {
+      "allRepositories": "All repositories",
+      "artifactHub": "Artifact Hub",
+      "repositories": "Repositories",
+      "verifiedPublisher": "Verified publisher"
+    },
+    "messages": {
+      "addRepositoryDescription": "Add a Helm repository to make its charts available.",
+      "repositoryAdded": "Repository added",
+      "repositoryDeleted": "Repository deleted",
+      "deleteRepositoryDescription": "This only removes the managed chart source from Kite. It does not delete remote charts or installed Helm releases.",
+      "noCharts": "No charts found",
+      "noReadme": "No README found",
+      "noValues": "No values found",
+      "noTemplates": "No templates found",
+      "noVersions": "No versions found",
+      "noChartUrl": "Chart package URL is missing.",
+      "invalidValues": "Values must be a YAML object.",
+      "artifactHubTrafficNotice": "Security notice: Kite contacts <artifactHub>Artifact Hub</artifactHub> when searching or viewing chart information from this source. Kite only displays third-party data and is not responsible for its content.",
+      "installed": "Helm release installed"
+    },
+    "placeholders": {
+      "search": "Search charts..."
+    }
+  },
+  "jobs": {
+    "activeDeadline": "Active deadline",
+    "backoffLimit": "Backoff limit",
+    "completions": "Completions",
+    "parallelism": "Parallelism",
+    "target": "Target",
+    "ttlAfterFinished": "TTL after finished"
+  },
+  "cronjobs": {
+    "activeJobs": "Active jobs",
+    "clusterDefault": "Cluster default",
+    "concurrencyPolicy": "Concurrency policy",
+    "cronJobInformation": "CronJob information",
+    "failedJobsHistoryLimit": "Failed jobs history limit",
+    "lastSchedule": "Last schedule",
+    "lastSuccessful": "Last successful",
+    "loadingJobs": "Loading jobs...",
+    "noJobs": "No jobs found for this CronJob",
+    "schedule": "Schedule",
+    "startingDeadline": "Starting deadline",
+    "successfulJobsHistoryLimit": "Successful jobs history limit",
+    "suspend": "Suspend",
+    "timeZone": "Time zone"
+  },
+  "helm": {
+    "actions": {
+      "backToValues": "Back",
+      "dryRun": "Dry Run",
+      "upgrade": "Upgrade",
+      "rollback": "Rollback",
+      "autoUpgrade": "Auto upgrade"
+    },
+    "fields": {
+      "chart": "Chart",
+      "version": "Version",
+      "appVersion": "App Version",
+      "publishedAt": "Published",
+      "kubeVersion": "Kubernetes Version",
+      "releaseName": "Release Name",
+      "createNamespace": "Create namespace",
+      "dryRunPreview": "Dry run preview",
+      "ignoreLabelsAnnotationsChanges": "Ignore labels/annotations changes (diff only)",
+      "forceConflicts": "force-conflicts",
+      "wait": "wait",
+      "rollbackOnFailure": "Rollback on failure",
+      "firstDeployed": "First Deployed",
+      "lastDeployed": "Last Deployed",
+      "autoUpgrade": "Auto upgrade",
+      "chartRepository": "Chart repository",
+      "upgradeSettings": "Upgrade settings",
+      "status": "Status",
+      "schedule": "Schedule",
+      "scheduleInterval": "Interval",
+      "scheduleDaily": "Daily",
+      "intervalMinutes": "Interval (minutes)",
+      "scheduleTime": "Time",
+      "timeoutMinutes": "Timeout (minutes)",
+      "lastChecked": "Last checked",
+      "lastUpgraded": "Last upgraded",
+      "lastError": "Last error"
+    },
+    "diff": {
+      "added": "Added",
+      "deleted": "Deleted",
+      "changed": "Changed",
+      "unchanged": "Unchanged"
+    },
+    "tabs": {
+      "manifest": "Manifest",
+      "values": "Values",
+      "notes": "Notes"
+    },
+    "messages": {
+      "noResources": "No resources found",
+      "noDryRunResources": "No resources rendered by dry run.",
+      "noHistory": "No history found",
+      "rollbackStarted": "Rollback requested",
+      "rollbackConfirmTitle": "Rollback release?",
+      "rollbackConfirmDescription": "Rollback {{namespace}}/{{name}} to revision {{revision}}.",
+      "chartNotFound": "Chart not found in managed Helm repositories or Artifact Hub.",
+      "chartSourceManagedRepository": "Using managed chart repository {{repository}}.",
+      "chartSourceArtifactHubVerified": "Using Artifact Hub chart from {{repository}} (verified publisher).",
+      "chartSourceArtifactHubVerifiedShort": "Artifact Hub (verified)",
+      "chartSourceArtifactHub": "Using Artifact Hub chart from {{repository}}.",
+      "chartDetailsLink": "Chart details",
+      "chartSourceCurrentRelease": "Using the chart stored in the current release.",
+      "chartSourceSelectChart": "Select a chart to use a different chart package. Defaults to the current chart.",
+      "newVersionAvailable": "New {{version}}",
+      "loadingChart": "Loading chart...",
+      "loadingVersions": "Loading versions...",
+      "loadingChartPackage": "Loading chart package...",
+      "loadingValues": "Loading values...",
+      "autoUpgradeSaved": "Auto upgrade saved",
+      "autoUpgradeDescription": "Upgrade when a newer chart version is available.",
+      "autoUpgradeChartDescription": "Chart source for version checks.",
+      "autoUpgradeScheduleDescription": "When to check for updates.",
+      "autoUpgradeIntervalDescription": "Check frequency.",
+      "autoUpgradeScheduleTimeDescription": "Check once per day.",
+      "autoUpgradeTimeoutDescription": "Upgrade wait limit.",
+      "invalidAutoUpgradeInterval": "Interval must be at least 1 minute.",
+      "invalidAutoUpgradeScheduleTime": "Enter a valid time.",
+      "invalidAutoUpgradeTimeout": "Timeout must be at least 1 minute.",
+      "autoUpgradeChartRequired": "Select a chart for auto upgrade."
+    },
+    "placeholders": {
+      "selectChart": "Select a chart..."
+    }
   }
 }

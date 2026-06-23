@@ -1,8 +1,11 @@
 package prometheus
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
@@ -134,5 +137,36 @@ func TestIsForbiddenError(t *testing.T) {
 				t.Fatalf("IsForbiddenError() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestResourceUsageHistoryJSONUsesEmptyArrays(t *testing.T) {
+	body, err := json.Marshal(ResourceUsageHistory{
+		CPU:        NormalizeUsageDataPoints(nil),
+		Memory:     NormalizeUsageDataPoints(nil),
+		NetworkIn:  NormalizeUsageDataPoints(nil),
+		NetworkOut: NormalizeUsageDataPoints(nil),
+		DiskRead:   NormalizeUsageDataPoints(nil),
+		DiskWrite:  NormalizeUsageDataPoints(nil),
+	})
+	if err != nil {
+		t.Fatalf("marshal ResourceUsageHistory: %v", err)
+	}
+
+	payload := string(body)
+	for _, field := range []string{"cpu", "memory", "networkIn", "networkOut", "diskRead", "diskWrite"} {
+		if strings.Contains(payload, fmt.Sprintf(`"%s":null`, field)) {
+			t.Fatalf("expected %s to serialize as an empty array, got %s", field, payload)
+		}
+		if !strings.Contains(payload, fmt.Sprintf(`"%s":[]`, field)) {
+			t.Fatalf("expected %s to serialize as an empty array, got %s", field, payload)
+		}
+	}
+}
+
+func TestFillMissingDataPointsKeepsEmptySliceNonNil(t *testing.T) {
+	points := FillMissingDataPoints(time.Minute, time.Second, []UsageDataPoint{})
+	if points == nil {
+		t.Fatal("expected empty input slice to remain non-nil")
 	}
 }

@@ -34,6 +34,11 @@ func HandleProxy(c *gin.Context, client *K8sClient, kind, namespace, name, proxy
 	req.Header = cloneHeader(c.Request.Header)
 	req.Header.Del("Authorization")
 	req.Header.Del("Cookie")
+	req.Header.Del("Connection")
+	req.Header.Del("Upgrade")
+	req.Header.Del("Keep-Alive")
+	req.Header.Del("Proxy-Connection")
+	req.Header.Del("Transfer-Encoding")
 
 	resp, err := httpClient.Do(req)
 

@@ -25,12 +25,18 @@ interface ResponsiveTabsProps {
   tabs: TabItem[]
   className?: string
   tabsListClassName?: string
+  contentClassName?: string
+  stickyHeader?: React.ReactNode
+  stickyHeaderClassName?: string
 }
 
 export function ResponsiveTabs({
   tabs,
   className,
   tabsListClassName,
+  contentClassName,
+  stickyHeader,
+  stickyHeaderClassName,
 }: ResponsiveTabsProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -55,6 +61,9 @@ export function ResponsiveTabs({
   if (isMobile) {
     return (
       <div className={cn('space-y-4', className)}>
+        {stickyHeader ? (
+          <div className={stickyHeaderClassName}>{stickyHeader}</div>
+        ) : null}
         <Select value={value} onValueChange={onValueChange}>
           <SelectTrigger className="w-full">
             <SelectValue>{currentTab?.label || t('common.selectTab')}</SelectValue>
@@ -68,13 +77,20 @@ export function ResponsiveTabs({
           </SelectContent>
         </Select>
 
-        {currentTab && <div className="space-y-4">{currentTab.content}</div>}
+        {currentTab && (
+          <div className={cn('space-y-4', contentClassName)}>
+            {currentTab.content}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
     <Tabs value={value} onValueChange={onValueChange} className={className}>
+      {stickyHeader ? (
+        <div className={stickyHeaderClassName}>{stickyHeader}</div>
+      ) : null}
       <TabsList
         className={cn(
           '[&_[data-slot=badge]]:bg-muted-foreground/30 [&_[data-slot=badge]]:size-5 [&_[data-slot=badge]]:rounded-full [&_[data-slot=badge]]:px-1',
@@ -89,7 +105,11 @@ export function ResponsiveTabs({
       </TabsList>
 
       {tabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value} className="space-y-4">
+        <TabsContent
+          key={tab.value}
+          value={tab.value}
+          className={cn('space-y-4', contentClassName)}
+        >
           {tab.content}
         </TabsContent>
       ))}

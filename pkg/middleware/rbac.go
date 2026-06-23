@@ -22,6 +22,9 @@ func RBACMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid resource URL"})
 			return
 		}
+		if meta := common.LookupResource(resource); meta != nil {
+			resource = string(meta.Plural)
+		}
 		if resource == "namespaces" && verbs == "get" {
 			// if user has roles, allow access to list namespaces resource
 			// don't worry about security here, we will filter namespaces in the list namespace handler

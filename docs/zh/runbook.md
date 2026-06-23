@@ -14,6 +14,20 @@ make deps
 make dev
 ```
 
+`make dev` 启动后端时会带上 `DISABLE_CACHE=true`。本地开发默认走直接
+Kubernetes API client 路径，不为每个已保存集群启动 controller-runtime
+informer cache。若本地 CPU 飙高，先查后端进程：
+
+```bash
+ps -Ao pid,ppid,pcpu,pmem,etime,command | sort -nrk3 | head
+go tool pprof -top 'http://localhost:6060/debug/pprof/profile?seconds=10'
+```
+
+如果 profile 主要落在
+`sigs.k8s.io/controller-runtime/pkg/manager.(*runnableGroup).Start`，确认进程是
+通过 `make dev` 启动的，或本地手动运行 `./kite` 时显式设置
+`DISABLE_CACHE=true`。
+
 默认本地入口：
 
 - 后端：`http://localhost:8080`
@@ -65,13 +79,20 @@ make docs-build
 - `ANONYMOUS_USER_ENABLED`：跳过普通认证。除非部署环境明确可信，否则不要在生产环境开启。
 - `SEALOS_AUTH_ENABLED`：启用 Sealos 登录接口。
 - `SEALOS_JWT_SECRET`：Sealos 认证校验使用的 JWT 密钥。
+- `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`：逗号分隔的 Sealos 工作空间命名空间列表，表示这些工作空间使用全局/管理员凭据。命中的 Sealos 用户会获得其托管集群下的 `*` 命名空间权限，并被分配 Kite 内置 `admin` 角色。
 - `AUTH_COOKIE_SAMESITE` 和 `AUTH_COOKIE_SECURE`：普通部署和 iframe 部署下的 Cookie 策略。
 - `VITE_SEALOS_AUTO_LOGIN`：构建期前端开关，控制是否自动尝试 Sealos SDK 会话登录。
+
+AI 和终端类功能状态存储在管理员通用设置记录中，而不是普通环境变量：
+
+- `aiAgentEnabled`、`aiProvider`、`aiModel`、`aiApiKey`、`aiBaseUrl` 和 `aiMaxTokens` 配置 AI 助手。新安装默认显示并启用 AI Agent UI，但真正发起聊天请求仍需要配置 API Key。
+- `kubectlEnabled`、`kubectlImage` 和 `nodeTerminalImage` 配置可选终端辅助 Pod。
 
 Sealos 认证说明：
 
 - Kite 不会仅因为应用以顶层窗口打开而阻断 Sealos 认证。`SEALOS_AUTH_ENABLED=true` 时，独立本地开发页面和 `sealos-app-dev-bridge` 仍会优先尝试 Sealos SDK 自动登录。
 - `/login` 可以在 SDK 会话通道不可用时展示非阻断的 Sealos SDK 可用性提示。它只是 Sealos Desktop 或 `sealos-app-dev-bridge` 的诊断线索，不是访问闸门。
+- 显示名是 `admin` 不等于拥有 Kite 管理员权限。需要检查 `/api/auth/user` 或 `role_assignments` 表，确认当前用户拥有内置 `admin` 角色。对于命中 `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES` 的 Sealos 工作空间，下一次 Sealos 登录/同步会自动补齐该角色。
 - 如果独立本地开发中的 Sealos 自动登录失败，先检查 bridge 或 Sealos Desktop 会话，再查看 `/api/auth/login/sealos` 响应和后端日志。
 
 ## 认证故障页
@@ -111,6 +132,14 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 - 托管 Kubernetes 的 kubeconfig 如果使用 `aws`、`gcloud`、`kubelogin` 这类 `exec` 插件，应改用 Service Account token kubeconfig。参考 `docs/zh/config/managed-k8s-auth.md`。
 - 如果访问资源时报权限错误，先检查 Kite RBAC，再检查服务账号或导入 kubeconfig 对应的 Kubernetes RBAC。
 - 如果生产镜像没有 shell，不要强行 `kubectl exec` 进 Kite，改用临时 debug/client pod。
+
+## AI 助手运维
+
+- AI 助手 UI 在新安装中默认启用。可见设置入口只保留在 AI 聊天面板的配置按钮里；只有 Kite 管理员可以编辑设置页，且该页面只显示 AI Agent 设置。
+- 聊天请求需要 OpenAI-compatible 或 Anthropic-compatible provider 配置和 API Key。缺少 API Key 时，运行时会把 AI 视为未启用。
+- 只读工具仍使用当前认证用户、集群和命名空间作用域。
+- 变更资源的工具需要同时满足 Kite RBAC，并经过显式继续/确认步骤。Pending session 会绑定同一用户和集群。
+- 如果 AI chat 返回 AI Agent configuration、disabled 或 provider 错误，检查通用设置记录、provider Base URL、API Key、模型名，以及当前用户编辑 `/settings` 时是否拥有 Kite 内置 `admin` 角色。
 
 ## 生产镜像说明
 

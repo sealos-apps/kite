@@ -15,7 +15,7 @@ This guide explains how to configure OAuth authentication for Kite, supporting m
 
 ## Configuration
 
-In the user interface with the **admin** role, the settings entry will be displayed in the upper right corner of the page.
+The current Kite app shell does not expose OAuth provider management from the visible Settings page. OAuth provider administration remains available through the admin API and any deployment-specific administrator tooling.
 
 Follow the instructions on the page to fill in the basic information to use OAuth login.
 ![OAuth](../screenshots/oauth.png)
@@ -30,7 +30,7 @@ See the [RBAC Configuration Guide](./rbac-config) for details.
 
 ### How to map OAuth users to RBAC roles?
 
-You can configure the mapping relationship between OAuth users and RBAC roles in the settings. For specific steps, please refer to the [RBAC Configuration Guide](./rbac-config).
+You can configure the mapping relationship between OAuth users and RBAC roles through RBAC administrator tooling. For specific steps, please refer to the [RBAC Configuration Guide](./rbac-config).
 
 ### Login failure
 

@@ -5,10 +5,10 @@ Kite is a Go backend plus a React/TypeScript frontend.
 
 - `main.go`: backend entrypoint.
 - `internal/`: internal bootstrapping helpers (for example `internal/load.go`).
-- `pkg/`: core backend modules (`auth`, `cluster`, `handlers`, `middleware`, `rbac`, `utils`, etc.).
+- `pkg/`: core backend modules (`ai`, `auth`, `cluster`, `helm`, `helmutil`, `helmguard`, `handlers`, `middleware`, `rbac`, `scheduler`, `terminal`, `utils`, etc.).
 - `ui/`: Vite + React frontend; main code is under `ui/src/` (`components`, `pages`, `hooks`, `i18n`, `styles`, `types`).
 - `docs/`: VitePress documentation site.
-- `charts/kite/`: Helm chart.
+- `deploy/charts/kite/`: Helm chart used by Sealos packaging and release scripts.
 - `deploy/`: Kubernetes manifests for direct install.
 - `scripts/`: release/version helper scripts.
 
@@ -18,11 +18,16 @@ Run from repo root unless noted:
 - `make deps`: install frontend dependencies (`pnpm`) and download Go modules.
 - `make build`: build frontend static assets and backend binary (`./kite`).
 - `make dev`: run backend and Vite dev server together.
+  This target starts the backend with `DISABLE_CACHE=true` so local development
+  does not spin up controller-runtime informer caches for every saved cluster.
+  If a manual backend run is needed during development, set `DISABLE_CACHE=true`
+  unless cache behavior is the thing being tested.
 - `make run`: start the built backend binary.
 - `make lint`: run `go vet`, `golangci-lint`, and frontend ESLint.
 - `make format`: run `go fmt` and frontend Prettier.
 - `make test`: run backend tests (`go test -v ./...`).
 - `cd ui && pnpm run type-check`: strict TypeScript checks.
+- `cd ui && pnpm run build`: strict TypeScript checks plus Vite/Tailwind production build.
 - `make docs-dev` / `make docs-build`: develop or build docs.
 
 ## Coding Style & Naming Conventions
@@ -31,11 +36,13 @@ Run from repo root unless noted:
 - Frontend uses TypeScript with strict settings and `@/*` path alias.
 - Frontend formatting is Prettier-based: 2 spaces, single quotes, no semicolons, trailing commas (`es5`).
 - Keep TS/TSX file names kebab-case (example: `node-status-icon.tsx`); export components in PascalCase.
+- Frontend i18n must preserve existing flat `common.*` keys. Do not convert string keys such as `common.actions` into nested objects; wire new UI to existing flat keys or add non-conflicting feature/nested keys instead.
 
 ## Testing Guidelines
 - Place Go tests beside implementation files using `*_test.go`.
 - Current CI enforces build, lint, and backend tests; no fixed coverage gate is defined.
 - Add or update tests for any changed backend logic, middleware behavior, or API handlers.
+- When syncing upstream UI, run a literal translation-key scan for the touched scopes in addition to `cd ui && pnpm run type-check` and `cd ui && pnpm run build`, so raw keys such as `common.fields.description` do not leak into the interface.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat:`, `fix:`, `chore(deps):`, `release vX.Y.Z`.
@@ -50,7 +57,12 @@ Run from repo root unless noted:
 - Do not commit kubeconfig files, tokens, or other secrets.
 - Review `SECURITY.md` before reporting or handling vulnerabilities.
 - Never execute database write operations unless explicitly requested.
-- Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, standalone/local dev bridge auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are all intentional fork behavior.
+- Helm v4 requires Go 1.26. Keep `go.mod`, Dockerfile, and GitHub Actions `GO_VERSION` in sync.
+- AI resource mutation tools and Helm release operations are write-capable; keep their user-confirmation, rendered-manifest guard, namespace-scope checks, and RBAC gates intact.
+- AI Agent UI is enabled by default for new installs, but chat runtime still requires a configured API key. Keep the visible AI Agent settings entry scoped to the AI chat panel configure button; `/settings` itself should show only AI Agent configuration, editable by Kite administrators. Keep kubectl, node terminal, analytics, and login-prompt controls out of that visible panel unless the product decision changes explicitly.
+- Helm chart catalog read routes are available to authenticated users under `/api/v1/charts`; repository create/delete and other catalog management routes stay admin-only under `/api/v1/admin/charts`. Do not expose stored repository credentials in responses.
+- Kubectl terminal is disabled by default, admin-only, and requires a pre-created `kite-kubectl-admin` ServiceAccount in the agent namespace. Kite must not auto-create cluster-admin RBAC.
+- Preserve Sealos compatibility when syncing upstream: `/api/auth/login/sealos`, Sealos SDK auto-login, standalone/local dev bridge auto-login, namespace-scoped cluster behavior, `_all` routing, and default Sealos Prometheus backfill are all intentional fork behavior. Sealos users whose workspace namespace is listed in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES` are treated as global/admin workspaces: their auto-generated role gets `*` namespaces on the managed cluster, and Kite also assigns the built-in `admin` role so admin-only app settings such as AI Agent configuration are available.
 
 ## Auth UI Product Decisions
 - `/login` is an operational fault page, not an interactive sign-in surface. Do not reintroduce username/password forms, OAuth provider buttons, or a dashboard sidebar there unless the product decision changes explicitly.

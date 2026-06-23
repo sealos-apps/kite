@@ -1,5 +1,4 @@
 import { ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
-import { useAuth } from '@/contexts/auth-context'
 import { useSidebarConfig } from '@/contexts/sidebar-config-context'
 import {
   IconArrowsHorizontal,
@@ -16,7 +15,6 @@ import {
   IconRouter,
   IconServer,
   IconServer2,
-  IconSettings,
   IconStar,
   IconStarFilled,
   IconSun,
@@ -109,7 +107,6 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const [results, setResults] = useState<SearchResult[] | null>([])
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
-  const { user } = useAuth()
   const {
     config,
     getIconComponent,
@@ -146,60 +143,6 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         searchText: `${overviewTitle} overview dashboard /`.toLowerCase(),
         isPinned: false,
       },
-      ...(user?.isAdmin()
-        ? [
-            {
-              id: 'settings',
-              title: t('settings.nav', 'Settings'),
-              url: '/settings',
-              Icon: IconSettings,
-              groupLabel: 'Settings',
-              searchText:
-                `${t('settings.nav', 'Settings')} admin`.toLowerCase(),
-              isPinned: false,
-            },
-            {
-              id: 'clusters',
-              title: t('settings.tabs.clusters', 'Cluster'),
-              url: '/settings?tab=clusters',
-              Icon: IconSettings,
-              groupLabel: 'Settings',
-              searchText:
-                `${t('settings.tabs.clusters', 'Cluster')} settings cluster admin`.toLowerCase(),
-              isPinned: false,
-            },
-            {
-              id: 'oauth',
-              title: t('settings.tabs.oauth', 'OAuth'),
-              url: '/settings?tab=oauth',
-              Icon: IconSettings,
-              groupLabel: 'Settings',
-              searchText:
-                `${t('settings.tabs.oauth', 'OAuth')} settings oauth admin`.toLowerCase(),
-              isPinned: false,
-            },
-            {
-              id: 'rbac',
-              title: t('settings.tabs.rbac', 'RBAC'),
-              url: '/settings?tab=rbac',
-              Icon: IconSettings,
-              groupLabel: 'Settings',
-              searchText:
-                `${t('settings.tabs.rbac', 'RBAC')} settings rbac admin`.toLowerCase(),
-              isPinned: false,
-            },
-            {
-              id: 'users',
-              title: t('settings.tabs.users', 'User'),
-              url: '/settings?tab=users',
-              Icon: IconSettings,
-              groupLabel: 'Settings',
-              searchText:
-                `${t('settings.tabs.users', 'User')} settings user admin`.toLowerCase(),
-              isPinned: false,
-            },
-          ]
-        : []),
     ]
 
     if (!config) {
@@ -261,7 +204,6 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     resolveSidebarItemTitle,
     shouldShowSidebarItem,
     t,
-    user,
   ])
 
   const sidebarResults = useMemo(() => {

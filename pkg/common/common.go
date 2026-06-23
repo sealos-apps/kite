@@ -10,8 +10,10 @@ import (
 
 const (
 	JWTExpirationSeconds = 24 * 60 * 60 // 24 hours
+	DefaultJWTSecret     = "kite-default-jwt-secret-key-change-in-production"
 
-	NodeTerminalPodName = "kite-node-terminal-agent"
+	NodeTerminalPodName    = "kite-node-terminal-agent"
+	KubectlTerminalPodName = "kite-kubectl-agent"
 
 	KubectlAnnotation = "kubectl.kubernetes.io/last-applied-configuration"
 
@@ -23,17 +25,20 @@ const (
 
 var (
 	Port            = "8080"
-	JwtSecret       = "kite-default-jwt-secret-key-change-in-production"
+	JwtSecret       = DefaultJWTSecret
 	EnableAnalytics = false
 	Host            = ""
 	Base            = ""
 
-	NodeTerminalImage = "busybox:latest"
-	DBType            = "sqlite"
-	DBDSN             = "dev.db"
-	DBAutoCreate      = true
+	NodeTerminalImage    = "busybox:latest"
+	KubectlTerminalImage = "zzde/kubectl:latest"
+	DBType               = "sqlite"
+	DBDSN                = "dev.db"
+	DBAutoCreate         = true
 
 	KiteEncryptKey = "kite-default-encryption-key-change-in-production"
+
+	AllNamespaces = "_all"
 
 	AnonymousUserEnabled = false
 
@@ -41,8 +46,11 @@ var (
 
 	DisableGZIP         = true
 	DisableVersionCheck = false
+	EnableVersionCheck  = true
 
 	APIKeyProvider = "api_key"
+
+	AgentPodNamespace = "kube-system"
 
 	AuthCookieSameSite = "lax"
 	AuthCookieSecure   = "auto"
@@ -74,8 +82,16 @@ func LoadEnvs() {
 		EnableAnalytics = true
 	}
 
+	if ns := os.Getenv("NAMESPACE"); ns != "" {
+		AgentPodNamespace = ns
+	}
+
 	if nodeTerminalImage := os.Getenv("NODE_TERMINAL_IMAGE"); nodeTerminalImage != "" {
 		NodeTerminalImage = nodeTerminalImage
+	}
+
+	if kubectlTerminalImage := os.Getenv("KUBECTL_TERMINAL_IMAGE"); kubectlTerminalImage != "" {
+		KubectlTerminalImage = kubectlTerminalImage
 	}
 
 	if dbDSN := os.Getenv("DB_DSN"); dbDSN != "" {
@@ -119,6 +135,7 @@ func LoadEnvs() {
 
 	if v := os.Getenv("DISABLE_VERSION_CHECK"); v == "true" {
 		DisableVersionCheck = true
+		EnableVersionCheck = false
 	}
 
 	if v := os.Getenv("KITE_BASE"); v != "" {

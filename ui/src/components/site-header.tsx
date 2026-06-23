@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
-import { Plus, Settings } from 'lucide-react'
+import { useTerminal } from '@/contexts/terminal-context'
+import { Plus, TerminalSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Button } from '@/components/ui/button'
@@ -18,10 +18,12 @@ import { UserMenu } from './user-menu'
 
 export function SiteHeader() {
   const isMobile = useIsMobile()
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, capabilities } = useAuth()
+  const { toggleTerminal, isOpen } = useTerminal()
   const { t } = useTranslation()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const isAdmin = user?.isAdmin() ?? false
+  const kubectlEnabled = capabilities.kubectlEnabled
 
   return (
     <>
@@ -40,23 +42,33 @@ export function SiteHeader() {
               onClick={() => setCreateDialogOpen(true)}
               aria-label={t('dialog.createResource')}
             />
+            {isAdmin && kubectlEnabled && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTerminal}
+                className="hidden sm:flex"
+                aria-pressed={isOpen}
+                title={t('terminal.kubectlTerminal', 'Kubectl Terminal')}
+              >
+                <TerminalSquare
+                  className={
+                    isOpen
+                      ? 'h-5 w-5 text-green-500'
+                      : 'h-5 w-5 text-muted-foreground'
+                  }
+                />
+                <span className="sr-only">
+                  {t('terminal.toggleKubectlTerminal', 'Toggle Kubectl Terminal')}
+                </span>
+              </Button>
+            )}
             {!isMobile && (
               <>
                 <Separator
                   orientation="vertical"
                   className="mx-2 data-[orientation=vertical]:h-4"
                 />
-                {user?.isAdmin() && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate('/settings')}
-                    className="hidden sm:flex"
-                  >
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">{t('settings.nav')}</span>
-                  </Button>
-                )}
                 <LanguageToggle />
                 <ModeToggle />
               </>

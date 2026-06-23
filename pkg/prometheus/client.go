@@ -155,11 +155,20 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	}
 
 	return &ResourceUsageHistory{
-		CPU:        cpuData,
-		Memory:     memoryData,
-		NetworkIn:  networkInData,
-		NetworkOut: networkOutData,
+		CPU:        NormalizeUsageDataPoints(cpuData),
+		Memory:     NormalizeUsageDataPoints(memoryData),
+		NetworkIn:  NormalizeUsageDataPoints(networkInData),
+		NetworkOut: NormalizeUsageDataPoints(networkOutData),
+		DiskRead:   []UsageDataPoint{},
+		DiskWrite:  []UsageDataPoint{},
 	}, nil
+}
+
+func NormalizeUsageDataPoints(points []UsageDataPoint) []UsageDataPoint {
+	if points == nil {
+		return []UsageDataPoint{}
+	}
+	return points
 }
 
 func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsageOptions) (string, string, string, string) {
@@ -248,7 +257,7 @@ func (c *Client) queryRange(ctx context.Context, query string, start, end time.T
 		fmt.Printf("Warnings: %v\n", warnings)
 	}
 
-	var dataPoints []UsageDataPoint
+	dataPoints := []UsageDataPoint{}
 
 	switch result.Type() {
 	case model.ValMatrix:
@@ -286,6 +295,16 @@ func IsClientErrorStatus(err error, statusCode int) bool {
 
 func IsForbiddenError(err error) bool {
 	return IsClientErrorStatus(err, http.StatusForbidden)
+}
+
+// Query executes an instant query against Prometheus.
+func (c *Client) Query(ctx context.Context, query string, ts time.Time, opts ...v1.Option) (model.Value, v1.Warnings, error) {
+	return c.client.Query(ctx, query, ts, opts...)
+}
+
+// QueryRange executes a range query against Prometheus.
+func (c *Client) QueryRange(ctx context.Context, query string, r v1.Range, opts ...v1.Option) (model.Value, v1.Warnings, error) {
+	return c.client.QueryRange(ctx, query, r, opts...)
 }
 
 // HealthCheck verifies if Prometheus is accessible
@@ -489,12 +508,12 @@ func (c *Client) GetPodMetrics(ctx context.Context, namespace, podName, containe
 	}
 
 	return &PodMetrics{
-		CPU:        FillMissingDataPoints(timeRange, step, cpuData),
-		Memory:     FillMissingDataPoints(timeRange, step, memoryData),
-		NetworkIn:  FillMissingDataPoints(timeRange, step, networkInData),
-		NetworkOut: FillMissingDataPoints(timeRange, step, networkOutData),
-		DiskRead:   FillMissingDataPoints(timeRange, step, diskReadData),
-		DiskWrite:  FillMissingDataPoints(timeRange, step, diskWriteData),
+		CPU:        NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, cpuData)),
+		Memory:     NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, memoryData)),
+		NetworkIn:  NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, networkInData)),
+		NetworkOut: NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, networkOutData)),
+		DiskRead:   NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, diskReadData)),
+		DiskWrite:  NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, diskWriteData)),
 		Fallback:   false,
 	}, nil
 }

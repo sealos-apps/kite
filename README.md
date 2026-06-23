@@ -6,7 +6,7 @@
 
 _A modern, intuitive Kubernetes dashboard_
 
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![React](https://img.shields.io/badge/React-19+-61DAFB?style=flat&logo=react)](https://reactjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/License-Apache-green.svg)](LICENSE)
@@ -53,15 +53,17 @@ _Comprehensive cluster overview with real-time metrics and resource statistics_
 - 🏷️ **Quick Image Tag Selector** - Easily select and change container image tags based on Docker and container registry APIs
 - 🎨 **Customizable Sidebar** - Customize sidebar visibility and order, and add CRDs for quick access
 - 🔌 **Kube Proxy** - Access pods or services directly through Kite, no more `kubectl port-forward`
+- 📦 **Helm Management** - Browse admin-managed chart repositories, install charts, inspect releases, dry-run upgrades, roll back, and manage release history
 
 ### 📈 **Monitoring & Observability**
 
 - 📊 **Real-time Metrics** - CPU, memory, and network usage charts powered by Prometheus
 - 📋 **Cluster Overview** - Comprehensive cluster health and resource statistics
 - 📝 **Live Logs** - Stream pod logs in real-time with filtering and search capabilities
-- 💻 **Web/Node Terminal** - Execute commands directly in pods/nodes through the browser
+- 💻 **Web/Node/Kubectl Terminal** - Execute commands in pods, nodes, or an operator-enabled kubectl session through the browser
 - 📈 **Node Monitoring** - Detailed node-level performance metrics and utilization
 - 📊 **Pod Monitoring** - Individual pod resource usage and performance tracking
+- 🤖 **AI Assistant** - Optional OpenAI/Anthropic-compatible chat panel for cluster inspection, logs, Prometheus queries, and confirmation-gated resource actions
 
 ### 🔐 **Security**
 

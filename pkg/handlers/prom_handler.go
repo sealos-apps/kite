@@ -149,11 +149,18 @@ func applyResourceUsageHistoryMetadata(resourceUsageHistory *prometheus.Resource
 func (h *PromHandler) GetPodMetrics(c *gin.Context) {
 	ctx := c.Request.Context()
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	user := c.MustGet("user").(model.User)
 	// Get path parameters
 	namespace := c.Param("namespace")
 	podName := c.Param("podName")
 	if namespace == "" || podName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace and podName are required"})
+		return
+	}
+	if !rbac.CanAccess(user, string(common.Pods), string(common.VerbGet), cs.Name, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": rbac.NoAccess(user.Key(), string(common.VerbGet), string(common.Pods), namespace, cs.Name),
+		})
 		return
 	}
 
@@ -246,8 +253,8 @@ func (h *PromHandler) fetchPodMetricsFromMetricsServer(c *gin.Context, namespace
 			handlePodMetrics(&podMetrics, timestamp)
 		}
 		return &prometheus.PodMetrics{
-			CPU:      mergeUsageDataPointsSum(cpuSeries),
-			Memory:   mergeUsageDataPointsSum(memSeries),
+			CPU:      prometheus.NormalizeUsageDataPoints(mergeUsageDataPointsSum(cpuSeries)),
+			Memory:   prometheus.NormalizeUsageDataPoints(mergeUsageDataPointsSum(memSeries)),
 			Fallback: true,
 		}, nil
 	}
@@ -259,8 +266,8 @@ func (h *PromHandler) fetchPodMetricsFromMetricsServer(c *gin.Context, namespace
 	}
 	handlePodMetrics(podMetrics, podMetrics.Timestamp.Time)
 	return &prometheus.PodMetrics{
-		CPU:      cpuSeries,
-		Memory:   memSeries,
+		CPU:      prometheus.NormalizeUsageDataPoints(cpuSeries),
+		Memory:   prometheus.NormalizeUsageDataPoints(memSeries),
 		Fallback: true,
 	}, nil
 }
@@ -271,7 +278,7 @@ func mergeUsageDataPointsSum(points []prometheus.UsageDataPoint) []prometheus.Us
 		ts := pt.Timestamp.Unix()
 		m[ts] += pt.Value
 	}
-	var merged []prometheus.UsageDataPoint
+	merged := []prometheus.UsageDataPoint{}
 	for ts, value := range m {
 		merged = append(merged, prometheus.UsageDataPoint{
 			Timestamp: time.Unix(ts, 0),

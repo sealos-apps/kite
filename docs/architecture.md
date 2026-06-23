@@ -36,6 +36,10 @@ Core persistent models are initialized in `pkg/model/model.go`:
 - `RoleAssignment`
 - `ResourceHistory`
 - `ResourceTemplate`
+- `GeneralSetting`
+- `PendingSession`
+- `HelmRepository`
+- `ScheduledTask`
 
 Kite runs `AutoMigrate` on startup. When `DB_AUTO_CREATE=true`, the service attempts to create a missing MySQL/PostgreSQL target database before migrations, so the configured database user must have the required permission.
 
@@ -43,12 +47,17 @@ Kite runs `AutoMigrate` on startup. When `DB_AUTO_CREATE=true`, the service atte
 
 - Generic Kubernetes resource list/detail/apply routes are registered from `pkg/handlers/resources`.
 - Custom Resources are handled through `pkg/handlers/resources/cr_handler.go` and frontend routes under `/crds/...`.
-- Search, logs, web terminal, node terminal, image tags, templates, Prometheus metrics, and proxy routes are registered under `/api/v1`.
+- Search, logs, web terminal, node terminal, optional kubectl terminal, image tags, templates, Prometheus metrics, and proxy routes are registered under `/api/v1`.
+- `pkg/ai` exposes `/api/v1/ai/chat` plus continuation endpoints. New installs enable the AI Agent UI by default, but `LoadRuntimeConfig` still disables runtime chat when no API key is configured. Tools read resources, logs, cluster overview, and Prometheus data through the current user and cluster context. Mutating tools create a pending session and execute only after the user continues the confirmed operation.
+- `pkg/helm` exposes authenticated read-only chart catalog APIs under `/api/v1/charts` so namespaced Sealos users can browse and install charts they are authorized to render. Repository create/delete remains admin-only under `/api/v1/admin/charts`, and stored repository credentials must never be exposed in responses.
+- `pkg/handlers/resources/helmrelease_handler.go` registers `helmreleases` as the canonical resource route, with a legacy `helmrelease` alias for compatibility. Helm install, upgrade, rollback, uninstall, and auto-upgrade pass through rendered-manifest authorization in `pkg/helmguard` before Helm writes resources.
+- `pkg/scheduler` runs background scheduled tasks such as Helm release auto-upgrade. Tasks reload their creator and due/enabled state before execution.
 
 ## Sealos Compatibility Layer
 
 - `/api/auth/login/sealos` remains available when `SEALOS_AUTH_ENABLED=true`.
 - Sealos SDK auto-login is handled in the frontend auth context and stores the selected cluster in storage plus the `x-cluster-name` cookie/header.
+- Sealos SSO creates or updates a managed cluster, a per-user Sealos role, and a role assignment on login. When the workspace namespace is listed in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`, Kite treats that workspace as global/admin: the Sealos role receives `*` namespaces on its managed cluster, and the user also receives the built-in `admin` role for admin-only app settings such as AI Agent configuration.
 - The frontend does not reject Sealos auth just because it is running as the top-level window. This keeps standalone local development and tools such as `sealos-app-dev-bridge` on the same SDK auto-login path as iframe deployments.
 - `/login` may show a Sealos SDK availability notice when the SDK session channel is unavailable, but the notice is diagnostic-only and does not block the auto-login attempt.
 
@@ -61,3 +70,5 @@ Kite runs `AutoMigrate` on startup. When `DB_AUTO_CREATE=true`, the service atte
 - Database connection and migration failures happen during startup and can prevent the backend from serving normally.
 - Session/auth failures in the frontend should send users to `/login?reason=<code>` and present operator remediation rather than a misleading login form.
 - Distroless production images may not contain a shell; use a temporary client/debug pod for in-cluster database or network troubleshooting.
+- Helm v4 is part of the backend dependency graph; build environments must use Go 1.26 or newer.
+- Kubectl terminal creates per-session pods only after an admin enables the feature and pre-provisions the `kite-kubectl-admin` ServiceAccount/RBAC.

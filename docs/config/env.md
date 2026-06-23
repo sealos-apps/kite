@@ -16,7 +16,7 @@ Kite supports several environment variables by default to change the default val
 - **SEALOS_AUTH_ENABLED**: Enable Sealos login API (`/api/auth/login/sealos`), default is `false`.
 - **SEALOS_JWT_SECRET**: Secret used to verify Sealos JWT. Kite uses `HS256` for Sealos token verification.
 - **SEALOS_DEFAULT_PROMETHEUS_URL**: Default Prometheus URL for Sealos-managed clusters. If set, Kite writes this value for newly synced Sealos clusters and backfills existing Sealos clusters with empty `prometheus_url` during startup.
-- **KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES**: Comma-separated namespace allowlist (for example `ns-admin,platform-admin`). For these namespaces, Kite bypasses kubeconfig `current-context.namespace` namespace-scope lock, and Sealos SSO auto-roles are granted `*` namespaces on their managed cluster. Use this only for namespaces whose credentials are truly cluster-admin/global.
+- **KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES**: Comma-separated namespace allowlist (for example `ns-admin,platform-admin`). For these namespaces, Kite bypasses kubeconfig `current-context.namespace` namespace-scope lock, Sealos SSO auto-roles are granted `*` namespaces on their managed cluster, and those Sealos users are assigned Kite's built-in `admin` role for admin-only app settings such as AI Agent configuration. Use this only for namespaces whose credentials are truly cluster-admin/global.
 
 - **HOST**: Used for generating OAuth 2.0 authorization callback addresses, default will be obtained from request headers. If you find the result not as expected, you can manually configure this environment variable.
 
@@ -25,6 +25,10 @@ Kite supports several environment variables by default to change the default val
 - **ENABLE_ANALYTICS**: Enable data analytics functionality, default value is `false`. When enabled, Kite will collect limited data to help improve the product.
 
 - **PORT**: Port on which Kite runs, default value is `8080`.
+- **DISABLE_CACHE**: Set to `true` to use the direct Kubernetes API client
+  instead of the controller-runtime informer cache. `make dev` sets this by
+  default for local development to avoid high CPU when cached cluster clients
+  repeatedly fail to sync.
 
 Optional frontend environment variables (build-time):
 
