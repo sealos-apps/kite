@@ -253,8 +253,8 @@ func (h *PromHandler) fetchPodMetricsFromMetricsServer(c *gin.Context, namespace
 			handlePodMetrics(&podMetrics, timestamp)
 		}
 		return &prometheus.PodMetrics{
-			CPU:      mergeUsageDataPointsSum(cpuSeries),
-			Memory:   mergeUsageDataPointsSum(memSeries),
+			CPU:      prometheus.NormalizeUsageDataPoints(mergeUsageDataPointsSum(cpuSeries)),
+			Memory:   prometheus.NormalizeUsageDataPoints(mergeUsageDataPointsSum(memSeries)),
 			Fallback: true,
 		}, nil
 	}
@@ -266,8 +266,8 @@ func (h *PromHandler) fetchPodMetricsFromMetricsServer(c *gin.Context, namespace
 	}
 	handlePodMetrics(podMetrics, podMetrics.Timestamp.Time)
 	return &prometheus.PodMetrics{
-		CPU:      cpuSeries,
-		Memory:   memSeries,
+		CPU:      prometheus.NormalizeUsageDataPoints(cpuSeries),
+		Memory:   prometheus.NormalizeUsageDataPoints(memSeries),
 		Fallback: true,
 	}, nil
 }
@@ -278,7 +278,7 @@ func mergeUsageDataPointsSum(points []prometheus.UsageDataPoint) []prometheus.Us
 		ts := pt.Timestamp.Unix()
 		m[ts] += pt.Value
 	}
-	var merged []prometheus.UsageDataPoint
+	merged := []prometheus.UsageDataPoint{}
 	for ts, value := range m {
 		merged = append(merged, prometheus.UsageDataPoint{
 			Timestamp: time.Unix(ts, 0),
