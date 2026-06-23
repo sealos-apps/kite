@@ -155,11 +155,20 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	}
 
 	return &ResourceUsageHistory{
-		CPU:        cpuData,
-		Memory:     memoryData,
-		NetworkIn:  networkInData,
-		NetworkOut: networkOutData,
+		CPU:        NormalizeUsageDataPoints(cpuData),
+		Memory:     NormalizeUsageDataPoints(memoryData),
+		NetworkIn:  NormalizeUsageDataPoints(networkInData),
+		NetworkOut: NormalizeUsageDataPoints(networkOutData),
+		DiskRead:   []UsageDataPoint{},
+		DiskWrite:  []UsageDataPoint{},
 	}, nil
+}
+
+func NormalizeUsageDataPoints(points []UsageDataPoint) []UsageDataPoint {
+	if points == nil {
+		return []UsageDataPoint{}
+	}
+	return points
 }
 
 func buildResourceUsageQueries(instance, nodeLabel string, options ResourceUsageOptions) (string, string, string, string) {
@@ -248,7 +257,7 @@ func (c *Client) queryRange(ctx context.Context, query string, start, end time.T
 		fmt.Printf("Warnings: %v\n", warnings)
 	}
 
-	var dataPoints []UsageDataPoint
+	dataPoints := []UsageDataPoint{}
 
 	switch result.Type() {
 	case model.ValMatrix:
@@ -489,12 +498,12 @@ func (c *Client) GetPodMetrics(ctx context.Context, namespace, podName, containe
 	}
 
 	return &PodMetrics{
-		CPU:        FillMissingDataPoints(timeRange, step, cpuData),
-		Memory:     FillMissingDataPoints(timeRange, step, memoryData),
-		NetworkIn:  FillMissingDataPoints(timeRange, step, networkInData),
-		NetworkOut: FillMissingDataPoints(timeRange, step, networkOutData),
-		DiskRead:   FillMissingDataPoints(timeRange, step, diskReadData),
-		DiskWrite:  FillMissingDataPoints(timeRange, step, diskWriteData),
+		CPU:        NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, cpuData)),
+		Memory:     NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, memoryData)),
+		NetworkIn:  NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, networkInData)),
+		NetworkOut: NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, networkOutData)),
+		DiskRead:   NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, diskReadData)),
+		DiskWrite:  NormalizeUsageDataPoints(FillMissingDataPoints(timeRange, step, diskWriteData)),
 		Fallback:   false,
 	}, nil
 }

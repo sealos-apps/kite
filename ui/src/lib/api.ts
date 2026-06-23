@@ -644,6 +644,25 @@ const EMPTY_RESOURCE_USAGE_HISTORY: ResourceUsageHistory = {
   diskWrite: [],
 }
 
+const asUsageDataPoints = (
+  points: ResourceUsageHistory[keyof Pick<
+    ResourceUsageHistory,
+    'cpu' | 'memory' | 'networkIn' | 'networkOut' | 'diskRead' | 'diskWrite'
+  >]
+) => (Array.isArray(points) ? points : [])
+
+const normalizeResourceUsageHistory = (
+  history: ResourceUsageHistory
+): ResourceUsageHistory => ({
+  ...history,
+  cpu: asUsageDataPoints(history.cpu),
+  memory: asUsageDataPoints(history.memory),
+  networkIn: asUsageDataPoints(history.networkIn),
+  networkOut: asUsageDataPoints(history.networkOut),
+  diskRead: asUsageDataPoints(history.diskRead),
+  diskWrite: asUsageDataPoints(history.diskWrite),
+})
+
 const isNoResourceUsageDataError = (error: unknown): boolean => {
   if (!(error instanceof Error)) {
     return false
@@ -668,12 +687,14 @@ export const fetchResourceUsageHistory = (
       )
     : fetchAPI<ResourceUsageHistory>(endpoint)
 
-  return request.catch((error) => {
-    if (isNoResourceUsageDataError(error)) {
-      return { ...EMPTY_RESOURCE_USAGE_HISTORY }
-    }
-    throw error
-  })
+  return request
+    .then((history) => normalizeResourceUsageHistory(history))
+    .catch((error) => {
+      if (isNoResourceUsageDataError(error)) {
+        return { ...EMPTY_RESOURCE_USAGE_HISTORY }
+      }
+      throw error
+    })
 }
 
 export const useResourceUsageHistory = (
