@@ -8,6 +8,7 @@ docs/node_modules
 
 # Local build/test artifacts.
 bin
+!bin/kite-*
 kite
 *.test
 *.out
