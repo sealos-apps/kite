@@ -1,0 +1,24 @@
+# Git metadata is not needed by the Docker build.
+.git
+
+# Local dependency caches are installed inside container build stages.
+ui/node_modules
+docs/node_modules
+.pnpm-store
+
+# Local build/test artifacts.
+bin
+kite
+*.test
+*.out
+
+# Local development state.
+dev.db
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+# Documentation build cache/output is not part of the runtime image.
+docs/.vitepress/cache
+docs/.vitepress/dist
