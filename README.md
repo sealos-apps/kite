@@ -63,7 +63,7 @@ _Comprehensive cluster overview with real-time metrics and resource statistics_
 - 💻 **Web/Node/Kubectl Terminal** - Execute commands in pods, nodes, or an operator-enabled kubectl session through the browser
 - 📈 **Node Monitoring** - Detailed node-level performance metrics and utilization
 - 📊 **Pod Monitoring** - Individual pod resource usage and performance tracking
-- 🤖 **AI Assistant** - Optional OpenAI/Anthropic-compatible chat panel for cluster inspection, logs, Prometheus queries, and confirmation-gated resource actions
+- 🤖 **AI Assistant** - Optional OpenAI/Anthropic-compatible chat panel for cluster inspection, logs, Prometheus queries, confirmation-gated resource actions, and Helm release workflows
 
 ### 🔐 **Security**
 

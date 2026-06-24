@@ -212,6 +212,9 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - Read-only tools still use the current authenticated user, cluster, and namespace scope.
 - In namespace-scoped non-exempt Sealos workspaces, AI tools resolve omitted namespace and `_all` to the current workspace namespace, reject ordinary cluster-scoped resources such as Nodes/Namespaces, hide arbitrary Prometheus queries, and show namespace-local cluster overview data only.
 - Mutating tools require both Kite RBAC and an explicit continue/confirmation step. Pending sessions are scoped to the same user and cluster.
+- Helm actions in AI chat are structured tool calls backed by Kite's Helm SDK integration, not direct `helm` shell commands inside the Kite pod. The pod does not need a Helm CLI binary for AI Helm workflows.
+- AI Helm install and upgrade should run the matching dry-run tool first. The dry-run response summarizes rendered resources for review; the actual install, upgrade, rollback, or uninstall tool then enters the same confirmation flow as other mutating tools.
+- AI Helm tools require `helmreleases` RBAC for the release action and rendered-resource RBAC through `pkg/helmguard`. If a tool fails with a permission error, check both the `helmreleases` verb on the target namespace and the rendered Kubernetes resources in the dry-run summary.
 - If AI chat returns an AI Agent configuration, disabled, or provider error, check the general settings record, provider base URL, API key, model name, and whether the current user has Kite's built-in `admin` role when trying to edit `/settings`.
 
 ## Helm Operations
@@ -219,6 +222,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - Chart catalog read APIs live under `/api/v1/charts` for authenticated users. Repository create/delete and catalog management APIs remain admin-only under `/api/v1/admin/charts`; stored repository credentials must not be exposed in responses.
 - Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
 - Helm install, upgrade, rollback, uninstall, and auto-upgrade render target manifests before writing. Added resources require `create`, retained resources require `update`, and removed resources require `delete` on the rendered Kubernetes resource.
+- The AI assistant uses the same Helm SDK and rendered-manifest guard path as the HTTP Helm release API. Do not troubleshoot AI Helm failures by installing a shell or Helm CLI into the Kite container unless a separate debug session explicitly needs those tools.
 - Cluster-scoped rendered resources such as CRDs, Namespaces, ClusterRoles, and ClusterRoleBindings require the Kite admin role and are rejected on namespace-scoped Sealos clusters.
 - If an upgrade or rollback fails with a rendered resource permission error, inspect the dry-run manifest diff and grant the specific resource verb in Kite RBAC or choose a chart/values set that stays inside the user's namespace scope.
 
