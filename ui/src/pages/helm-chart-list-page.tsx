@@ -562,13 +562,14 @@ export function HelmChartListPage() {
               >
                 {t('helmCharts.filters.repositories')}
               </ToggleGroupItem>
-              <ToggleGroupItem
-                value={artifactHubSource}
-                disabled={!helmArtifactHubEnabled}
-                className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
-              >
-                {t('helmCharts.filters.artifactHub')}
-              </ToggleGroupItem>
+              {helmArtifactHubEnabled ? (
+                <ToggleGroupItem
+                  value={artifactHubSource}
+                  className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+                >
+                  {t('helmCharts.filters.artifactHub')}
+                </ToggleGroupItem>
+              ) : null}
             </ToggleGroup>
             {!isArtifactHubSource && !isOCISource ? (
               <div className="flex w-full items-center gap-2 sm:w-auto">
