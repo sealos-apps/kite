@@ -77,7 +77,6 @@ type ChartSource =
   | typeof repositoriesSource
   | typeof ociSource
 type HelmChartListSessionState = {
-  chartSource?: ChartSource
   verifiedPublisherOnly?: boolean
   searchQuery?: string
   repositoryFilter?: string
@@ -101,12 +100,6 @@ function readHelmChartListSessionState(): HelmChartListSessionState {
     const pagination = state.pagination
 
     return {
-      chartSource:
-        state.chartSource === artifactHubSource ||
-        state.chartSource === repositoriesSource ||
-        state.chartSource === ociSource
-          ? state.chartSource
-          : undefined,
       verifiedPublisherOnly:
         typeof state.verifiedPublisherOnly === 'boolean'
           ? state.verifiedPublisherOnly
@@ -285,13 +278,7 @@ export function HelmChartListPage() {
   const { t } = useTranslation()
   const { user, helmArtifactHubEnabled } = useAuth()
   const [initialSessionState] = useState(readHelmChartListSessionState)
-  const [chartSource, setChartSource] = useState<ChartSource>(
-    helmArtifactHubEnabled
-      ? (initialSessionState.chartSource ?? artifactHubSource)
-      : initialSessionState.chartSource === ociSource
-        ? ociSource
-        : repositoriesSource
-  )
+  const [chartSource, setChartSource] = useState<ChartSource>(ociSource)
   const [verifiedPublisherOnly, setVerifiedPublisherOnly] = useState(
     initialSessionState.verifiedPublisherOnly ?? false
   )
@@ -320,7 +307,7 @@ export function HelmChartListPage() {
 
   useEffect(() => {
     if (!helmArtifactHubEnabled && chartSource === artifactHubSource) {
-      setChartSource(repositoriesSource)
+      setChartSource(ociSource)
     }
   }, [chartSource, helmArtifactHubEnabled])
 
@@ -328,20 +315,13 @@ export function HelmChartListPage() {
     sessionStorage.setItem(
       helmChartListSessionStorageKey,
       JSON.stringify({
-        chartSource,
         verifiedPublisherOnly,
         searchQuery,
         repositoryFilter,
         pagination,
       })
     )
-  }, [
-    chartSource,
-    verifiedPublisherOnly,
-    searchQuery,
-    repositoryFilter,
-    pagination,
-  ])
+  }, [verifiedPublisherOnly, searchQuery, repositoryFilter, pagination])
 
   const { data: repositories = [], refetch: refetchRepositories } =
     useHelmRepositories()
@@ -570,14 +550,12 @@ export function HelmChartListPage() {
               aria-label={t('common.fields.source')}
               className="h-9 shrink-0 gap-0 overflow-hidden rounded-md border bg-muted/30 p-0.5 shadow-xs"
             >
-              {helmArtifactHubEnabled ? (
-                <ToggleGroupItem
-                  value={artifactHubSource}
-                  className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
-                >
-                  {t('helmCharts.filters.artifactHub')}
-                </ToggleGroupItem>
-              ) : null}
+              <ToggleGroupItem
+                value={ociSource}
+                className="h-8 min-w-[5.5rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+              >
+                {t('helmCharts.filters.oci')}
+              </ToggleGroupItem>
               <ToggleGroupItem
                 value={repositoriesSource}
                 className="h-8 min-w-[4.25rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
@@ -585,10 +563,11 @@ export function HelmChartListPage() {
                 {t('helmCharts.filters.repositories')}
               </ToggleGroupItem>
               <ToggleGroupItem
-                value={ociSource}
-                className="h-8 min-w-[5.5rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+                value={artifactHubSource}
+                disabled={!helmArtifactHubEnabled}
+                className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
               >
-                {t('helmCharts.filters.oci')}
+                {t('helmCharts.filters.artifactHub')}
               </ToggleGroupItem>
             </ToggleGroup>
             {!isArtifactHubSource && !isOCISource ? (
