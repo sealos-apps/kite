@@ -126,7 +126,7 @@ func (cm *ClusterManager) CreateCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	cm.TriggerSyncForCluster(cluster.Name)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      cluster.ID,
@@ -195,7 +195,7 @@ func (cm *ClusterManager) UpdateCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	cm.TriggerSyncForCluster(cluster.Name)
 
 	c.JSON(http.StatusOK, gin.H{"message": "cluster updated successfully"})
 }
@@ -228,7 +228,7 @@ func (cm *ClusterManager) DeleteCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	cm.TriggerSyncForCluster(cluster.Name)
 
 	c.JSON(http.StatusOK, gin.H{"message": "cluster deleted successfully"})
 }
@@ -268,7 +268,7 @@ func (cm *ClusterManager) ImportClustersFromKubeconfig(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		syncNow <- struct{}{}
+		cm.TriggerSyncForCluster(cluster.Name)
 		// wait for sync to complete
 		time.Sleep(1 * time.Second)
 		c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("imported %d clusters successfully", 1)})
@@ -282,7 +282,7 @@ func (cm *ClusterManager) ImportClustersFromKubeconfig(c *gin.Context) {
 	}
 
 	importedCount := ImportClustersFromKubeconfig(kubeconfig)
-	syncNow <- struct{}{}
+	cm.TriggerSync()
 	// wait for sync to complete
 	time.Sleep(1 * time.Second)
 	c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("imported %d clusters successfully", importedCount)})

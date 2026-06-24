@@ -91,7 +91,7 @@ func Test_buildSealosRoleNamespaces(t *testing.T) {
 	})
 }
 
-func TestEnsureSealosAdminRoleAssignmentIfExempt(t *testing.T) {
+func TestSyncSealosAdminRoleAssignment(t *testing.T) {
 	useTestSealosAuthDB(t)
 
 	originalExempt := common.NamespaceScopeExemptNamespaces
@@ -104,7 +104,8 @@ func TestEnsureSealosAdminRoleAssignmentIfExempt(t *testing.T) {
 		"ns-admin": {},
 	}
 
-	require.NoError(t, ensureSealosAdminRoleAssignmentIfExempt("ns-admin", "sealos-admin"))
+	require.NoError(t, syncSealosAdminRoleAssignment("ns-admin", "sealos-admin"))
+	require.NoError(t, syncSealosAdminRoleAssignment("ns-admin", "other-admin"))
 
 	adminRole, err := model.GetRoleByName(model.DefaultAdminRole.Name)
 	require.NoError(t, err)
@@ -118,7 +119,26 @@ func TestEnsureSealosAdminRoleAssignmentIfExempt(t *testing.T) {
 	).Count(&adminAssignments).Error)
 	assert.EqualValues(t, 1, adminAssignments)
 
-	require.NoError(t, ensureSealosAdminRoleAssignmentIfExempt("default", "sealos-regular"))
+	require.NoError(t, syncSealosAdminRoleAssignment("default", "sealos-admin"))
+
+	require.NoError(t, model.DB.Model(&model.RoleAssignment{}).Where(
+		"role_id = ? AND subject_type = ? AND subject = ?",
+		adminRole.ID,
+		model.SubjectTypeUser,
+		"sealos-admin",
+	).Count(&adminAssignments).Error)
+	assert.EqualValues(t, 0, adminAssignments)
+
+	var otherAssignments int64
+	require.NoError(t, model.DB.Model(&model.RoleAssignment{}).Where(
+		"role_id = ? AND subject_type = ? AND subject = ?",
+		adminRole.ID,
+		model.SubjectTypeUser,
+		"other-admin",
+	).Count(&otherAssignments).Error)
+	assert.EqualValues(t, 1, otherAssignments)
+
+	require.NoError(t, syncSealosAdminRoleAssignment("default", "sealos-regular"))
 
 	var regularAssignments int64
 	require.NoError(t, model.DB.Model(&model.RoleAssignment{}).Where(

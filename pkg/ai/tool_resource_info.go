@@ -223,8 +223,12 @@ func parseResourceYAML(args map[string]interface{}) (*unstructured.Unstructured,
 
 // MutationTools is the set of tools that modify cluster state and require confirmation.
 var MutationTools = map[string]bool{
-	"create_resource": true,
-	"update_resource": true,
-	"patch_resource":  true,
-	"delete_resource": true,
+	"create_resource":        true,
+	"update_resource":        true,
+	"patch_resource":         true,
+	"delete_resource":        true,
+	"install_helm_release":   true,
+	"upgrade_helm_release":   true,
+	"rollback_helm_release":  true,
+	"uninstall_helm_release": true,
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/zxh326/kite/pkg/cluster"
+	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -74,5 +75,42 @@ func TestToolDefinitionsPrometheusToggle(t *testing.T) {
 
 	if got := hasPrometheusTool(toolDefinitions(&cluster.ClientSet{PromClient: &prometheus.Client{}})); !got {
 		t.Fatalf("expected Prometheus tool when client is present")
+	}
+
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+	if got := hasPrometheusTool(toolDefinitions(&cluster.ClientSet{
+		NamespaceScoped: true,
+		Namespace:       "team-a",
+		PromClient:      &prometheus.Client{},
+	})); got {
+		t.Fatalf("expected no Prometheus tool in namespace-scoped workspace")
+	}
+}
+
+func TestToolDefinitionsIncludeHelmTools(t *testing.T) {
+	defs := toolDefinitions(&cluster.ClientSet{})
+	names := map[string]bool{}
+	for _, def := range defs {
+		names[def.Name] = true
+	}
+
+	for _, name := range []string{
+		"list_helm_releases",
+		"get_helm_release",
+		"get_helm_release_history",
+		"dry_run_install_helm_release",
+		"install_helm_release",
+		"dry_run_upgrade_helm_release",
+		"upgrade_helm_release",
+		"rollback_helm_release",
+		"uninstall_helm_release",
+	} {
+		if !names[name] {
+			t.Fatalf("expected Helm tool %s to be defined", name)
+		}
 	}
 }

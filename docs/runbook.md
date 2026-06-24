@@ -150,7 +150,7 @@ make docs-build
 - `ANONYMOUS_USER_ENABLED`: bypass normal auth. Do not enable in production unless the deployment is intentionally trusted.
 - `SEALOS_AUTH_ENABLED`: enables the Sealos login API.
 - `SEALOS_JWT_SECRET`: JWT secret used for Sealos auth validation.
-- `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`: comma-separated Sealos workspace namespaces that represent global/admin credentials. Matching Sealos users receive `*` namespaces on their managed cluster and Kite's built-in `admin` role.
+- `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`: comma-separated Sealos workspace namespaces that represent global/admin credentials. Matching Sealos users receive `*` namespaces on their managed cluster and Kite's built-in `admin` role. When the same Sealos user logs into a non-exempt workspace, Kite removes that user's stale built-in `admin` assignment before RBAC sync.
 - `AUTH_COOKIE_SAMESITE` and `AUTH_COOKIE_SECURE`: cookie settings for normal and iframe deployments.
 - `VITE_SEALOS_AUTO_LOGIN`: frontend build-time flag controlling Sealos SDK session login attempts.
 
@@ -163,7 +163,8 @@ Sealos auth notes:
 
 - Kite does not block Sealos auth solely because the app is opened as the top-level window. Standalone local development and `sealos-app-dev-bridge` can still attempt Sealos SDK auto-login when `SEALOS_AUTH_ENABLED=true`.
 - `/login` can show a non-blocking Sealos SDK availability notice when the SDK session channel is unavailable. Treat it as a diagnostic hint for Sealos Desktop or `sealos-app-dev-bridge`, not as an access gate.
-- The display name `admin` is not enough for Kite admin-only settings. Check `/api/auth/user` or the `role_assignments` table: the user must have the built-in `admin` role. For Sealos workspaces in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`, the next Sealos login/sync assigns that role automatically.
+- The display name `admin` is not enough for Kite admin-only settings. Check `/api/auth/user` or the `role_assignments` table: the user must have the built-in `admin` role. For Sealos workspaces in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`, the next Sealos login/sync assigns that role automatically; for non-exempt workspaces, the next Sealos login/sync removes stale built-in `admin` assignments for that Sealos username.
+- Non-exempt Sealos kubeconfigs with a current-context namespace are loaded as namespace-scoped clients. Kite disables the controller-runtime informer cache for those clients, so direct Kubernetes API reads are expected even when the global process cache is enabled.
 - If Sealos auto-login fails in standalone/local development, verify the bridge or Sealos Desktop session first, then inspect `/api/auth/login/sealos` responses and backend logs.
 
 ## Auth Fault Page
@@ -209,6 +210,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - The AI assistant UI is enabled by default for new installs. The visible settings entry is the configure button in the AI chat panel; only Kite admins can edit the Settings page, which only shows AI Agent settings.
 - Chat requests require an OpenAI-compatible or Anthropic-compatible provider configuration with an API key. If the API key is missing, the runtime treats AI as not enabled.
 - Read-only tools still use the current authenticated user, cluster, and namespace scope.
+- In namespace-scoped non-exempt Sealos workspaces, AI tools resolve omitted namespace and `_all` to the current workspace namespace, reject ordinary cluster-scoped resources such as Nodes/Namespaces, hide arbitrary Prometheus queries, and show namespace-local cluster overview data only.
 - Mutating tools require both Kite RBAC and an explicit continue/confirmation step. Pending sessions are scoped to the same user and cluster.
 - If AI chat returns an AI Agent configuration, disabled, or provider error, check the general settings record, provider base URL, API key, model name, and whether the current user has Kite's built-in `admin` role when trying to edit `/settings`.
 

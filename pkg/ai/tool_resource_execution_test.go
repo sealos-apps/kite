@@ -1,13 +1,20 @@
 package ai
 
 import (
+	"context"
 	"math"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/zxh326/kite/pkg/cluster"
+	"github.com/zxh326/kite/pkg/common"
+	"github.com/zxh326/kite/pkg/kube"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestObjectToYAML(t *testing.T) {
@@ -256,5 +263,98 @@ func TestAsInt64(t *testing.T) {
 				t.Fatalf("unexpected value: want %d, got %d", tc.want, got)
 			}
 		})
+	}
+}
+
+func TestExecuteListResourcesUsesNamespaceScope(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+
+	cs := testAIClientSet(
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-a", Namespace: "team-a"}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-b", Namespace: "team-b"}},
+	)
+	cs.NamespaceScoped = true
+	cs.Namespace = "team-a"
+
+	got, isError := executeListResources(context.Background(), cs, map[string]interface{}{
+		"kind": "Pod",
+	})
+	if isError {
+		t.Fatalf("expected list to succeed, got %s", got)
+	}
+	if !strings.Contains(got, "team-a/pod-a") {
+		t.Fatalf("expected team-a pod, got %s", got)
+	}
+	if strings.Contains(got, "team-b/pod-b") {
+		t.Fatalf("did not expect team-b pod, got %s", got)
+	}
+
+	got, isError = executeListResources(context.Background(), cs, map[string]interface{}{
+		"kind":      "Pod",
+		"namespace": "team-b",
+	})
+	if !isError || !strings.Contains(got, "outside the current workspace scope") {
+		t.Fatalf("expected cross-namespace error, got isError=%v result=%s", isError, got)
+	}
+
+	got, isError = executeListResources(context.Background(), cs, map[string]interface{}{
+		"kind": "Node",
+	})
+	if !isError || !strings.Contains(got, "cluster-scoped") {
+		t.Fatalf("expected cluster-scoped error, got isError=%v result=%s", isError, got)
+	}
+}
+
+func TestExecuteGetClusterOverviewUsesNamespaceScope(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+
+	cs := testAIClientSet(
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "running", Namespace: "team-a"},
+			Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "hidden", Namespace: "team-b"},
+			Status:     corev1.PodStatus{Phase: corev1.PodFailed},
+		},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc-a", Namespace: "team-a"}},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc-b", Namespace: "team-b"}},
+	)
+	cs.NamespaceScoped = true
+	cs.Namespace = "team-a"
+
+	got, isError := executeGetClusterOverview(context.Background(), cs)
+	if isError {
+		t.Fatalf("expected overview to succeed, got %s", got)
+	}
+	for _, want := range []string{
+		"Namespace scope: team-a",
+		"Cluster-wide nodes and namespaces are hidden",
+		"Pods in team-a: 1 total (1 running, 0 pending, 0 failed, 0 succeeded)",
+		"Services in team-a: 1",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected overview to contain %q, got %s", want, got)
+		}
+	}
+	if strings.Contains(got, "team-b") {
+		t.Fatalf("did not expect other namespace in overview, got %s", got)
+	}
+}
+
+func testAIClientSet(objects ...client.Object) *cluster.ClientSet {
+	return &cluster.ClientSet{
+		Name: "cluster-a",
+		K8sClient: &kube.K8sClient{
+			Client: fake.NewClientBuilder().WithObjects(objects...).Build(),
+		},
 	}
 }

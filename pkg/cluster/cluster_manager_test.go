@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -42,6 +43,39 @@ func Test_applyNamespaceScope(t *testing.T) {
 
 		assert.False(t, cs.NamespaceScoped)
 		assert.Equal(t, "ns-admin", cs.Namespace)
+	})
+}
+
+func Test_clientOptionsForContextNamespace(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+
+	t.Run("regular namespace disables informer cache", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+
+		options := clientOptionsForContextNamespace(" ns-a ")
+
+		assert.True(t, options.DisableCache)
+	})
+
+	t.Run("exempt namespace keeps default cache behavior", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{
+			"ns-admin": {},
+		}
+
+		options := clientOptionsForContextNamespace(" NS-ADMIN ")
+
+		assert.False(t, options.DisableCache)
+	})
+
+	t.Run("empty namespace keeps default cache behavior", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+
+		options := clientOptionsForContextNamespace("")
+
+		assert.False(t, options.DisableCache)
 	})
 }
 
@@ -187,6 +221,166 @@ func Test_shouldUpdateCluster(t *testing.T) {
 			assert.False(t, got, "expected no update when all the same")
 		})
 	})
+}
+
+func TestClusterBuildBackoff(t *testing.T) {
+	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
+	cm := &ClusterManager{
+		errors:       map[string]string{},
+		errorBackoff: map[string]clusterBuildBackoff{},
+	}
+	cluster := &model.Cluster{
+		Name:          "sealos-user-ns-a",
+		Enable:        true,
+		Config:        model.SecretString("kubeconfig-a"),
+		PrometheusURL: "http://prometheus",
+	}
+
+	assert.False(t, cm.shouldSkipFailedBuild(cluster, now))
+
+	cm.recordFailedBuild(cluster, now)
+
+	assert.True(t, cm.shouldSkipFailedBuild(cluster, now.Add(time.Minute)))
+	assert.False(t, cm.shouldSkipFailedBuild(cluster, now.Add(failedClusterBuildBackoff+time.Second)))
+
+	changedCluster := *cluster
+	changedCluster.Config = model.SecretString("kubeconfig-b")
+	assert.False(t, cm.shouldSkipFailedBuild(&changedCluster, now.Add(time.Minute)))
+
+	changedPrometheusCluster := *cluster
+	changedPrometheusCluster.PrometheusURL = "http://prometheus-new"
+	assert.False(t, cm.shouldSkipFailedBuild(&changedPrometheusCluster, now.Add(time.Minute)))
+
+	changedInCluster := *cluster
+	changedInCluster.InCluster = true
+	assert.False(t, cm.shouldSkipFailedBuild(&changedInCluster, now.Add(time.Minute)))
+
+	cm.errors[cluster.Name] = "failed"
+	cm.clearBuildFailure(cluster.Name)
+	assert.NotContains(t, cm.errors, cluster.Name)
+	assert.NotContains(t, cm.errorBackoff, cluster.Name)
+}
+
+func TestSyncClustersClearsBuildFailureWhenClusterDisabled(t *testing.T) {
+	originalListClusters := listClusters
+	originalBuildClientSet := buildClientSetFunc
+	originalNow := nowFunc
+	t.Cleanup(func() {
+		listClusters = originalListClusters
+		buildClientSetFunc = originalBuildClientSet
+		nowFunc = originalNow
+	})
+
+	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
+	cluster := &model.Cluster{
+		Name:   "sealos-user-ns-a",
+		Enable: false,
+		Config: model.SecretString("kubeconfig-a"),
+	}
+	listClusters = func() ([]*model.Cluster, error) {
+		return []*model.Cluster{cluster}, nil
+	}
+	nowFunc = func() time.Time {
+		return now
+	}
+
+	cm := &ClusterManager{
+		clusters:     map[string]*ClientSet{},
+		errors:       map[string]string{cluster.Name: "cache sync failed"},
+		errorBackoff: map[string]clusterBuildBackoff{},
+	}
+	cm.recordFailedBuild(cluster, now)
+
+	buildCalls := 0
+	buildClientSetFunc = func(cluster *model.Cluster) (*ClientSet, error) {
+		buildCalls++
+		return nil, errors.New("should not build disabled cluster")
+	}
+
+	require.NoError(t, syncClusters(cm))
+	assert.Equal(t, 0, buildCalls)
+	assert.NotContains(t, cm.errors, cluster.Name)
+	assert.NotContains(t, cm.errorBackoff, cluster.Name)
+}
+
+func TestSyncClustersFailedBuildBackoff(t *testing.T) {
+	originalListClusters := listClusters
+	originalBuildClientSet := buildClientSetFunc
+	originalNow := nowFunc
+	t.Cleanup(func() {
+		listClusters = originalListClusters
+		buildClientSetFunc = originalBuildClientSet
+		nowFunc = originalNow
+	})
+
+	now := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
+	currentCluster := &model.Cluster{
+		Name:          "sealos-user-ns-a",
+		Enable:        true,
+		Config:        model.SecretString("kubeconfig-a"),
+		PrometheusURL: "http://prometheus",
+	}
+	listClusters = func() ([]*model.Cluster, error) {
+		return []*model.Cluster{currentCluster}, nil
+	}
+	nowFunc = func() time.Time {
+		return now
+	}
+
+	cm := &ClusterManager{
+		clusters:     map[string]*ClientSet{},
+		errors:       map[string]string{},
+		errorBackoff: map[string]clusterBuildBackoff{},
+	}
+
+	buildCalls := 0
+	buildClientSetFunc = func(cluster *model.Cluster) (*ClientSet, error) {
+		buildCalls++
+		return nil, errors.New("cache sync failed")
+	}
+
+	require.NoError(t, syncClusters(cm))
+	assert.Equal(t, 1, buildCalls)
+	assert.Equal(t, "cache sync failed", cm.errors[currentCluster.Name])
+	assert.Contains(t, cm.errorBackoff, currentCluster.Name)
+
+	require.NoError(t, syncClusters(cm))
+	assert.Equal(t, 1, buildCalls, "background sync should respect failed-build backoff")
+
+	require.NoError(t, syncClustersWithOptions(cm, clusterSyncOptions{ignoreFailedBuildBackoff: true}))
+	assert.Equal(t, 2, buildCalls, "manual sync should retry immediately")
+
+	changedCluster := *currentCluster
+	changedCluster.Config = model.SecretString("kubeconfig-b")
+	currentCluster = &changedCluster
+
+	require.NoError(t, syncClusters(cm))
+	assert.Equal(t, 3, buildCalls, "config changes should bypass failed-build backoff")
+
+	buildClientSetFunc = func(cluster *model.Cluster) (*ClientSet, error) {
+		buildCalls++
+		return &ClientSet{Name: cluster.Name, config: string(cluster.Config), prometheusURL: cluster.PrometheusURL}, nil
+	}
+
+	require.NoError(t, syncClustersWithOptions(cm, clusterSyncOptions{ignoreFailedBuildBackoff: true}))
+	assert.Equal(t, 4, buildCalls)
+	assert.Contains(t, cm.clusters, currentCluster.Name)
+	assert.NotContains(t, cm.errors, currentCluster.Name)
+	assert.NotContains(t, cm.errorBackoff, currentCluster.Name)
+}
+
+func TestWaitForClusterRefreshIgnoresStaleError(t *testing.T) {
+	cm := &ClusterManager{
+		clusters: map[string]*ClientSet{},
+		errors:   map[string]string{"sealos-tenant-c": "stale build error"},
+	}
+
+	assert.False(t, cm.WaitForCluster("sealos-tenant-c", 10*time.Millisecond))
+
+	start := time.Now()
+	assert.False(t, cm.WaitForClusterRefresh("sealos-tenant-c", 10*time.Millisecond))
+
+	assert.GreaterOrEqual(t, time.Since(start), 10*time.Millisecond)
 }
 
 func TestResolveClientSetForUser(t *testing.T) {

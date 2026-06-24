@@ -69,6 +69,10 @@ func executeGetResource(ctx context.Context, cs *cluster.ClientSet, args map[str
 	namespace, _ := args["namespace"].(string)
 
 	resource := resolveResourceInfo(ctx, cs, kind)
+	namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
 	obj := buildObjectForResource(resource)
 	key := k8stypes.NamespacedName{
 		Name:      name,
@@ -132,6 +136,10 @@ func executeListResources(ctx context.Context, cs *cluster.ClientSet, args map[s
 	labelSelector, _ := args["label_selector"].(string)
 
 	resource := resolveResourceInfo(ctx, cs, kind)
+	namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
 	namespace = normalizeNamespace(resource, namespace)
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(resource.ListGVK())
@@ -477,6 +485,10 @@ func executeGetPodLogs(ctx context.Context, cs *cluster.ClientSet, args map[stri
 	if name == "" || namespace == "" {
 		return "Error: name and namespace are required", true
 	}
+	namespace, err := scopedNamespaceForTool(cs, resolveStaticResourceInfo(string(common.Pods)), namespace)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
 
 	logOpts := &corev1.PodLogOptions{
 		TailLines: &tailLines,
@@ -512,6 +524,41 @@ func executeGetPodLogs(ctx context.Context, cs *cluster.ClientSet, args map[stri
 func executeGetClusterOverview(ctx context.Context, cs *cluster.ClientSet) (string, bool) {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Cluster: %s\n\n", cs.Name)
+
+	if isNamespaceScopeLocked(cs) {
+		namespace := strings.TrimSpace(cs.Namespace)
+		fmt.Fprintf(&sb, "Namespace scope: %s\n", namespace)
+		fmt.Fprintf(&sb, "Cluster-wide nodes and namespaces are hidden by the current workspace scope.\n")
+
+		pods := &corev1.PodList{}
+		if err := cs.K8sClient.List(ctx, pods, client.InNamespace(namespace)); err != nil {
+			fmt.Fprintf(&sb, "Error listing pods in namespace %s: %v\n", namespace, err)
+		} else {
+			running, pending, failed, succeeded := 0, 0, 0, 0
+			for _, pod := range pods.Items {
+				switch pod.Status.Phase {
+				case corev1.PodRunning:
+					running++
+				case corev1.PodPending:
+					pending++
+				case corev1.PodFailed:
+					failed++
+				case corev1.PodSucceeded:
+					succeeded++
+				}
+			}
+			fmt.Fprintf(&sb, "Pods in %s: %d total (%d running, %d pending, %d failed, %d succeeded)\n", namespace, len(pods.Items), running, pending, failed, succeeded)
+		}
+
+		services := &corev1.ServiceList{}
+		if err := cs.K8sClient.List(ctx, services, client.InNamespace(namespace)); err != nil {
+			fmt.Fprintf(&sb, "Error listing services in namespace %s: %v\n", namespace, err)
+		} else {
+			fmt.Fprintf(&sb, "Services in %s: %d\n", namespace, len(services.Items))
+		}
+
+		return sb.String(), false
+	}
 
 	// Nodes
 	nodes := &corev1.NodeList{}
@@ -573,6 +620,13 @@ func executeCreateResource(ctx context.Context, cs *cluster.ClientSet, user pkgm
 
 	yamlStr, _ := getRequiredString(args, "yaml")
 	resource := resolveResourceInfoForObject(ctx, cs, obj)
+	namespace, err := scopedNamespaceForTool(cs, resource, obj.GetNamespace())
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
+	if !resource.ClusterScoped {
+		obj.SetNamespace(namespace)
+	}
 	err = cs.K8sClient.Create(ctx, obj)
 
 	recordResourceHistory(cs, user, resource.Resource, obj.GetName(), obj.GetNamespace(), "create", yamlStr, "", err == nil, err)
@@ -595,10 +649,17 @@ func executeUpdateResource(ctx context.Context, cs *cluster.ClientSet, user pkgm
 
 	// Get previous state
 	resource := resolveResourceInfoForObject(ctx, cs, obj)
+	namespace, err := scopedNamespaceForTool(cs, resource, obj.GetNamespace())
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
+	if !resource.ClusterScoped {
+		obj.SetNamespace(namespace)
+	}
 	prevObj := buildObjectForResource(resource)
 	key := k8stypes.NamespacedName{
 		Name:      obj.GetName(),
-		Namespace: normalizeNamespace(resource, obj.GetNamespace()),
+		Namespace: normalizeNamespace(resource, namespace),
 	}
 	var previousYAML string
 	if getErr := cs.K8sClient.Get(ctx, key, prevObj); getErr == nil {
@@ -636,6 +697,10 @@ func executePatchResource(ctx context.Context, cs *cluster.ClientSet, user pkgmo
 	}
 
 	resource := resolveResourceInfo(ctx, cs, kind)
+	namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
 	obj := buildObjectForResource(resource)
 
 	key := k8stypes.NamespacedName{
@@ -681,6 +746,10 @@ func executeDeleteResource(ctx context.Context, cs *cluster.ClientSet, user pkgm
 	namespace, _ := args["namespace"].(string)
 
 	resource := resolveResourceInfo(ctx, cs, kind)
+	namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
 	obj := buildObjectForResource(resource)
 
 	key := k8stypes.NamespacedName{

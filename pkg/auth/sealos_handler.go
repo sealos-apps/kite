@@ -308,13 +308,18 @@ func ensureSealosRoleAssignment(roleID uint, username string) error {
 	}).Error
 }
 
-func ensureSealosAdminRoleAssignmentIfExempt(namespace, username string) error {
-	if !common.IsNamespaceScopeExempt(namespace) {
-		return nil
-	}
+func syncSealosAdminRoleAssignment(namespace, username string) error {
 	role, err := model.GetRoleByName(model.DefaultAdminRole.Name)
 	if err != nil {
 		return err
+	}
+	if !common.IsNamespaceScopeExempt(namespace) {
+		return model.DB.Where(
+			"role_id = ? AND subject_type = ? AND subject = ?",
+			role.ID,
+			model.SubjectTypeUser,
+			username,
+		).Delete(&model.RoleAssignment{}).Error
 	}
 	return ensureSealosRoleAssignment(role.ID, username)
 }
@@ -416,8 +421,8 @@ func (h *AuthHandler) SealosLogin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign sealos role"})
 		return
 	}
-	if err := ensureSealosAdminRoleAssignmentIfExempt(workspaceID, user.Username); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to assign sealos admin role"})
+	if err := syncSealosAdminRoleAssignment(workspaceID, user.Username); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to sync sealos admin role"})
 		return
 	}
 	if err := rbac.ForceSyncRolesConfig(); err != nil {
