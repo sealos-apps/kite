@@ -131,6 +131,7 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 
 - 托管 Kubernetes 的 kubeconfig 如果使用 `aws`、`gcloud`、`kubelogin` 这类 `exec` 插件，应改用 Service Account token kubeconfig。参考 `docs/zh/config/managed-k8s-auth.md`。
 - 如果访问资源时报权限错误，先检查 Kite RBAC，再检查服务账号或导入 kubeconfig 对应的 Kubernetes RBAC。
+- 如果 Sealos 个人工作空间一直停留在加载状态，同时后端日志反复出现 `failed to wait for cache sync`，先检查 kubeconfig current-context namespace。非豁免命名空间作用域 kubeconfig 应走直接 Kubernetes API 读取，而不是 controller-runtime informer cache；后端集群构建失败会被限频，新的 Sealos 登录或集群配置更新会立即重试。
 - 如果生产镜像没有 shell，不要强行 `kubectl exec` 进 Kite，改用临时 debug/client pod。
 
 ## AI 助手运维

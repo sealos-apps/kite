@@ -17,21 +17,22 @@ import (
 )
 
 func (cm *ClusterManager) GetClusters(c *gin.Context) {
-	result := make([]common.ClusterInfo, 0, len(cm.clusters))
+	snapshot := cm.snapshotRuntimeState()
+	result := make([]common.ClusterInfo, 0, len(snapshot.clusters))
 	user := c.MustGet("user").(model.User)
-	for name, cluster := range cm.clusters {
+	for name, cluster := range snapshot.clusters {
 		if !rbac.CanAccessCluster(user, name) {
 			continue
 		}
 		result = append(result, common.ClusterInfo{
 			Name:            name,
 			Version:         cluster.Version,
-			IsDefault:       name == cm.defaultContext,
+			IsDefault:       name == snapshot.defaultContext,
 			NamespaceScoped: cluster.NamespaceScoped,
 			Namespace:       cluster.Namespace,
 		})
 	}
-	for name, errMsg := range cm.errors {
+	for name, errMsg := range snapshot.errors {
 		if !rbac.CanAccessCluster(user, name) {
 			continue
 		}
@@ -55,6 +56,7 @@ func (cm *ClusterManager) GetClusterList(c *gin.Context) {
 		return
 	}
 
+	snapshot := cm.snapshotRuntimeState()
 	result := make([]gin.H, 0, len(clusters))
 	for _, cluster := range clusters {
 		clusterInfo := gin.H{
@@ -68,10 +70,10 @@ func (cm *ClusterManager) GetClusterList(c *gin.Context) {
 			"config":        "",
 		}
 
-		if clientSet, exists := cm.clusters[cluster.Name]; exists {
+		if clientSet, exists := snapshot.clusters[cluster.Name]; exists {
 			clusterInfo["version"] = clientSet.Version
 		}
-		if errMsg, exists := cm.errors[cluster.Name]; exists {
+		if errMsg, exists := snapshot.errors[cluster.Name]; exists {
 			clusterInfo["error"] = errMsg
 		}
 

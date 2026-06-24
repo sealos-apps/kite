@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zxh326/kite/pkg/common"
@@ -39,6 +40,8 @@ type ClientSet struct {
 }
 
 type ClusterManager struct {
+	syncMu         sync.Mutex
+	mu             sync.RWMutex
 	clusters       map[string]*ClientSet
 	errors         map[string]string
 	errorBackoff   map[string]clusterBuildBackoff
@@ -259,20 +262,46 @@ func (t *k8sProxyTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.transport.RoundTrip(req)
 }
 
+type clusterRuntimeSnapshot struct {
+	clusters       map[string]*ClientSet
+	errors         map[string]string
+	defaultContext string
+}
+
+func (cm *ClusterManager) snapshotRuntimeState() clusterRuntimeSnapshot {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	clusters := make(map[string]*ClientSet, len(cm.clusters))
+	for name, clientSet := range cm.clusters {
+		clusters[name] = clientSet
+	}
+	errors := make(map[string]string, len(cm.errors))
+	for name, errMsg := range cm.errors {
+		errors[name] = errMsg
+	}
+	return clusterRuntimeSnapshot{
+		clusters:       clusters,
+		errors:         errors,
+		defaultContext: cm.defaultContext,
+	}
+}
+
 func (cm *ClusterManager) GetClientSet(clusterName string) (*ClientSet, error) {
-	if len(cm.clusters) == 0 {
+	snapshot := cm.snapshotRuntimeState()
+	if len(snapshot.clusters) == 0 {
 		return nil, fmt.Errorf("no clusters available")
 	}
 	if clusterName == "" {
-		if cm.defaultContext == "" {
+		if snapshot.defaultContext == "" {
 			// If no default context is set, return the first available cluster
-			for _, cs := range cm.clusters {
+			for _, cs := range snapshot.clusters {
 				return cs, nil
 			}
 		}
-		return cm.GetClientSet(cm.defaultContext)
+		clusterName = snapshot.defaultContext
 	}
-	if cluster, ok := cm.clusters[clusterName]; ok {
+	if cluster, ok := snapshot.clusters[clusterName]; ok {
 		return cluster, nil
 	}
 	return nil, fmt.Errorf("cluster not found: %s", clusterName)
@@ -290,18 +319,19 @@ func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName s
 		return cluster, nil
 	}
 
-	if len(cm.clusters) == 0 {
+	snapshot := cm.snapshotRuntimeState()
+	if len(snapshot.clusters) == 0 {
 		return nil, fmt.Errorf("no clusters available")
 	}
 
-	if cm.defaultContext != "" {
-		if cluster, ok := cm.clusters[cm.defaultContext]; ok && rbac.CanAccessCluster(user, cm.defaultContext) {
+	if snapshot.defaultContext != "" {
+		if cluster, ok := snapshot.clusters[snapshot.defaultContext]; ok && rbac.CanAccessCluster(user, snapshot.defaultContext) {
 			return cluster, nil
 		}
 	}
 
-	accessible := make([]string, 0, len(cm.clusters))
-	for name := range cm.clusters {
+	accessible := make([]string, 0, len(snapshot.clusters))
+	for name := range snapshot.clusters {
 		if rbac.CanAccessCluster(user, name) {
 			accessible = append(accessible, name)
 		}
@@ -311,7 +341,7 @@ func (cm *ClusterManager) ResolveClientSetForUser(user model.User, clusterName s
 	}
 
 	sort.Strings(accessible)
-	return cm.clusters[accessible[0]], nil
+	return snapshot.clusters[accessible[0]], nil
 }
 
 func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet, bool) {
@@ -319,7 +349,7 @@ func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet
 		return nil, false
 	}
 
-	if cluster, ok := cm.clusters[clusterName]; ok {
+	if cluster, ok := cm.getCluster(clusterName); ok {
 		return cluster, true
 	}
 
@@ -339,7 +369,14 @@ func (cm *ClusterManager) resolveClientSetByName(clusterName string) (*ClientSet
 		return nil, false
 	}
 
-	cluster, ok := cm.clusters[clusterName]
+	cluster, ok := cm.getCluster(clusterName)
+	return cluster, ok
+}
+
+func (cm *ClusterManager) getCluster(name string) (*ClientSet, bool) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	cluster, ok := cm.clusters[name]
 	return cluster, ok
 }
 
@@ -435,15 +472,19 @@ func (cm *ClusterManager) waitForCluster(name string, timeout time.Duration, ign
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if _, ok := cm.clusters[name]; ok {
+		cm.mu.RLock()
+		_, clusterExists := cm.clusters[name]
+		_, hasError := cm.errors[name]
+		cm.mu.RUnlock()
+		if clusterExists {
 			return true
 		}
-		if _, ok := cm.errors[name]; ok && !ignoreStaleError {
+		if hasError && !ignoreStaleError {
 			return false
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	_, ok := cm.clusters[name]
+	_, ok := cm.getCluster(name)
 	return ok
 }
 
@@ -456,7 +497,16 @@ func clusterConfigHash(cluster *model.Cluster) string {
 }
 
 func (cm *ClusterManager) shouldSkipFailedBuild(cluster *model.Cluster, now time.Time) bool {
-	if cm == nil || cluster == nil || cm.errorBackoff == nil {
+	if cm == nil || cluster == nil {
+		return false
+	}
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.shouldSkipFailedBuildLocked(cluster, now)
+}
+
+func (cm *ClusterManager) shouldSkipFailedBuildLocked(cluster *model.Cluster, now time.Time) bool {
+	if cm.errorBackoff == nil {
 		return false
 	}
 	backoff, ok := cm.errorBackoff[cluster.Name]
@@ -464,6 +514,12 @@ func (cm *ClusterManager) shouldSkipFailedBuild(cluster *model.Cluster, now time
 }
 
 func (cm *ClusterManager) recordFailedBuild(cluster *model.Cluster, now time.Time) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.recordFailedBuildLocked(cluster, now)
+}
+
+func (cm *ClusterManager) recordFailedBuildLocked(cluster *model.Cluster, now time.Time) {
 	if cm.errorBackoff == nil {
 		cm.errorBackoff = make(map[string]clusterBuildBackoff)
 	}
@@ -474,6 +530,12 @@ func (cm *ClusterManager) recordFailedBuild(cluster *model.Cluster, now time.Tim
 }
 
 func (cm *ClusterManager) clearBuildFailure(name string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.clearBuildFailureLocked(name)
+}
+
+func (cm *ClusterManager) clearBuildFailureLocked(name string) {
 	delete(cm.errors, name)
 	delete(cm.errorBackoff, name)
 }
@@ -483,6 +545,9 @@ func syncClusters(cm *ClusterManager) error {
 }
 
 func syncClustersWithOptions(cm *ClusterManager, options clusterSyncOptions) error {
+	cm.syncMu.Lock()
+	defer cm.syncMu.Unlock()
+
 	clusters, err := listClusters()
 	if err != nil {
 		klog.Warningf("list cluster err: %v", err)
@@ -493,40 +558,62 @@ func syncClustersWithOptions(cm *ClusterManager, options clusterSyncOptions) err
 	dbClusterMap := make(map[string]interface{})
 	for _, cluster := range clusters {
 		dbClusterMap[cluster.Name] = cluster
+
+		cm.mu.Lock()
 		if cluster.IsDefault {
 			cm.defaultContext = cluster.Name
 		}
 		current, currentExist := cm.clusters[cluster.Name]
 		if !cluster.Enable {
-			cm.clearBuildFailure(cluster.Name)
+			cm.clearBuildFailureLocked(cluster.Name)
 		}
-		if shouldUpdateCluster(current, cluster) {
-			if currentExist {
-				delete(cm.clusters, cluster.Name)
-				current.K8sClient.Stop(cluster.Name)
-			}
-			if cluster.Enable {
-				if !options.ignoreFailedBuildBackoff && cm.shouldSkipFailedBuild(cluster, now) {
-					continue
-				}
-				clientSet, err := buildClientSetFunc(cluster)
-				if err != nil {
-					klog.Errorf("Failed to build k8s client for cluster %s, in cluster: %t, err: %v", cluster.Name, cluster.InCluster, err)
-					cm.errors[cluster.Name] = err.Error()
-					cm.recordFailedBuild(cluster, now)
-					continue
-				}
-				cm.clearBuildFailure(cluster.Name)
-				cm.clusters[cluster.Name] = clientSet
-			} else {
-				cm.clearBuildFailure(cluster.Name)
-			}
+		cm.mu.Unlock()
+
+		needsUpdate := shouldUpdateCluster(current, cluster)
+		if !needsUpdate {
+			continue
 		}
+		cm.mu.Lock()
+		current, currentExist = cm.clusters[cluster.Name]
+		shouldSkip := !currentExist && !options.ignoreFailedBuildBackoff && cm.shouldSkipFailedBuildLocked(cluster, now)
+		if shouldSkip {
+			cm.mu.Unlock()
+			continue
+		}
+		if currentExist {
+			delete(cm.clusters, cluster.Name)
+		}
+		if !cluster.Enable {
+			cm.clearBuildFailureLocked(cluster.Name)
+		}
+		cm.mu.Unlock()
+
+		if currentExist {
+			stopClientSet(cluster.Name, current)
+		}
+		if !cluster.Enable {
+			continue
+		}
+
+		clientSet, err := buildClientSetFunc(cluster)
+		cm.mu.Lock()
+		if err != nil {
+			klog.Errorf("Failed to build k8s client for cluster %s, in cluster: %t, err: %v", cluster.Name, cluster.InCluster, err)
+			cm.errors[cluster.Name] = err.Error()
+			cm.recordFailedBuildLocked(cluster, now)
+			cm.mu.Unlock()
+			continue
+		}
+		cm.clearBuildFailureLocked(cluster.Name)
+		cm.clusters[cluster.Name] = clientSet
+		cm.mu.Unlock()
 	}
+	stoppedClientSets := map[string]*ClientSet{}
+	cm.mu.Lock()
 	for name, clientSet := range cm.clusters {
 		if _, ok := dbClusterMap[name]; !ok {
 			delete(cm.clusters, name)
-			clientSet.K8sClient.Stop(name)
+			stoppedClientSets[name] = clientSet
 		}
 	}
 	for name := range cm.errors {
@@ -539,8 +626,19 @@ func syncClustersWithOptions(cm *ClusterManager, options clusterSyncOptions) err
 			delete(cm.errorBackoff, name)
 		}
 	}
+	cm.mu.Unlock()
+	for name, clientSet := range stoppedClientSets {
+		stopClientSet(name, clientSet)
+	}
 
 	return nil
+}
+
+func stopClientSet(name string, clientSet *ClientSet) {
+	if clientSet == nil || clientSet.K8sClient == nil {
+		return
+	}
+	clientSet.K8sClient.Stop(name)
 }
 
 // shouldUpdateCluster decides whether the cached ClientSet needs to be updated

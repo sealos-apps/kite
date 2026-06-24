@@ -203,6 +203,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 - If managed Kubernetes kubeconfigs use an `exec` plugin such as `aws`, `gcloud`, or `kubelogin`, use a Service Account token kubeconfig instead. See `docs/config/managed-k8s-auth.md`.
 - If resource access fails with permission errors, verify Kite RBAC first, then Kubernetes RBAC for the service account or imported kubeconfig.
+- If a Sealos personal workspace stays on a loading spinner while the backend logs repeat `failed to wait for cache sync`, inspect the kubeconfig current-context namespace. Non-exempt namespace-scoped kubeconfigs should use direct Kubernetes API reads instead of the controller-runtime informer cache; backend cluster build failures are rate-limited, and a new Sealos login or cluster config update triggers an immediate retry.
 - If a production image has no shell, use a temporary debug/client pod rather than `kubectl exec` into Kite.
 
 ## AI Assistant Operations

@@ -255,10 +255,13 @@ func TestClusterBuildBackoff(t *testing.T) {
 	changedInCluster.InCluster = true
 	assert.False(t, cm.shouldSkipFailedBuild(&changedInCluster, now.Add(time.Minute)))
 
+	cm.mu.Lock()
 	cm.errors[cluster.Name] = "failed"
+	cm.mu.Unlock()
 	cm.clearBuildFailure(cluster.Name)
-	assert.NotContains(t, cm.errors, cluster.Name)
-	assert.NotContains(t, cm.errorBackoff, cluster.Name)
+	snapshot := cm.snapshotRuntimeState()
+	assert.NotContains(t, snapshot.errors, cluster.Name)
+	assert.False(t, cm.shouldSkipFailedBuild(cluster, now.Add(time.Minute)))
 }
 
 func TestSyncClustersClearsBuildFailureWhenClusterDisabled(t *testing.T) {
@@ -299,8 +302,9 @@ func TestSyncClustersClearsBuildFailureWhenClusterDisabled(t *testing.T) {
 
 	require.NoError(t, syncClusters(cm))
 	assert.Equal(t, 0, buildCalls)
-	assert.NotContains(t, cm.errors, cluster.Name)
-	assert.NotContains(t, cm.errorBackoff, cluster.Name)
+	snapshot := cm.snapshotRuntimeState()
+	assert.NotContains(t, snapshot.errors, cluster.Name)
+	assert.False(t, cm.shouldSkipFailedBuild(cluster, now.Add(time.Minute)))
 }
 
 func TestSyncClustersFailedBuildBackoff(t *testing.T) {
@@ -341,8 +345,9 @@ func TestSyncClustersFailedBuildBackoff(t *testing.T) {
 
 	require.NoError(t, syncClusters(cm))
 	assert.Equal(t, 1, buildCalls)
-	assert.Equal(t, "cache sync failed", cm.errors[currentCluster.Name])
-	assert.Contains(t, cm.errorBackoff, currentCluster.Name)
+	snapshot := cm.snapshotRuntimeState()
+	assert.Equal(t, "cache sync failed", snapshot.errors[currentCluster.Name])
+	assert.True(t, cm.shouldSkipFailedBuild(currentCluster, now.Add(time.Minute)))
 
 	require.NoError(t, syncClusters(cm))
 	assert.Equal(t, 1, buildCalls, "background sync should respect failed-build backoff")
@@ -364,9 +369,10 @@ func TestSyncClustersFailedBuildBackoff(t *testing.T) {
 
 	require.NoError(t, syncClustersWithOptions(cm, clusterSyncOptions{ignoreFailedBuildBackoff: true}))
 	assert.Equal(t, 4, buildCalls)
-	assert.Contains(t, cm.clusters, currentCluster.Name)
-	assert.NotContains(t, cm.errors, currentCluster.Name)
-	assert.NotContains(t, cm.errorBackoff, currentCluster.Name)
+	snapshot = cm.snapshotRuntimeState()
+	assert.Contains(t, snapshot.clusters, currentCluster.Name)
+	assert.NotContains(t, snapshot.errors, currentCluster.Name)
+	assert.False(t, cm.shouldSkipFailedBuild(currentCluster, now.Add(time.Minute)))
 }
 
 func TestWaitForClusterRefreshIgnoresStaleError(t *testing.T) {
@@ -454,6 +460,8 @@ func TestResolveClientSetForUser(t *testing.T) {
 
 		go func() {
 			time.Sleep(50 * time.Millisecond)
+			cm.mu.Lock()
+			defer cm.mu.Unlock()
 			cm.clusters["sealos-tenant-c"] = &ClientSet{Name: "sealos-tenant-c"}
 		}()
 
