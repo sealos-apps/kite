@@ -53,6 +53,66 @@ charts:
 	require.Equal(t, "oci://registry.local/offline/gogs:0.4.0", ref.ChartURL)
 }
 
+func TestLoadOCIChartCatalogAddsRuntimeRegistryOptions(t *testing.T) {
+	t.Setenv(ociCatalogBaseURLEnv, "oci://registry.local/offline")
+	t.Setenv(ociRegistryPlainHTTPEnv, "true")
+	t.Setenv(ociRegistryInsecureTLSEnv, "true")
+	t.Setenv(ociRegistryCAFileEnv, "/etc/kite/registry-ca.crt")
+	t.Setenv(ociRegistryUsernameEnv, "admin")
+	t.Setenv(ociRegistryPasswordEnv, "secret")
+	t.Setenv(ociCatalogEnv, `
+charts:
+  - name: gogs
+    version: 0.4.0
+`)
+
+	ref, err := FindOCIChartVersion("offline", "gogs", "")
+	require.NoError(t, err)
+	require.Equal(t, "oci://registry.local/offline/gogs:0.4.0", ref.ChartURL)
+	require.True(t, ref.Registry.PlainHTTP)
+	require.True(t, ref.Registry.InsecureSkipTLSVerify)
+	require.Equal(t, "/etc/kite/registry-ca.crt", ref.Registry.CAFile)
+	require.Equal(t, "admin", ref.Registry.Username)
+	require.Equal(t, "secret", ref.Registry.Password)
+	require.NotContains(t, ref.ChartURL, "admin")
+	require.NotContains(t, ref.ChartURL, "secret")
+}
+
+func TestLoadOCIChartCatalogRejectsInvalidRegistryBool(t *testing.T) {
+	t.Setenv(ociRegistryPlainHTTPEnv, "maybe")
+
+	_, err := LoadOCIChartCatalog()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), ociRegistryPlainHTTPEnv)
+}
+
+func TestOCIRegistryOptionsForChartURLMatchesCatalog(t *testing.T) {
+	t.Setenv(ociRegistryPlainHTTPEnv, "true")
+	t.Setenv(ociRegistryUsernameEnv, "admin")
+	t.Setenv(ociRegistryPasswordEnv, "secret")
+	t.Setenv(ociCatalogEnv, `
+repositories:
+  - name: offline
+    url: oci://registry.local/charts
+    charts:
+      - name: postgres
+        versions:
+          - version: 12.0.0
+`)
+
+	options, ok, err := OCIRegistryOptionsForChartURL("oci://registry.local/charts/postgres:12.0.0")
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.True(t, options.PlainHTTP)
+	require.Equal(t, "admin", options.Username)
+	require.Equal(t, "secret", options.Password)
+
+	options, ok, err = OCIRegistryOptionsForChartURL("oci://registry.local/charts/postgres")
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.True(t, options.PlainHTTP)
+}
+
 func TestLoadOCIChartCatalogRequiresBaseForTopLevelCharts(t *testing.T) {
 	t.Setenv(ociCatalogEnv, `
 charts:

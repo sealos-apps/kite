@@ -139,7 +139,7 @@ func (h *HelmChartHandler) loadOCIChartContent(ref helmutil.OCIChartVersionRef) 
 	}
 	h.contentCacheMu.Unlock()
 
-	loadedChart, err := helmutil.LoadArchive(ref.ChartURL, nil)
+	loadedChart, err := helmutil.LoadOCIArchive(ref)
 	if err != nil {
 		return helmChartContent{}, err
 	}

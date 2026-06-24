@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,11 @@ const (
 	ociCatalogFileEnv           = "KITE_HELM_OCI_CATALOG_FILE"
 	ociCatalogBaseURLEnv        = "KITE_HELM_OCI_CATALOG_BASE"
 	ociCatalogRepositoryNameEnv = "KITE_HELM_OCI_CATALOG_REPOSITORY_NAME"
+	ociRegistryPlainHTTPEnv     = "KITE_HELM_OCI_REGISTRY_PLAIN_HTTP"
+	ociRegistryInsecureTLSEnv   = "KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY"
+	ociRegistryUsernameEnv      = "KITE_HELM_OCI_REGISTRY_USERNAME"
+	ociRegistryPasswordEnv      = "KITE_HELM_OCI_REGISTRY_PASSWORD"
+	ociRegistryCAFileEnv        = "KITE_HELM_OCI_REGISTRY_CA_FILE"
 	defaultOCIRepositoryName    = "offline"
 )
 
@@ -26,9 +32,10 @@ type OCIChartCatalog struct {
 }
 
 type OCIChartRepository struct {
-	Name   string     `json:"name"`
-	URL    string     `json:"url"`
-	Charts []OCIChart `json:"charts"`
+	Name     string             `json:"name"`
+	URL      string             `json:"url"`
+	Charts   []OCIChart         `json:"charts"`
+	Registry OCIRegistryOptions `json:"-"`
 }
 
 type OCIChart struct {
@@ -62,12 +69,26 @@ type OCIChartVersion struct {
 type OCIChartVersionRef struct {
 	RepositoryName string
 	RepositoryURL  string
+	Registry       OCIRegistryOptions `json:"-"`
 	Chart          OCIChart
 	Version        OCIChartVersion
 	ChartURL       string
 }
 
+type OCIRegistryOptions struct {
+	PlainHTTP             bool   `json:"-"`
+	InsecureSkipTLSVerify bool   `json:"-"`
+	CAFile                string `json:"-"`
+	Username              string `json:"-"`
+	Password              string `json:"-"`
+}
+
 func LoadOCIChartCatalog() (OCIChartCatalog, error) {
+	registryOptions, err := loadOCIRegistryOptions()
+	if err != nil {
+		return OCIChartCatalog{}, err
+	}
+
 	data := strings.TrimSpace(os.Getenv(ociCatalogEnv))
 	if file := strings.TrimSpace(os.Getenv(ociCatalogFileEnv)); file != "" {
 		content, err := os.ReadFile(file)
@@ -102,6 +123,9 @@ func LoadOCIChartCatalog() (OCIChartCatalog, error) {
 
 	if err := normalizeOCIChartCatalog(&catalog); err != nil {
 		return OCIChartCatalog{}, err
+	}
+	for i := range catalog.Repositories {
+		catalog.Repositories[i].Registry = registryOptions
 	}
 	return catalog, nil
 }
@@ -175,6 +199,33 @@ func OCIChartUpdatedAt(value string) *time.Time {
 		}
 	}
 	return nil
+}
+
+func OCIRegistryOptionsForChartURL(chartURL string) (OCIRegistryOptions, bool, error) {
+	catalog, err := LoadOCIChartCatalog()
+	if err != nil {
+		return OCIRegistryOptions{}, false, err
+	}
+	chartURL = strings.TrimRight(strings.TrimSpace(chartURL), "/")
+	if chartURL == "" {
+		return OCIRegistryOptions{}, false, nil
+	}
+	chartURLWithoutReference := ociURLWithoutReference(chartURL)
+	for _, repository := range catalog.Repositories {
+		for _, chart := range repository.Charts {
+			for _, version := range ociChartVersions(chart) {
+				ref := newOCIChartVersionRef(repository, chart, version)
+				if ref.ChartURL == chartURL || ociURLWithoutReference(ref.ChartURL) == chartURLWithoutReference {
+					return ref.Registry, true, nil
+				}
+			}
+		}
+		repositoryURL := strings.TrimRight(repository.URL, "/")
+		if chartURLWithoutReference == repositoryURL || strings.HasPrefix(chartURLWithoutReference, repositoryURL+"/") {
+			return repository.Registry, true, nil
+		}
+	}
+	return OCIRegistryOptions{}, false, nil
 }
 
 func matchingOCIChartVersions(repositoryName, chartName string) ([]OCIChartVersionRef, error) {
@@ -281,10 +332,41 @@ func newOCIChartVersionRef(repository OCIChartRepository, chart OCIChart, versio
 	return OCIChartVersionRef{
 		RepositoryName: repository.Name,
 		RepositoryURL:  repository.URL,
+		Registry:       repository.Registry,
 		Chart:          chart,
 		Version:        version,
 		ChartURL:       OCIChartVersionURL(chartURL, version.Version),
 	}
+}
+
+func loadOCIRegistryOptions() (OCIRegistryOptions, error) {
+	plainHTTP, err := parseOptionalBoolEnv(ociRegistryPlainHTTPEnv)
+	if err != nil {
+		return OCIRegistryOptions{}, err
+	}
+	insecureSkipTLSVerify, err := parseOptionalBoolEnv(ociRegistryInsecureTLSEnv)
+	if err != nil {
+		return OCIRegistryOptions{}, err
+	}
+	return OCIRegistryOptions{
+		PlainHTTP:             plainHTTP,
+		InsecureSkipTLSVerify: insecureSkipTLSVerify,
+		CAFile:                strings.TrimSpace(os.Getenv(ociRegistryCAFileEnv)),
+		Username:              strings.TrimSpace(os.Getenv(ociRegistryUsernameEnv)),
+		Password:              os.Getenv(ociRegistryPasswordEnv),
+	}, nil
+}
+
+func parseOptionalBoolEnv(name string) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return false, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s: %w", name, err)
+	}
+	return parsed, nil
 }
 
 func validateOCIChartURL(rawURL string) error {
@@ -351,6 +433,24 @@ func ociURLReferenceParts(rawURL string) ociURLReference {
 		hasTag:    hasTag,
 		hasDigest: hasDigest,
 	}
+}
+
+func ociURLWithoutReference(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return strings.TrimRight(strings.TrimSpace(rawURL), "/")
+	}
+	base := path.Base(parsed.Path)
+	namePart, _, _ := strings.Cut(base, "@")
+	if index := strings.LastIndex(namePart, ":"); index >= 0 {
+		namePart = namePart[:index]
+	}
+	if namePart != base {
+		parsed.Path = path.Join(path.Dir(parsed.Path), namePart)
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return strings.TrimRight(parsed.String(), "/")
 }
 
 func ociTagFromChartVersion(version string) string {

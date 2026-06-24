@@ -128,6 +128,13 @@ helmCatalog:
     base: ''
     # Repository name used when catalog defines top-level charts.
     repositoryName: offline
+    # OCI registry access options used by the server when loading chart details,
+    # installs, upgrades, AI tool resolutions, and scheduled auto-upgrades.
+    plainHTTP: false
+    insecureSkipTLSVerify: false
+    caFile: ''
+    username: ''
+    password: ''
 
 serviceAccount:
   create: true

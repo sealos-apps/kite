@@ -127,6 +127,18 @@ spec:
             - name: KITE_HELM_OCI_CATALOG_REPOSITORY_NAME
               value: {{ .Values.helmCatalog.oci.repositoryName | quote }}
             {{- end }}
+            - name: KITE_HELM_OCI_REGISTRY_PLAIN_HTTP
+              value: {{ .Values.helmCatalog.oci.plainHTTP | quote }}
+            - name: KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY
+              value: {{ .Values.helmCatalog.oci.insecureSkipTLSVerify | quote }}
+            {{- if .Values.helmCatalog.oci.caFile }}
+            - name: KITE_HELM_OCI_REGISTRY_CA_FILE
+              value: {{ .Values.helmCatalog.oci.caFile | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.oci.username }}
+            - name: KITE_HELM_OCI_REGISTRY_USERNAME
+              value: {{ .Values.helmCatalog.oci.username | quote }}
+            {{- end }}
           {{- with .Values.extraEnvs }}
           {{- toYaml . | nindent 12 }}
           {{- end }}
