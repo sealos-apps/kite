@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm'
 import type {
   HelmChartContentType,
   HelmChartDetail,
+  HelmChartSource,
   HelmChartTemplate,
   HelmChartVersion,
 } from '@/types/api'
@@ -26,14 +27,15 @@ import { TextViewer } from '@/components/text-viewer'
 import { YamlFileTreeViewerNative as YamlFileTreeViewer } from '@/components/yaml-file-tree-viewer-native'
 
 const artifactHubSource = 'artifacthub'
+const ociSource = 'oci'
 
 function chartDetailPath(chart: HelmChartDetail, version: string) {
   const params = new URLSearchParams({
     version,
     tab: 'versions',
   })
-  if (chart.source === artifactHubSource) {
-    params.set('source', artifactHubSource)
+  if (chart.source && chart.source !== 'repository') {
+    params.set('source', chart.source)
   }
   return `/charts/${encodeURIComponent(chart.repositoryName)}/${encodeURIComponent(chart.name)}?${params.toString()}`
 }
@@ -102,6 +104,12 @@ function DetailItem({
 
 function ChartDetailsCard({ chart }: { chart: HelmChartDetail }) {
   const { t } = useTranslation()
+  const sourceLabel =
+    chart.source === artifactHubSource
+      ? 'Artifact Hub'
+      : chart.source === ociSource
+        ? t('helmCharts.filters.oci')
+        : t('helmCharts.filters.repositories')
 
   return (
     <Card className="gap-0 rounded-lg border-border/70 py-0 shadow-none">
@@ -125,10 +133,10 @@ function ChartDetailsCard({ chart }: { chart: HelmChartDetail }) {
                   <ExternalLink className="size-3" />
                 </a>
               ) : (
-                'Artifact Hub'
+                sourceLabel
               )
             ) : (
-              t('helmCharts.filters.repositories')
+              sourceLabel
             )}
           </DetailItem>
           <DetailItem label={t('helmCharts.fields.repository')}>
@@ -284,7 +292,7 @@ function LazyChartTextTab({
   repository?: string
   name?: string
   version?: string
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
   content: HelmChartContentType
   enabled: boolean
   emptyMessage: string
@@ -390,9 +398,10 @@ export function HelmChartDetailPage() {
   const { t } = useTranslation()
   const [installDialogOpen, setInstallDialogOpen] = useState(false)
   const version = searchParams.get('version') || undefined
-  const source =
-    searchParams.get('source') === artifactHubSource
-      ? artifactHubSource
+  const sourceParam = searchParams.get('source')
+  const source: HelmChartSource | undefined =
+    sourceParam === artifactHubSource || sourceParam === ociSource
+      ? sourceParam
       : undefined
   const isIframe = searchParams.get('iframe') === 'true'
   const tabParam = searchParams.get('tab')
@@ -501,12 +510,14 @@ export function HelmChartDetailPage() {
                   <h1 className="truncate text-lg font-extrabold">
                     {data.name}
                   </h1>
-                  {data.source === artifactHubSource ? (
+                  {data.source && data.source !== 'repository' ? (
                     <Badge
                       variant="outline"
                       className="shrink-0 font-normal text-muted-foreground"
                     >
-                      Artifact Hub
+                      {data.source === ociSource
+                        ? t('helmCharts.filters.oci')
+                        : 'Artifact Hub'}
                     </Badge>
                   ) : null}
                 </div>

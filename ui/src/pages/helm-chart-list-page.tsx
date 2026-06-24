@@ -70,8 +70,12 @@ import { ResourceTableView } from '@/components/resource-table-view'
 const allRepositories = 'all'
 const artifactHubSource = 'artifacthub'
 const repositoriesSource = 'repositories'
+const ociSource = 'oci'
 const columnHelper = createColumnHelper<HelmChart>()
-type ChartSource = typeof artifactHubSource | typeof repositoriesSource
+type ChartSource =
+  | typeof artifactHubSource
+  | typeof repositoriesSource
+  | typeof ociSource
 type HelmChartListSessionState = {
   chartSource?: ChartSource
   verifiedPublisherOnly?: boolean
@@ -99,7 +103,8 @@ function readHelmChartListSessionState(): HelmChartListSessionState {
     return {
       chartSource:
         state.chartSource === artifactHubSource ||
-        state.chartSource === repositoriesSource
+        state.chartSource === repositoriesSource ||
+        state.chartSource === ociSource
           ? state.chartSource
           : undefined,
       verifiedPublisherOnly:
@@ -128,10 +133,10 @@ function readHelmChartListSessionState(): HelmChartListSessionState {
 
 function chartDetailPath(chart: HelmChart) {
   const path = `/charts/${encodeURIComponent(chart.repositoryName)}/${encodeURIComponent(chart.name)}`
-  if (chart.source !== artifactHubSource) {
+  if (!chart.source || chart.source === 'repository') {
     return path
   }
-  return `${path}?source=${artifactHubSource}`
+  return `${path}?source=${chart.source}`
 }
 
 function ChartNameLink({ chart }: { chart: HelmChart }) {
@@ -278,10 +283,14 @@ function AddRepositoryDialog({
 
 export function HelmChartListPage() {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, helmArtifactHubEnabled } = useAuth()
   const [initialSessionState] = useState(readHelmChartListSessionState)
   const [chartSource, setChartSource] = useState<ChartSource>(
-    initialSessionState.chartSource ?? artifactHubSource
+    helmArtifactHubEnabled
+      ? (initialSessionState.chartSource ?? artifactHubSource)
+      : initialSessionState.chartSource === ociSource
+        ? ociSource
+        : repositoriesSource
   )
   const [verifiedPublisherOnly, setVerifiedPublisherOnly] = useState(
     initialSessionState.verifiedPublisherOnly ?? false
@@ -304,9 +313,16 @@ export function HelmChartListPage() {
   const selectedRepository =
     repositoryFilter === allRepositories ? undefined : repositoryFilter
   const isArtifactHubSource = chartSource === artifactHubSource
+  const isOCISource = chartSource === ociSource
   const canManageRepositories = user?.isAdmin() ?? false
 
   usePageTitle(t('nav.helmCharts'))
+
+  useEffect(() => {
+    if (!helmArtifactHubEnabled && chartSource === artifactHubSource) {
+      setChartSource(repositoriesSource)
+    }
+  }, [chartSource, helmArtifactHubEnabled])
 
   useEffect(() => {
     sessionStorage.setItem(
@@ -333,7 +349,9 @@ export function HelmChartListPage() {
     (repository) => repository.name === selectedRepository
   )
   const localChartsQuery = useHelmCharts({
-    repository: selectedRepository,
+    repository: isOCISource ? undefined : selectedRepository,
+    query: isOCISource ? searchQuery : undefined,
+    source: isOCISource ? 'oci' : 'repository',
     enabled: !isArtifactHubSource,
   })
   const artifactHubChartsQuery = useArtifactHubCharts({
@@ -341,7 +359,7 @@ export function HelmChartListPage() {
     verifiedPublisher: verifiedPublisherOnly,
     limit: pagination.pageSize,
     offset: pagination.pageIndex * pagination.pageSize,
-    enabled: isArtifactHubSource,
+    enabled: helmArtifactHubEnabled && isArtifactHubSource,
   })
   const activeChartsQuery = isArtifactHubSource
     ? artifactHubChartsQuery
@@ -465,6 +483,9 @@ export function HelmChartListPage() {
     if (!value) {
       return
     }
+    if (value === artifactHubSource && !helmArtifactHubEnabled) {
+      return
+    }
     setChartSource(value as ChartSource)
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
   }
@@ -520,7 +541,7 @@ export function HelmChartListPage() {
           <h3 className="mb-1 text-lg font-medium">
             {t('helmCharts.messages.noCharts')}
           </h3>
-          {!isArtifactHubSource && canManageRepositories ? (
+          {!isArtifactHubSource && !isOCISource && canManageRepositories ? (
             <Button
               variant="outline"
               className="mt-4"
@@ -549,20 +570,28 @@ export function HelmChartListPage() {
               aria-label={t('common.fields.source')}
               className="h-9 shrink-0 gap-0 overflow-hidden rounded-md border bg-muted/30 p-0.5 shadow-xs"
             >
-              <ToggleGroupItem
-                value={artifactHubSource}
-                className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
-              >
-                {t('helmCharts.filters.artifactHub')}
-              </ToggleGroupItem>
+              {helmArtifactHubEnabled ? (
+                <ToggleGroupItem
+                  value={artifactHubSource}
+                  className="h-8 min-w-[7.75rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+                >
+                  {t('helmCharts.filters.artifactHub')}
+                </ToggleGroupItem>
+              ) : null}
               <ToggleGroupItem
                 value={repositoriesSource}
                 className="h-8 min-w-[4.25rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
               >
                 {t('helmCharts.filters.repositories')}
               </ToggleGroupItem>
+              <ToggleGroupItem
+                value={ociSource}
+                className="h-8 min-w-[5.5rem] flex-none rounded-sm border-0 px-3 text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs"
+              >
+                {t('helmCharts.filters.oci')}
+              </ToggleGroupItem>
             </ToggleGroup>
-            {!isArtifactHubSource ? (
+            {!isArtifactHubSource && !isOCISource ? (
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <Select
                   value={repositoryFilter}
@@ -647,7 +676,7 @@ export function HelmChartListPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              {!isArtifactHubSource && canManageRepositories ? (
+              {!isArtifactHubSource && !isOCISource && canManageRepositories ? (
                 <Button onClick={() => setDialogOpen(true)}>
                   <Plus className="size-4" />
                   {t('helmCharts.actions.addRepository')}
@@ -696,7 +725,7 @@ export function HelmChartListPage() {
           </div>
         </div>
 
-        {isArtifactHubSource ? (
+        {isArtifactHubSource && helmArtifactHubEnabled ? (
           <p className="text-pretty text-xs text-muted-foreground">
             <Trans
               i18nKey="helmCharts.messages.artifactHubTrafficNotice"

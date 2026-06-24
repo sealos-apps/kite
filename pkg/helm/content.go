@@ -18,45 +18,105 @@ import (
 
 func (h *HelmChartHandler) ListCharts(c *gin.Context) {
 	repositoryName := c.Query("repository")
+	source := strings.TrimSpace(c.Query("source"))
 	query := strings.ToLower(strings.TrimSpace(c.Query("q")))
+	if source != "" && source != helmutil.ChartSourceRepository && source != helmutil.ChartSourceOCI {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported chart source"})
+		return
+	}
 
+	items := []helmChart{}
+	if source == "" || source == helmutil.ChartSourceRepository {
+		repositories, err := h.listRepositories(repositoryName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		for _, repository := range repositories {
+			indexFile, err := h.loadRepositoryIndex(repository)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			for _, versions := range indexFile.Entries {
+				if len(versions) == 0 {
+					continue
+				}
+				entry := versions[0]
+				item := toHelmChart(repository, indexFile.Generated, entry)
+				if query != "" && !helmChartMatchesQuery(item, query) {
+					continue
+				}
+				items = append(items, item)
+			}
+		}
+	}
+	if source == "" || source == helmutil.ChartSourceOCI {
+		ociCharts, err := h.listOCICharts(repositoryName, query)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, ociCharts...)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": len(items)})
+}
+
+func (h *HelmChartHandler) listRepositories(repositoryName string) ([]model.HelmRepository, error) {
 	var repositories []model.HelmRepository
 	db := model.DB.Order("name")
 	if repositoryName != "" {
 		db = db.Where("name = ?", repositoryName)
 	}
 	if err := db.Find(&repositories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
+	return repositories, nil
+}
 
-	items := []helmChart{}
-	for _, repository := range repositories {
-		indexFile, err := h.loadRepositoryIndex(repository)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+func (h *HelmChartHandler) listOCICharts(repositoryName, query string) ([]helmChart, error) {
+	refs, err := helmutil.ListOCIChartVersions()
+	if err != nil {
+		return nil, err
+	}
+	latestByKey := map[string]helmutil.OCIChartVersionRef{}
+	for _, ref := range refs {
+		if repositoryName != "" && ref.RepositoryName != repositoryName {
+			continue
 		}
-		for _, versions := range indexFile.Entries {
-			if len(versions) == 0 {
-				continue
-			}
-			entry := versions[0]
-			item := toHelmChart(repository, indexFile.Generated, entry)
-			if query != "" && !helmChartMatchesQuery(item, query) {
-				continue
-			}
-			items = append(items, item)
+		key := ref.RepositoryName + "/" + ref.Chart.Name
+		latest, ok := latestByKey[key]
+		if !ok || compareChartVersions(ref.Version.Version, latest.Version.Version) > 0 {
+			latestByKey[key] = ref
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": len(items)})
+	items := make([]helmChart, 0, len(latestByKey))
+	for _, ref := range latestByKey {
+		item := toOCIHelmChart(ref)
+		if query != "" && !helmChartMatchesQuery(item, query) {
+			continue
+		}
+		items = append(items, item)
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].RepositoryName == items[j].RepositoryName {
+			return items[i].Name < items[j].Name
+		}
+		return items[i].RepositoryName < items[j].RepositoryName
+	})
+	return items, nil
 }
 
 func (h *HelmChartHandler) GetChart(c *gin.Context) {
 	repositoryName := c.Param("repository")
 	chartName := c.Param("name")
 	version := c.Query("version")
+	if c.Query("source") == helmutil.ChartSourceOCI {
+		h.getOCIChart(c, repositoryName, chartName, version)
+		return
+	}
 
 	var repository model.HelmRepository
 	if err := model.DB.Where("name = ?", repositoryName).First(&repository).Error; err != nil {
@@ -99,6 +159,45 @@ func (h *HelmChartHandler) GetChart(c *gin.Context) {
 	})
 }
 
+func (h *HelmChartHandler) getOCIChart(c *gin.Context, repositoryName, chartName, version string) {
+	ref, err := helmutil.FindOCIChartVersion(repositoryName, chartName, version)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	content, err := h.loadOCIChartContent(ref)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	refs, err := helmutil.ListOCIChartVersions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	versions := []helmChartVersion{}
+	for _, candidate := range refs {
+		if candidate.RepositoryName != ref.RepositoryName || candidate.Chart.Name != ref.Chart.Name {
+			continue
+		}
+		versions = append(versions, helmChartVersion{
+			Version:    candidate.Version.Version,
+			AppVersion: firstNonEmpty(candidate.Version.AppVersion, candidate.Chart.AppVersion),
+			PublishedAt: firstTime(
+				helmutil.OCIChartUpdatedAt(candidate.Version.UpdatedAt),
+				helmutil.OCIChartUpdatedAt(candidate.Chart.UpdatedAt),
+			),
+		})
+	}
+	sortHelmChartVersions(versions)
+
+	c.JSON(http.StatusOK, helmChartDetail{
+		helmChart: toOCIHelmChart(ref),
+		Readme:    content.Readme,
+		Versions:  versions,
+	})
+}
+
 func (h *HelmChartHandler) GetChartContent(c *gin.Context) {
 	repositoryName := c.Param("repository")
 	chartName := c.Param("name")
@@ -107,6 +206,10 @@ func (h *HelmChartHandler) GetChartContent(c *gin.Context) {
 
 	if contentName != "values" && contentName != "templates" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported chart content"})
+		return
+	}
+	if c.Query("source") == helmutil.ChartSourceOCI {
+		h.getOCIChartContent(c, repositoryName, chartName, contentName, version)
 		return
 	}
 
@@ -141,6 +244,24 @@ func (h *HelmChartHandler) GetChartContent(c *gin.Context) {
 	c.JSON(http.StatusOK, helmChartContentResponse{Templates: content.Templates})
 }
 
+func (h *HelmChartHandler) getOCIChartContent(c *gin.Context, repositoryName, chartName, contentName, version string) {
+	ref, err := helmutil.FindOCIChartVersion(repositoryName, chartName, version)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	content, err := h.loadOCIChartContent(ref)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if contentName == "values" {
+		c.JSON(http.StatusOK, helmChartContentResponse{Content: content.Values})
+		return
+	}
+	c.JSON(http.StatusOK, helmChartContentResponse{Templates: content.Templates})
+}
+
 func toHelmChart(repository model.HelmRepository, generated time.Time, entry *repo.ChartVersion) helmChart {
 	chartURL := ""
 	if len(entry.URLs) > 0 {
@@ -166,6 +287,48 @@ func toHelmChart(repository model.HelmRepository, generated time.Time, entry *re
 		Deprecated:     entry.Deprecated,
 		UpdatedAt:      chartUpdatedAt(generated, entry),
 	}
+}
+
+func toOCIHelmChart(ref helmutil.OCIChartVersionRef) helmChart {
+	return helmChart{
+		RepositoryName: ref.RepositoryName,
+		RepositoryURL:  ref.RepositoryURL,
+		Source:         helmutil.ChartSourceOCI,
+		Name:           ref.Chart.Name,
+		Version:        ref.Version.Version,
+		AppVersion:     firstNonEmpty(ref.Version.AppVersion, ref.Chart.AppVersion),
+		KubeVersion:    firstNonEmpty(ref.Version.KubeVersion, ref.Chart.KubeVersion),
+		Description:    firstNonEmpty(ref.Version.Description, ref.Chart.Description),
+		Icon:           firstNonEmpty(ref.Version.Icon, ref.Chart.Icon),
+		Home:           firstNonEmpty(ref.Version.Home, ref.Chart.Home),
+		Sources:        ref.Chart.Sources,
+		ChartURL:       ref.ChartURL,
+		Keywords:       ref.Chart.Keywords,
+		Maintainers:    ref.Chart.Maintainers,
+		Deprecated:     ref.Chart.Deprecated,
+		UpdatedAt: firstTime(
+			helmutil.OCIChartUpdatedAt(ref.Version.UpdatedAt),
+			helmutil.OCIChartUpdatedAt(ref.Chart.UpdatedAt),
+		),
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstTime(values ...*time.Time) *time.Time {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }
 
 func sortHelmChartVersions(versions []helmChartVersion) {

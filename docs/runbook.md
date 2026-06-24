@@ -221,6 +221,26 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 ## Helm Operations
 
 - Chart catalog read APIs live under `/api/v1/charts` for authenticated users. Repository create/delete and catalog management APIs remain admin-only under `/api/v1/admin/charts`; stored repository credentials must not be exposed in responses.
+- Offline environments can disable Artifact Hub with `KITE_HELM_ARTIFACT_HUB_ENABLED=false` or `helmCatalog.artifactHub.enabled=false`. This disables the backend Artifact Hub proxy endpoints and the frontend fallback.
+- Kite can consume a static OCI chart catalog through `KITE_HELM_OCI_CATALOG` or `KITE_HELM_OCI_CATALOG_FILE`. This catalog points to charts already mirrored into an offline OCI registry; Kite does not discover registry contents by scanning the registry.
+- OCI catalog `url` and `chartUrl` values must not include credentials, query parameters, or fragments because chart read APIs return those URLs to authenticated users. If a `chartUrl` includes a tag, the tag must match the declared version using Helm OCI encoding (`+` becomes `_`); digest-only references are not supported for catalog update detection.
+- Minimal inline OCI catalog example:
+
+```yaml
+helmCatalog:
+  artifactHub:
+    enabled: false
+  oci:
+    base: oci://registry.internal/charts
+    repositoryName: offline
+    catalog: |
+      charts:
+        - name: demo-chart
+          versions:
+            - version: 0.1.0
+            - version: 0.2.0
+```
+
 - Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
 - Helm install, upgrade, rollback, uninstall, and auto-upgrade render target manifests before writing. Added resources require `create`, retained resources require `update`, and removed resources require `delete` on the rendered Kubernetes resource.
 - The AI assistant uses the same Helm SDK and rendered-manifest guard path as the HTTP Helm release API. Do not troubleshoot AI Helm failures by installing a shell or Helm CLI into the Kite container unless a separate debug session explicitly needs those tools.

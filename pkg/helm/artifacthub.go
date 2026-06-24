@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zxh326/kite/pkg/common"
 )
 
 const (
@@ -23,6 +24,11 @@ const (
 )
 
 func (h *HelmChartHandler) ListArtifactHubCharts(c *gin.Context) {
+	if !common.HelmArtifactHubEnabled {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Artifact Hub chart source is disabled"})
+		return
+	}
+
 	query := strings.TrimSpace(c.Query("q"))
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if err != nil || limit < 1 {
@@ -88,6 +94,11 @@ func (h *HelmChartHandler) ListArtifactHubCharts(c *gin.Context) {
 }
 
 func (h *HelmChartHandler) GetArtifactHubChart(c *gin.Context) {
+	if !common.HelmArtifactHubEnabled {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Artifact Hub chart source is disabled"})
+		return
+	}
+
 	repositoryName := c.Param("repository")
 	chartName := c.Param("name")
 	version := c.Query("version")
@@ -102,6 +113,11 @@ func (h *HelmChartHandler) GetArtifactHubChart(c *gin.Context) {
 }
 
 func (h *HelmChartHandler) GetArtifactHubChartContent(c *gin.Context) {
+	if !common.HelmArtifactHubEnabled {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Artifact Hub chart source is disabled"})
+		return
+	}
+
 	repositoryName := c.Param("repository")
 	chartName := c.Param("name")
 	contentName := c.Param("content")

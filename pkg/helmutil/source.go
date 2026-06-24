@@ -12,6 +12,7 @@ import (
 	"time"
 
 	semver "github.com/blang/semver/v4"
+	"github.com/zxh326/kite/pkg/common"
 	"github.com/zxh326/kite/pkg/model"
 	"helm.sh/helm/v4/pkg/getter"
 	repo "helm.sh/helm/v4/pkg/repo/v1"
@@ -20,6 +21,7 @@ import (
 const (
 	ChartSourceRepository  = "repository"
 	ChartSourceArtifactHub = "artifacthub"
+	ChartSourceOCI         = "oci"
 
 	artifactHubHelmPackageAPIURL = "https://artifacthub.io/api/v1/packages/helm/"
 )
@@ -44,7 +46,7 @@ type artifactHubPackage struct {
 }
 
 func ResolveChartRepository(repositoryName, source string) (*model.HelmRepository, error) {
-	if repositoryName == "" || source == ChartSourceArtifactHub {
+	if repositoryName == "" || source == ChartSourceArtifactHub || source == ChartSourceOCI {
 		return nil, nil
 	}
 	var repository model.HelmRepository
@@ -59,7 +61,12 @@ func LatestChartPackage(ctx context.Context, source, repositoryName, chartName s
 	case "", ChartSourceRepository:
 		return latestRepositoryChartPackage(repositoryName, chartName)
 	case ChartSourceArtifactHub:
+		if !common.HelmArtifactHubEnabled {
+			return ChartPackage{}, fmt.Errorf("Artifact Hub chart source is disabled")
+		}
 		return latestArtifactHubChartPackage(ctx, repositoryName, chartName)
+	case ChartSourceOCI:
+		return latestOCIChartPackage(repositoryName, chartName)
 	default:
 		return ChartPackage{}, fmt.Errorf("unsupported chart source")
 	}
@@ -80,10 +87,18 @@ func ResolveChartPackage(ctx context.Context, ref ChartSourceRef) (ChartPackage,
 		}
 		return repositoryChartPackage(ref.RepositoryName, ref.ChartName, ref.Version, ref.URL)
 	case ChartSourceArtifactHub:
+		if !common.HelmArtifactHubEnabled {
+			return ChartPackage{}, fmt.Errorf("Artifact Hub chart source is disabled")
+		}
 		if strings.TrimSpace(ref.ChartName) == "" {
 			return ChartPackage{}, fmt.Errorf("chartName is required for Artifact Hub charts")
 		}
 		return artifactHubChartPackage(ctx, ref.RepositoryName, ref.ChartName, ref.Version, ref.URL)
+	case ChartSourceOCI:
+		if strings.TrimSpace(ref.ChartName) == "" {
+			return ChartPackage{}, fmt.Errorf("chartName is required for OCI charts")
+		}
+		return ociChartPackage(ref.RepositoryName, ref.ChartName, ref.Version, ref.URL)
 	default:
 		return ChartPackage{}, fmt.Errorf("unsupported chart source")
 	}
@@ -168,6 +183,31 @@ func LoadRepositoryIndex(repository model.HelmRepository) (*repo.IndexFile, erro
 		return nil, err
 	}
 	return repo.LoadIndexFile(indexPath)
+}
+
+func latestOCIChartPackage(repositoryName, chartName string) (ChartPackage, error) {
+	ref, err := LatestOCIChartVersion(repositoryName, chartName)
+	if err != nil {
+		return ChartPackage{}, err
+	}
+	return ChartPackage{
+		Version: ref.Version.Version,
+		URL:     ref.ChartURL,
+	}, nil
+}
+
+func ociChartPackage(repositoryName, chartName, version, requestedURL string) (ChartPackage, error) {
+	ref, err := FindOCIChartVersion(repositoryName, chartName, version)
+	if err != nil {
+		return ChartPackage{}, err
+	}
+	if strings.TrimSpace(requestedURL) != "" && strings.TrimSpace(requestedURL) != ref.ChartURL {
+		return ChartPackage{}, fmt.Errorf("chartUrl does not match OCI chart package")
+	}
+	return ChartPackage{
+		Version: ref.Version.Version,
+		URL:     ref.ChartURL,
+	}, nil
 }
 
 func latestArtifactHubChartPackage(ctx context.Context, repositoryName, chartName string) (ChartPackage, error) {

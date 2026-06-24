@@ -149,6 +149,26 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 ## Helm 运维
 
 - Chart catalog 只读 API 面向认证用户开放在 `/api/v1/charts`。仓库创建/删除和 catalog 管理 API 仍在 `/api/v1/admin/charts`，只允许管理员使用；响应里不能暴露已存储的仓库凭据。
+- 离线环境可以通过 `KITE_HELM_ARTIFACT_HUB_ENABLED=false` 或 `helmCatalog.artifactHub.enabled=false` 关闭 Artifact Hub。关闭后，后端 Artifact Hub 代理接口和前端 fallback 都不会再使用线上 Artifact Hub。
+- Kite 可以通过 `KITE_HELM_OCI_CATALOG` 或 `KITE_HELM_OCI_CATALOG_FILE` 消费静态 OCI Chart catalog。这个 catalog 指向已经同步到离线 OCI registry 的 Chart；Kite 不会扫描 registry 来自动发现所有内容。
+- OCI catalog 的 `url` 和 `chartUrl` 不能包含凭据、查询参数或 fragment，因为 Chart 只读 API 会把这些 URL 返回给已认证用户。如果 `chartUrl` 显式带 tag，tag 必须按 Helm OCI 规则匹配声明版本（SemVer build metadata 里的 `+` 在 registry tag 中写成 `_`）；当前 catalog 更新检测不支持 digest-only 引用。
+- 最小 inline OCI catalog 示例：
+
+```yaml
+helmCatalog:
+  artifactHub:
+    enabled: false
+  oci:
+    base: oci://registry.internal/charts
+    repositoryName: offline
+    catalog: |
+      charts:
+        - name: demo-chart
+          versions:
+            - version: 0.1.0
+            - version: 0.2.0
+```
+
 - Helm Release API 使用规范资源路径 `helmreleases`。旧的 `helmrelease` 路由仅保留兼容。
 - Helm install、upgrade、rollback、uninstall 和 auto-upgrade 在写入前都会先渲染目标清单。新增资源需要 `create`，保留资源需要 `update`，被移除资源需要 `delete`。
 - AI 助手复用与 HTTP Helm Release API 相同的 Helm SDK 和 rendered-manifest guard 路径。除非是独立 debug 会话明确需要，否则不要通过给 Kite 容器安装 shell 或 Helm CLI 来排查 AI Helm 失败。

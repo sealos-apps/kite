@@ -52,6 +52,8 @@ var (
 
 	AgentPodNamespace = "kube-system"
 
+	HelmArtifactHubEnabled = true
+
 	AuthCookieSameSite = "lax"
 	AuthCookieSecure   = "auto"
 	// AuthCookieSameSiteExplicit indicates AUTH_COOKIE_SAMESITE is explicitly configured.
@@ -187,6 +189,17 @@ func LoadEnvs() {
 		NamespaceScopeExemptNamespaces = namespaces
 		if len(namespaces) > 0 {
 			klog.Infof("Configured %d namespace-scope exemptions from KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES", len(namespaces))
+		}
+	}
+
+	if v := strings.TrimSpace(os.Getenv("KITE_HELM_ARTIFACT_HUB_ENABLED")); v != "" {
+		switch strings.ToLower(v) {
+		case "true":
+			HelmArtifactHubEnabled = true
+		case "false":
+			HelmArtifactHubEnabled = false
+		default:
+			klog.Warningf("Invalid KITE_HELM_ARTIFACT_HUB_ENABLED=%q, use true|false, fallback to true", v)
 		}
 	}
 }

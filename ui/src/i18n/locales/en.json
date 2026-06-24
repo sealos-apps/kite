@@ -1644,6 +1644,7 @@
     "filters": {
       "allRepositories": "All repositories",
       "artifactHub": "Artifact Hub",
+      "oci": "Offline OCI",
       "repositories": "Repositories",
       "verifiedPublisher": "Verified publisher"
     },
@@ -1745,8 +1746,9 @@
       "rollbackStarted": "Rollback requested",
       "rollbackConfirmTitle": "Rollback release?",
       "rollbackConfirmDescription": "Rollback {{namespace}}/{{name}} to revision {{revision}}.",
-      "chartNotFound": "Chart not found in managed Helm repositories or Artifact Hub.",
+      "chartNotFound": "Chart not found in configured Helm chart sources.",
       "chartSourceManagedRepository": "Using managed chart repository {{repository}}.",
+      "chartSourceOCI": "Using offline OCI chart source {{repository}}.",
       "chartSourceArtifactHubVerified": "Using Artifact Hub chart from {{repository}} (verified publisher).",
       "chartSourceArtifactHubVerifiedShort": "Artifact Hub (verified)",
       "chartSourceArtifactHub": "Using Artifact Hub chart from {{repository}}.",

@@ -142,15 +142,15 @@ func helmNamespaceSchema(description string) map[string]any {
 func helmChartSourceSchema() map[string]any {
 	return map[string]any{
 		"type":        "string",
-		"description": "Chart source. Use repository for Kite-managed chart repositories, or artifacthub for Artifact Hub charts. Defaults to repository.",
-		"enum":        []string{"repository", "artifacthub"},
+		"description": "Chart source. Use repository for Kite-managed chart repositories, artifacthub for Artifact Hub charts, or oci for configured offline OCI catalog charts. Defaults to repository.",
+		"enum":        []string{"repository", "artifacthub", "oci"},
 	}
 }
 
 func helmRepositoryNameSchema() map[string]any {
 	return map[string]any{
 		"type":        "string",
-		"description": "Kite chart repository name, or Artifact Hub repository name when source is artifacthub.",
+		"description": "Kite chart repository name, Artifact Hub repository name when source is artifacthub, or configured OCI catalog repository name when source is oci.",
 	}
 }
 
@@ -171,7 +171,7 @@ func helmChartVersionSchema() map[string]any {
 func helmChartURLSchema() map[string]any {
 	return map[string]any{
 		"type":        "string",
-		"description": "Resolved chart package URL. For repository charts, this must match the stored repository package URL.",
+		"description": "Resolved chart package URL. For repository and OCI catalog charts, this must match the configured package URL.",
 	}
 }
 

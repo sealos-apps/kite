@@ -139,6 +139,12 @@ func ValidateChartURLSource(chartURL string, repository *model.HelmRepository, s
 		}
 		return nil
 	}
+	if source == ChartSourceOCI {
+		if scheme != "oci" {
+			return fmt.Errorf("oci chartUrl must use oci scheme")
+		}
+		return nil
+	}
 	if repository == nil {
 		return fmt.Errorf("repositoryName is required for repository charts")
 	}

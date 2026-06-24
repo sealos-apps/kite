@@ -44,8 +44,8 @@ export function HelmReleaseChartSelector({
     chartSourceLabel,
   } = selection
   const chartDetailSearchParams = new URLSearchParams()
-  if (activeChartSource === 'artifacthub') {
-    chartDetailSearchParams.set('source', 'artifacthub')
+  if (activeChartSource !== 'repository') {
+    chartDetailSearchParams.set('source', activeChartSource)
   }
   if (detailVersion) {
     chartDetailSearchParams.set('version', detailVersion)

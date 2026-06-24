@@ -16,6 +16,7 @@ import {
   HelmChartContentType,
   HelmChartDetail,
   HelmChartList,
+  HelmChartSource,
   HelmRelease,
   HelmReleaseAutoUpgrade,
   HelmReleaseAutoUpgradeRequest,
@@ -354,6 +355,7 @@ export const deleteHelmRepository = (
 export const fetchHelmCharts = (options?: {
   repository?: string
   query?: string
+  source?: Extract<HelmChartSource, 'repository' | 'oci'>
 }): Promise<HelmChartList> => {
   const params = new URLSearchParams()
   if (options?.repository) {
@@ -361,6 +363,9 @@ export const fetchHelmCharts = (options?: {
   }
   if (options?.query) {
     params.append('q', options.query)
+  }
+  if (options?.source) {
+    params.append('source', options.source)
   }
   const query = params.toString()
   return fetchAPI<HelmChartList>(`/charts${query ? `?${query}` : ''}`)
@@ -395,11 +400,14 @@ export const fetchHelmChart = (
   repository: string,
   name: string,
   version?: string,
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
 ): Promise<HelmChartDetail> => {
   const params = new URLSearchParams()
   if (version) {
     params.append('version', version)
+  }
+  if (source === 'oci') {
+    params.append('source', source)
   }
   const query = params.toString()
   const endpoint =
@@ -415,11 +423,14 @@ export const fetchHelmChartContent = (
   name: string,
   content: HelmChartContentType,
   version?: string,
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
 ): Promise<HelmChartContent> => {
   const params = new URLSearchParams()
   if (version) {
     params.append('version', version)
+  }
+  if (source === 'oci') {
+    params.append('source', source)
   }
   const query = params.toString()
   const endpoint =
@@ -441,6 +452,7 @@ export const useHelmRepositories = () => {
 export const useHelmCharts = (options?: {
   repository?: string
   query?: string
+  source?: Extract<HelmChartSource, 'repository' | 'oci'>
   enabled?: boolean
 }) => {
   const clusterKey = getCurrentClusterCacheKey()
@@ -449,6 +461,7 @@ export const useHelmCharts = (options?: {
       'helmcharts',
       clusterKey,
       'charts',
+      options?.source || '',
       options?.repository || '',
       options?.query || '',
     ],
@@ -484,7 +497,7 @@ export const useHelmChart = (
   repository: string | undefined,
   name: string | undefined,
   version?: string,
-  source?: 'repository' | 'artifacthub',
+  source?: HelmChartSource,
   enabled = true
 ) => {
   const clusterKey = getCurrentClusterCacheKey()
@@ -509,7 +522,7 @@ export const useHelmChartContent = (
   name: string | undefined,
   content: HelmChartContentType,
   version?: string,
-  source?: 'repository' | 'artifacthub',
+  source?: HelmChartSource,
   enabled = true
 ) => {
   const clusterKey = getCurrentClusterCacheKey()

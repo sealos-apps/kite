@@ -753,8 +753,11 @@ func normalizeHelmReleaseAutoUpgradeRequest(req *helmReleaseAutoUpgradeRequest) 
 }
 
 func validateHelmReleaseAutoUpgradeRequest(req helmReleaseAutoUpgradeRequest) error {
-	if req.Source != "" && req.Source != helmutil.ChartSourceRepository && req.Source != helmutil.ChartSourceArtifactHub {
+	if req.Source != "" && req.Source != helmutil.ChartSourceRepository && req.Source != helmutil.ChartSourceArtifactHub && req.Source != helmutil.ChartSourceOCI {
 		return fmt.Errorf("unsupported chart source")
+	}
+	if req.Enabled && req.Source == helmutil.ChartSourceArtifactHub && !common.HelmArtifactHubEnabled {
+		return fmt.Errorf("Artifact Hub chart source is disabled")
 	}
 	if req.ScheduleType != model.ScheduledTaskScheduleTypeInterval && req.ScheduleType != model.ScheduledTaskScheduleTypeDaily {
 		return fmt.Errorf("unsupported scheduleType")
