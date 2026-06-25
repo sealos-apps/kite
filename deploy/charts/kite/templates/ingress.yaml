@@ -1,6 +1,5 @@
 {{- if .Values.ingress.enabled -}}
-{{- $cloudDomain := required "cloudDomain is required when ingress.enabled=true" .Values.cloudDomain -}}
-{{- $host := printf "kite.%s" $cloudDomain -}}
+{{- $host := include "kite.externalHost" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -13,10 +12,12 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
 spec:
   ingressClassName: nginx
+  {{- if eq (include "kite.ingressTlsEnabled" .) "true" }}
   tls:
     - hosts:
         - {{ $host | quote }}
-      secretName: wildcard-cert
+      secretName: {{ .Values.certSecretName | quote }}
+  {{- end }}
   rules:
     - host: {{ $host | quote }}
       http:

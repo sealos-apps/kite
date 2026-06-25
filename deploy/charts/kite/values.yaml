@@ -38,6 +38,13 @@ encryptKey: 'kite-default-encryption-key-change-in-production'
 # cloudDomain is commonly injected by deploy/install.sh from
 # configmap sealos-config in namespace sealos-system.
 cloudDomain: '127.0.0.1.nip.io'
+cloudPort: '443'
+httpPort: '80'
+disableHttps: false
+certSecretName: wildcard-cert
+
+platform:
+  tlsRejectUnauthorized: '1'
 
 # Sealos-related runtime values.
 sealos:
@@ -69,6 +76,7 @@ db:
       enabled: true
       clusterName: kite-pg
       credentialSecretName: ''
+      kubeblocksVersion: '0.8.2'
       version: postgresql-14.8.0
       replicas: 3
       storage: 3Gi

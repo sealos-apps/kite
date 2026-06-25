@@ -1,0 +1,3 @@
+# Default Sealos cloud override file for Kite.
+# User overrides are loaded from /root/.sealos/cloud/values/apps/kite/*-values.yaml.
+{}

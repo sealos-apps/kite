@@ -1,8 +1,6 @@
 1. Get the application URL by running these commands:
 {{- if .Values.ingress.enabled }}
-{{- $cloudDomain := required "cloudDomain is required when ingress.enabled=true" .Values.cloudDomain -}}
-{{- $host := printf "kite.%s" $cloudDomain -}}
-  https://{{ $host }}/
+  {{ include "kite.externalURL" . }}/
 {{- else if .Values.gateway.enabled }}
 {{- $hasHostnames := false }}
 {{- $hasHTTPSListener := false }}

@@ -125,7 +125,7 @@ helm install kite kite/kite -n kite-system --create-namespace --set basePath="/k
 
 Important notes:
 
-- Ingress configuration: in this chart, ingress host/path are fixed in templates (`https://kite.<cloudDomain>/`). You usually only need to set `cloudDomain`. Example:
+- Ingress configuration: in this chart, ingress host/path are fixed in templates and the external scheme is controlled by `disableHttps`. You usually only need to set `cloudDomain`. Example:
 
 ```yaml
 ingress:

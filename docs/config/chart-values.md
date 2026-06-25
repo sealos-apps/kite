@@ -25,6 +25,11 @@ This document describes all available configuration options for the Kite Helm Ch
 | `encryptKey`           | Secret key used for encrypting sensitive data. Change this in production.                | `"kite-default-encryption-key-change-in-production"` |
 | `host`                 | Hostname for the application                                                             | `""`                                                 |
 | `cloudDomain`          | Sealos cloud domain. Used to render ingress/app host                                     | `"127.0.0.1.nip.io"`                                |
+| `cloudPort`            | External HTTPS port used when rendering Sealos app URLs                                  | `"443"`                                             |
+| `httpPort`             | External HTTP port used when `disableHttps=true`                                         | `"80"`                                              |
+| `disableHttps`         | Render external Sealos app URLs and Ingress without HTTPS/TLS                            | `false`                                             |
+| `certSecretName`       | Ingress TLS secret used when HTTPS is enabled                                            | `"wildcard-cert"`                                   |
+| `platform.tlsRejectUnauthorized` | Value injected to env `NODE_TLS_REJECT_UNAUTHORIZED`                          | `"1"`                                               |
 | `sealos.jwtSecret`     | Value injected to env `SEALOS_JWT_SECRET`                                                | `""`                                                 |
 
 ## Database Configuration
@@ -34,6 +39,7 @@ This document describes all available configuration options for the Kite Helm Ch
 | `db.type`       | Database type: `sqlite`, `postgres`, `mysql`                                                                 | `postgres` |
 | `db.dsn`        | Full DSN string for MySQL/Postgres. Required when type is mysql/postgres and native Postgres is disabled      | `""`       |
 | `db.autoCreate` | Whether Kite should create the target MySQL/Postgres database automatically before running schema migrations | `true`     |
+| `db.postgres.native.kubeblocksVersion` | Sealos global KubeBlocks version marker read by the deploy entrypoint | `"0.8.2"` |
 
 When `db.autoCreate` is enabled, the configured database user must have permission to create databases. Kite only creates the target database itself; tables are still created by the normal application migration flow.
 
@@ -124,7 +130,7 @@ App metadata is intentionally fixed in templates:
 - namespace: `app-system`
 - name: `kite`
 - type/displayType: `iframe` / `normal`
-- icon/url: `https://kite.<cloudDomain>/logo.svg` and `https://kite.<cloudDomain>`
+- icon/url: rendered from `disableHttps`, `cloudPort`, and `httpPort`.
 
 ## Service Account Configuration
 
@@ -180,7 +186,7 @@ Ingress behavior is fixed in templates:
 - host: `kite.<cloudDomain>`
 - className: `nginx`
 - path/pathType: `/` / `Prefix`
-- TLS: enabled, secret name `wildcard-cert`
+- TLS: rendered only when `disableHttps=false`; secret name comes from `certSecretName`
 - annotations:
   - `nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'`
   - `nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'`

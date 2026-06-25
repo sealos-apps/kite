@@ -126,7 +126,7 @@ spec:
 
   说明：
 
-  - Ingress 配置：当前 chart 中 ingress 的 host/path 在模板中固定为 `https://kite.<cloudDomain>/`，通常只需要设置 `cloudDomain`。示例：
+  - Ingress 配置：当前 chart 中 ingress 的 host/path 在模板中固定，外部协议由 `disableHttps` 控制，通常只需要设置 `cloudDomain`。示例：
 
   ```yaml
   ingress:
