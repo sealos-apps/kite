@@ -175,6 +175,12 @@ helmCatalog:
 - CRD、Namespace、ClusterRole、ClusterRoleBinding 等集群级渲染资源需要 Kite admin 角色，并且会在命名空间作用域的 Sealos 集群中被拒绝。
 - 如果 upgrade 或 rollback 因渲染资源权限失败，查看 dry-run manifest diff，并补齐 Kite RBAC 中具体资源的 verb，或选择保持在用户命名空间作用域内的 chart/values。
 
+## Sealos 打包
+
+- Sealos 部署入口会从 `/root/.sealos/cloud/scripts/tools.sh` 加载平台 helper，读取全局 HTTP/TLS 设置，并把 `cloudDomain`、`cloudPort`、`httpPort`、`disableHttps`、`certSecretName`、`platform.tlsRejectUnauthorized` 和 `db.postgres.native.kubeblocksVersion` 传给 Helm。
+- 应用覆盖 values 从 `/root/.sealos/cloud/values/apps/kite/*-values.yaml` 按排序顺序加载。若该目录没有 `*-values.yaml`，入口会先复制 chart 默认的 `kite-values.yaml`，再执行 Helm。
+- Release workflow 会为 Sealos 镜像包生成 `.tar.gz.md5`，并附加到 GitHub artifact/release。当前设计不上传镜像包或校验文件到 OSS。
+
 ## 生产镜像说明
 
 生产部署默认构建和发布 `linux/amd64` 镜像，除非明确要求 ARM。

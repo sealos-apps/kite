@@ -242,12 +242,16 @@ jobs:
           docker pull "${GHCR_SEALOS_IMAGE}:${TAG_WITH_SHA}-${{ matrix.arch }}"
           mkdir -p release-assets
           docker save "${GHCR_SEALOS_IMAGE}:${TAG_WITH_SHA}-${{ matrix.arch }}" | gzip > "release-assets/kite-cluster-${TAG_NAME}-${{ matrix.arch }}.tar.gz"
+          md5sum "release-assets/kite-cluster-${TAG_NAME}-${{ matrix.arch }}.tar.gz" > "release-assets/kite-cluster-${TAG_NAME}-${{ matrix.arch }}.tar.gz.md5"
+          ls -lh release-assets/
 
       - name: Upload sealos image package
         uses: actions/upload-artifact@v4
         with:
           name: sealos-image-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}
-          path: release-assets/kite-cluster-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}.tar.gz
+          path: |
+            release-assets/kite-cluster-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}.tar.gz
+            release-assets/kite-cluster-${{ needs.meta.outputs.tag_name }}-${{ matrix.arch }}.tar.gz.md5
           if-no-files-found: error
           retention-days: 14
 
@@ -333,7 +337,7 @@ jobs:
                 "${TAR_NAME}.md5" \
                 "oss://${{ vars.OSS_BUCKET }}/${OSS_PREFIX}/${OSS_TAR_NAME}.md5"
           fi
-  
+
   release-assets:
     name: Publish Release Assets
     runs-on: ubuntu-latest
@@ -359,6 +363,8 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/**/kite-cluster-${{ needs.meta.outputs.tag_name }}-amd64.tar.gz
+            release-assets/**/kite-cluster-${{ needs.meta.outputs.tag_name }}-amd64.tar.gz.md5
             release-assets/**/kite-cluster-${{ needs.meta.outputs.tag_name }}-arm64.tar.gz
+            release-assets/**/kite-cluster-${{ needs.meta.outputs.tag_name }}-arm64.tar.gz.md5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

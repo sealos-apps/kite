@@ -25,6 +25,11 @@
 | `encryptKey`           | 用于加密敏感数据的密钥。生产环境请修改此值。               | `"kite-default-encryption-key-change-in-production"` |
 | `host`                 | 应用程序的主机名                                           | `""`                                                 |
 | `cloudDomain`          | Sealos 域名，用于渲染 ingress/app 主机名                   | `"127.0.0.1.nip.io"`                                |
+| `cloudPort`            | HTTPS 模式下渲染 Sealos App 外部 URL 使用的端口             | `"443"`                                             |
+| `httpPort`             | `disableHttps=true` 时渲染 HTTP 外部 URL 使用的端口          | `"80"`                                              |
+| `disableHttps`         | 以 HTTP/无 TLS 模式渲染 Sealos App URL 和 Ingress            | `false`                                             |
+| `certSecretName`       | HTTPS 模式下 Ingress TLS 使用的 Secret 名称                 | `"wildcard-cert"`                                   |
+| `platform.tlsRejectUnauthorized` | 注入环境变量 `NODE_TLS_REJECT_UNAUTHORIZED` 的值    | `"1"`                                               |
 | `sealos.jwtSecret`     | 注入环境变量 `SEALOS_JWT_SECRET` 的值                      | `""`                                                 |
 
 ## 数据库配置
@@ -34,6 +39,7 @@
 | `db.type`       | 数据库类型：`sqlite`、`postgres`、`mysql`                             | `postgres` |
 | `db.dsn`        | MySQL/Postgres 的完整 DSN 字符串。关闭内置 Postgres 且使用外部库时必需 | `""`       |
 | `db.autoCreate` | Kite 是否在运行表结构迁移前自动创建目标 MySQL/Postgres database       | `true`     |
+| `db.postgres.native.kubeblocksVersion` | 部署入口读取的 Sealos 全局 KubeBlocks 版本标记        | `"0.8.2"` |
 
 开启 `db.autoCreate` 时，配置的数据库账号需要有创建 database 的权限。Kite 只负责创建目标 database，表结构仍由应用正常迁移流程创建。
 
@@ -68,7 +74,7 @@ App 元数据在模板中固定：
 - namespace: `app-system`
 - name: `kite`
 - type/displayType: `iframe` / `normal`
-- icon/url: `https://kite.<cloudDomain>/logo.svg` 和 `https://kite.<cloudDomain>`
+- icon/url：根据 `disableHttps`、`cloudPort` 和 `httpPort` 渲染。
 
 ## 服务账户配置
 
@@ -124,7 +130,7 @@ Ingress 行为在模板中固定：
 - host: `kite.<cloudDomain>`
 - className: `nginx`
 - path/pathType: `/` / `Prefix`
-- TLS：默认开启，secret 名称 `wildcard-cert`
+- TLS：仅在 `disableHttps=false` 时渲染，secret 名称来自 `certSecretName`
 - annotations：
   - `nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'`
   - `nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'`

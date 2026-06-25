@@ -5,6 +5,7 @@ postgres:
     enabled: true
     clusterName: ""
     credentialSecretName: ""
+    kubeblocksVersion: "0.8.2"
     version: postgresql-14.8.0
     replicas: 2
     storage: 3Gi

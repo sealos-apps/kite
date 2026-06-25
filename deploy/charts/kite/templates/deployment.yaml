@@ -111,6 +111,8 @@ spec:
             {{- end }}
             - name: KITE_HELM_ARTIFACT_HUB_ENABLED
               value: {{ .Values.helmCatalog.artifactHub.enabled | quote }}
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: {{ .Values.platform.tlsRejectUnauthorized | quote }}
             {{- if .Values.helmCatalog.oci.catalog }}
             - name: KITE_HELM_OCI_CATALOG
               value: {{ .Values.helmCatalog.oci.catalog | quote }}

@@ -247,6 +247,12 @@ helmCatalog:
 - Cluster-scoped rendered resources such as CRDs, Namespaces, ClusterRoles, and ClusterRoleBindings require the Kite admin role and are rejected on namespace-scoped Sealos clusters.
 - If an upgrade or rollback fails with a rendered resource permission error, inspect the dry-run manifest diff and grant the specific resource verb in Kite RBAC or choose a chart/values set that stays inside the user's namespace scope.
 
+## Sealos Packaging
+
+- The Sealos deploy entrypoint loads platform helpers from `/root/.sealos/cloud/scripts/tools.sh`, reads global HTTP/TLS settings, and then passes `cloudDomain`, `cloudPort`, `httpPort`, `disableHttps`, `certSecretName`, `platform.tlsRejectUnauthorized`, and `db.postgres.native.kubeblocksVersion` to Helm.
+- App override values are loaded from `/root/.sealos/cloud/values/apps/kite/*-values.yaml` in sorted order. If that directory has no `*-values.yaml`, the entrypoint copies the chart default `kite-values.yaml` there before running Helm.
+- Release workflows generate `.tar.gz.md5` files for Sealos image packages and attach them to GitHub artifacts/releases. They intentionally do not upload packages or checksums to OSS.
+
 ## Kubectl Terminal Operations
 
 - Kubectl terminal is disabled by default and is admin-only.

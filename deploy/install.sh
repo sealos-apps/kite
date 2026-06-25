@@ -29,10 +29,58 @@ NAMESPACE="${NAMESPACE:-kite-system}"
 HELM_OPTS="${HELM_OPTS:-}"
 ENABLE_APP="${ENABLE_APP:-true}"
 STRICT_SECRET_REUSE="${STRICT_SECRET_REUSE:-true}"
+APP_NAME="${APP_NAME:-kite}"
+CHART_DIR="${CHART_DIR:-charts/kite}"
+VALUES_DIR_FILE="/root/.sealos/cloud/values/apps/${APP_NAME}/${APP_NAME}-values.yaml"
+DEFAULT_VALUES_FILE="${CHART_DIR}/${APP_NAME}-values.yaml"
+GLOBAL_VALUES_FILE="/root/.sealos/cloud/values/global.yaml"
 
-get_sealos_config() {
-  local key=$1
-  kubectl get configmap sealos-config -n sealos-system -o "jsonpath={.data.${key}}"
+die() {
+  error "$@"
+  exit 1
+}
+
+load_cloud_tools() {
+  local required_functions=(
+    bool_is_true
+    global_http_disable_https
+    global_http_external_url
+    read_yaml_file_path
+    read_jwt_internal
+    fetch_configmap_data_key
+  )
+  local missing_functions=()
+  local function_name
+
+  if [ ! -f /root/.sealos/cloud/scripts/tools.sh ]; then
+    die "tools.sh not found in /root/.sealos/cloud/scripts"
+  fi
+
+  # shellcheck source=/dev/null
+  source /root/.sealos/cloud/scripts/tools.sh
+  for function_name in "${required_functions[@]}"; do
+    if ! declare -f "$function_name" >/dev/null 2>&1; then
+      missing_functions+=("$function_name")
+    fi
+  done
+  [ "${#missing_functions[@]}" -eq 0 ] || die "tools.sh is missing required functions: ${missing_functions[*]}"
+}
+
+ensure_cloud_values_file() {
+  local source_file="$1"
+  local target_file="$2"
+  local label="$3"
+  local target_dir="${target_file%/*}"
+
+  [ -f "$source_file" ] || die "default ${label} values file not found: ${source_file}"
+  mkdir -p "$target_dir"
+  if [ ! -f "$target_file" ]; then
+    warn "/root/.sealos/cloud/values/apps/kite ${target_file} not found, copying default ${label} values"
+    cp "$source_file" "$target_file"
+    info "Copied default ${label} Helm values to ${target_file}"
+  else
+    info "Using existing ${label} Helm values from ${target_file}"
+  fi
 }
 
 decode_base64() {
@@ -90,8 +138,27 @@ is_existing_release() {
   helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1
 }
 
-sealos_jwt_secret="$(get_sealos_config jwtInternal || true)"
-sealos_cloud_domain="$(get_sealos_config cloudDomain || true)"
+read_cert_tls_skip() {
+    local cert_mode
+
+    cert_mode="$(kubectl get configmap cert-config -n sealos-system -o jsonpath='{.data.CERT_MODE}' 2>/dev/null || true)"
+    cert_mode="${CERT_MODE:-${cert_mode:-self-signed}}"
+    cert_mode="$(printf '%s' "${cert_mode}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+
+    case "${cert_mode}" in
+        https|acme|acmedns) printf 'false' ;;
+        *) printf 'true' ;;
+    esac
+}
+
+sealos_jwt_secret="$(read_jwt_internal 2>/dev/null || true)"
+sealos_cloud_domain="$(fetch_configmap_data_key sealos-config cloudDomain sealos-system 1 0 2>/dev/null || true)"
+sealos_cloud_port="$(fetch_configmap_data_key sealos-config cloudPort sealos-system 1 0 2>/dev/null || true)"
+sealos_http_port="$(fetch_configmap_data_key sealos-config httpPort sealos-system 1 0 2>/dev/null || true)"
+sealos_disable_https="$(fetch_configmap_data_key sealos-config disableHttps sealos-system 1 0 2>/dev/null || true)"
+sealos_cert_secret_name="$(fetch_configmap_data_key sealos-config certSecretName sealos-system 1 0 2>/dev/null || true)"
+platform_tls_reject_unauthorized="$(read_tls_reject_unauthorized)"
+kubeblocks_version="$(read_yaml_file_path '.global.featureConfigs.database.kubeblocksVersion')"
 
 [ -n "${sealos_jwt_secret}" ] || error "Failed to read sealos-config.data.jwtInternal"
 [ -n "${sealos_cloud_domain}" ] || error "Failed to read sealos-config.data.cloudDomain"
@@ -152,37 +219,49 @@ helm_set_args=(
   --set-string "encryptKey=${encrypt_key}"
   --set-string "sealos.jwtSecret=${sealos_jwt_secret}"
   --set-string "cloudDomain=${sealos_cloud_domain}"
+  --set-string "cloudPort=${sealos_cloud_port:-443}"
+  --set-string "httpPort=${sealos_http_port:-80}"
+  --set-string "disableHttps=${sealos_disable_https:-false}"
+  --set-string "certSecretName=${sealos_cert_secret_name:-wildcard-cert}"
+  --set-string "platform.tlsRejectUnauthorized=${platform_tls_reject_unauthorized:-1}"
+  --set-string "db.postgres.native.kubeblocksVersion=${kubeblocks_version:-0.8.2}"
 )
+
+if declare -f global_http_external_url >/dev/null 2>&1; then
+  kite_external_url="$(global_http_external_url "kite.${sealos_cloud_domain}" 2>/dev/null || true)"
+  [ -n "${kite_external_url}" ] && info "Kite external URL: ${kite_external_url}"
+fi
 
 if [ "${ENABLE_APP}" = "true" ]; then
   helm_set_args+=(--set "app.enabled=true")
 fi
 
-node_count="$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')"
-if [ "${node_count}" = "1" ]; then
-  warn "Single-node cluster detected, force app/database replicas to 1."
-  helm_set_args+=(
-    --set "replicaCount=1"
-    --set "db.postgres.native.replicas=1"
-  )
+registry_username="$(fetch_configmap_data_key registry-config ADMIN_USER sealos-system 1 0 2>/dev/null || true)"
+registry_password="$(fetch_configmap_data_key registry-config ADMIN_PASSWORD sealos-system 1 0 2>/dev/null || true)"
+
+helm_set_args+=(
+  --set "helmCatalog.oci.base=oci://hub.${sealos_cloud_domain}/kite-helm"
+  --set "helmCatalog.oci.username=${registry_username}"
+  --set "helmCatalog.oci.password=${registry_password}"
+)
+if bool_is_true "${sealos_disable_https}"; then
+  helm_set_args+=(--set "helmCatalog.oci.plainHTTP=true")
+else
+  helm_set_args+=(--set "helmCatalog.oci.plainHTTP=false")
 fi
+
+helm_set_args+=(--set "helmCatalog.oci.insecureSkipTLSVerify=$(read_cert_tls_skip)")
+
 
 helm_opts_arr=()
-if [ -n "${HELM_OPTS}" ]; then
-  # shellcheck disable=SC2206
-  helm_opts_arr=(${HELM_OPTS})
-fi
+values_args=()
+ensure_cloud_values_file ${DEFAULT_VALUES_FILE} ${VALUES_DIR_FILE}
+helm_set_args+=(
+    -f "${VALUES_DIR_FILE}"
+  )
 
-VALUES_FILE="/root/.sealos/cloud/values/apps/kite/kite-values.yaml"
-if [ -f "${VALUES_FILE}" ]; then
-  info "Using additional Helm values from ${VALUES_FILE}"
-  helm_set_args+=(-f "${VALUES_FILE}")
-else
-  warn "Values file ${VALUES_FILE} not found, proceeding without it"
-fi
-
-info "Installing chart charts/kite into namespace ${NAMESPACE}"
-helm upgrade -i "${RELEASE_NAME}" -n "${NAMESPACE}" --create-namespace charts/kite \
+info "Installing chart ${CHART_DIR} into namespace ${NAMESPACE}"
+helm upgrade -i "${RELEASE_NAME}" -n "${NAMESPACE}" --create-namespace "${CHART_DIR}" \
+  "${values_args[@]}" \
   "${helm_set_args[@]}" \
-  "${helm_opts_arr[@]}" \
   --wait

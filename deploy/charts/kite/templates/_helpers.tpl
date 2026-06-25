@@ -94,6 +94,50 @@ Create the name of the service account to use
 {{- end -}}
 {{- end }}
 
+{{- define "kite.boolStringIsTrue" -}}
+{{- $value := printf "%v" . | lower -}}
+{{- if or (eq $value "true") (eq $value "yes") (eq $value "y") (eq $value "1") (eq $value "on") -}}true{{- else -}}false{{- end -}}
+{{- end }}
+
+{{- define "kite.disableHttps" -}}
+{{- include "kite.boolStringIsTrue" (default false .Values.disableHttps) -}}
+{{- end }}
+
+{{- define "kite.externalScheme" -}}
+{{- if eq (include "kite.disableHttps" .) "true" -}}http{{- else -}}https{{- end -}}
+{{- end }}
+
+{{- define "kite.externalPort" -}}
+{{- if eq (include "kite.disableHttps" .) "true" -}}
+{{- default "80" .Values.httpPort -}}
+{{- else -}}
+{{- default "443" .Values.cloudPort -}}
+{{- end -}}
+{{- end }}
+
+{{- define "kite.externalPortSuffix" -}}
+{{- $scheme := include "kite.externalScheme" . -}}
+{{- $port := printf "%v" (include "kite.externalPort" .) -}}
+{{- if and (eq $scheme "http") (eq $port "80") -}}
+{{- else if and (eq $scheme "https") (eq $port "443") -}}
+{{- else -}}
+{{- printf ":%s" $port -}}
+{{- end -}}
+{{- end }}
+
+{{- define "kite.externalHost" -}}
+{{- $cloudDomain := required "cloudDomain is required when external access is enabled" .Values.cloudDomain -}}
+{{- printf "kite.%s" $cloudDomain -}}
+{{- end }}
+
+{{- define "kite.externalURL" -}}
+{{- printf "%s://%s%s" (include "kite.externalScheme" .) (include "kite.externalHost" .) (include "kite.externalPortSuffix" .) -}}
+{{- end }}
+
+{{- define "kite.ingressTlsEnabled" -}}
+{{- if eq (include "kite.disableHttps" .) "true" -}}false{{- else -}}true{{- end -}}
+{{- end }}
+
 
 {{- define "kite.secret" -}}
 {{- if .Values.secret.existingSecret }}
