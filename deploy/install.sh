@@ -48,6 +48,7 @@ load_cloud_tools() {
     read_yaml_file_path
     read_jwt_internal
     fetch_configmap_data_key
+    read_cert_tls_reject_unauthorized
   )
   local missing_functions=()
   local function_name
@@ -66,6 +67,7 @@ load_cloud_tools() {
   [ "${#missing_functions[@]}" -eq 0 ] || die "tools.sh is missing required functions: ${missing_functions[*]}"
 }
 
+load_cloud_tools
 ensure_cloud_values_file() {
   local source_file="$1"
   local target_file="$2"
@@ -157,7 +159,7 @@ sealos_cloud_port="$(fetch_configmap_data_key sealos-config cloudPort sealos-sys
 sealos_http_port="$(fetch_configmap_data_key sealos-config httpPort sealos-system 1 0 2>/dev/null || true)"
 sealos_disable_https="$(fetch_configmap_data_key sealos-config disableHttps sealos-system 1 0 2>/dev/null || true)"
 sealos_cert_secret_name="$(fetch_configmap_data_key sealos-config certSecretName sealos-system 1 0 2>/dev/null || true)"
-platform_tls_reject_unauthorized="$(read_tls_reject_unauthorized)"
+platform_tls_reject_unauthorized="$(read_cert_tls_reject_unauthorized)"
 kubeblocks_version="$(read_yaml_file_path '.global.featureConfigs.database.kubeblocksVersion')"
 
 [ -n "${sealos_jwt_secret}" ] || error "Failed to read sealos-config.data.jwtInternal"
@@ -255,7 +257,7 @@ helm_set_args+=(--set "helmCatalog.oci.insecureSkipTLSVerify=$(read_cert_tls_ski
 
 helm_opts_arr=()
 values_args=()
-ensure_cloud_values_file ${DEFAULT_VALUES_FILE} ${VALUES_DIR_FILE}
+ensure_cloud_values_file ${DEFAULT_VALUES_FILE} ${VALUES_DIR_FILE} kite
 helm_set_args+=(
     -f "${VALUES_DIR_FILE}"
   )
