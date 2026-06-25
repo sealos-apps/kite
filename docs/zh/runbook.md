@@ -131,6 +131,7 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 
 - 托管 Kubernetes 的 kubeconfig 如果使用 `aws`、`gcloud`、`kubelogin` 这类 `exec` 插件，应改用 Service Account token kubeconfig。参考 `docs/zh/config/managed-k8s-auth.md`。
 - 如果访问资源时报权限错误，先检查 Kite RBAC，再检查服务账号或导入 kubeconfig 对应的 Kubernetes RBAC。
+- 如果 Sealos 个人工作空间一直停留在加载状态，同时后端日志反复出现 `failed to wait for cache sync`，先检查 kubeconfig current-context namespace。非豁免命名空间作用域 kubeconfig 应走直接 Kubernetes API 读取，而不是 controller-runtime informer cache；后端集群构建失败会被限频，新的 Sealos 登录或集群配置更新会立即重试。
 - 如果生产镜像没有 shell，不要强行 `kubectl exec` 进 Kite，改用临时 debug/client pod。
 
 ## AI 助手运维
@@ -138,8 +139,41 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 - AI 助手 UI 在新安装中默认启用。可见设置入口只保留在 AI 聊天面板的配置按钮里；只有 Kite 管理员可以编辑设置页，且该页面只显示 AI Agent 设置。
 - 聊天请求需要 OpenAI-compatible 或 Anthropic-compatible provider 配置和 API Key。缺少 API Key 时，运行时会把 AI 视为未启用。
 - 只读工具仍使用当前认证用户、集群和命名空间作用域。
+- 在非豁免的 Sealos 命名空间作用域工作空间中，AI 工具会把省略的 namespace 和 `_all` 解析为当前工作空间命名空间，拒绝普通集群级资源（如 Nodes/Namespaces），隐藏任意 Prometheus 查询，并只展示命名空间内的集群概览。
 - 变更资源的工具需要同时满足 Kite RBAC，并经过显式继续/确认步骤。Pending session 会绑定同一用户和集群。
+- AI 聊天里的 Helm 操作是结构化 tool call，底层复用 Kite 的 Helm SDK 集成，而不是在 Kite Pod 里直接执行 `helm` shell 命令。因此 AI Helm 工作流不要求镜像内置 Helm CLI。
+- AI Helm install/upgrade 应先执行对应 dry-run 工具。dry-run 响应会汇总渲染出的资源供用户确认；真正的 install、upgrade、rollback、uninstall 工具随后进入与其他变更工具相同的确认流程。
+- AI Helm 工具既需要目标命名空间上的 `helmreleases` RBAC，也会通过 `pkg/helmguard` 校验渲染出的 Kubernetes 资源权限。如果报权限错误，同时检查目标 namespace 的 `helmreleases` verb 和 dry-run 资源摘要里的实际资源权限。
 - 如果 AI chat 返回 AI Agent configuration、disabled 或 provider 错误，检查通用设置记录、provider Base URL、API Key、模型名，以及当前用户编辑 `/settings` 时是否拥有 Kite 内置 `admin` 角色。
+
+## Helm 运维
+
+- Chart catalog 只读 API 面向认证用户开放在 `/api/v1/charts`。仓库创建/删除和 catalog 管理 API 仍在 `/api/v1/admin/charts`，只允许管理员使用；响应里不能暴露已存储的仓库凭据。
+- 离线环境可以通过 `KITE_HELM_ARTIFACT_HUB_ENABLED=false` 或 `helmCatalog.artifactHub.enabled=false` 关闭 Artifact Hub。关闭后，后端 Artifact Hub 代理接口和前端 fallback 都不会再使用线上 Artifact Hub。
+- Kite 可以通过 `KITE_HELM_OCI_CATALOG` 或 `KITE_HELM_OCI_CATALOG_FILE` 消费静态 OCI Chart catalog。这个 catalog 指向已经同步到离线 OCI registry 的 Chart；Kite 不会扫描 registry 来自动发现所有内容。
+- OCI catalog 的 `url` 和 `chartUrl` 不能包含凭据、查询参数或 fragment，因为 Chart 只读 API 会把这些 URL 返回给已认证用户。如果 `chartUrl` 显式带 tag，tag 必须按 Helm OCI 规则匹配声明版本（SemVer build metadata 里的 `+` 在 registry tag 中写成 `_`）；当前 catalog 更新检测不支持 digest-only 引用。
+- 最小 inline OCI catalog 示例：
+
+```yaml
+helmCatalog:
+  artifactHub:
+    enabled: false
+  oci:
+    base: oci://registry.internal/charts
+    repositoryName: offline
+    catalog: |
+      charts:
+        - name: demo-chart
+          versions:
+            - version: 0.1.0
+            - version: 0.2.0
+```
+
+- Helm Release API 使用规范资源路径 `helmreleases`。旧的 `helmrelease` 路由仅保留兼容。
+- Helm install、upgrade、rollback、uninstall 和 auto-upgrade 在写入前都会先渲染目标清单。新增资源需要 `create`，保留资源需要 `update`，被移除资源需要 `delete`。
+- AI 助手复用与 HTTP Helm Release API 相同的 Helm SDK 和 rendered-manifest guard 路径。除非是独立 debug 会话明确需要，否则不要通过给 Kite 容器安装 shell 或 Helm CLI 来排查 AI Helm 失败。
+- CRD、Namespace、ClusterRole、ClusterRoleBinding 等集群级渲染资源需要 Kite admin 角色，并且会在命名空间作用域的 Sealos 集群中被拒绝。
+- 如果 upgrade 或 rollback 因渲染资源权限失败，查看 dry-run manifest diff，并补齐 Kite RBAC 中具体资源的 verb，或选择保持在用户命名空间作用域内的 chart/values。
 
 ## 生产镜像说明
 

@@ -34,7 +34,7 @@ When `?iframe=true` is present, the app renders the route outlet without the sta
 | Route | Purpose |
 | --- | --- |
 | `/` and `/dashboard` | Cluster overview. |
-| `/settings` | AI Agent settings page reached from the AI chat panel configure button. Kite administrators can edit provider, API key, and model endpoint settings, while non-admin users see an administrator-managed notice. |
+| `/settings` | AI Agent settings page reached from the AI chat panel configure button, which is visible only to Kite administrators. Administrators can edit provider, API key, and model endpoint settings, while non-admin users who reach the route directly see an administrator-managed notice. |
 | `/crds/:crd` | Generic Custom Resource list page for a selected CRD. |
 | `/crds/:resource/:namespace/:name` | Namespaced Custom Resource detail page. |
 | `/crds/:resource/:name` | Cluster-scoped Custom Resource detail page. |

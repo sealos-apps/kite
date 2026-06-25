@@ -50,6 +50,7 @@ interface AuthContextType {
   isLoading: boolean
   sealosSdkAccessStatus: SealosSdkAccessStatus
   providers: string[]
+  helmArtifactHubEnabled: boolean
   capabilities: Required<
     Pick<UserCapabilities, 'aiEnabled' | 'kubectlEnabled'>
   > &
@@ -240,6 +241,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [providers, setProviders] = useState<string[]>([])
   const [sealosAuthEnabled, setSealosAuthEnabled] = useState(false)
+  const [helmArtifactHubEnabled, setHelmArtifactHubEnabled] = useState(true)
   const [sealosSdkAccessStatus, setSealosSdkAccessStatus] =
     useState<SealosSdkAccessStatus>('checking')
   const queryClient = useQueryClient()
@@ -265,6 +267,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.ok) {
         const data = await response.json()
         setProviders(data.providers || [])
+        setHelmArtifactHubEnabled(data.helm_artifact_hub_enabled !== false)
         const sealosEnabled = data.sealos_auth_enabled === true
         sealosAuthEnabledRef.current = sealosEnabled
         setSealosAuthEnabled(sealosEnabled)
@@ -276,6 +279,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Failed to load OAuth providers:', error)
     }
+    setHelmArtifactHubEnabled(true)
     sealosAuthEnabledRef.current = false
     setSealosAuthEnabled(false)
     setSealosSdkAccessStatus('disabled')
@@ -713,6 +717,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     sealosSdkAccessStatus,
     providers,
+    helmArtifactHubEnabled,
     capabilities: {
       ...DEFAULT_CAPABILITIES,
       ...user?.capabilities,

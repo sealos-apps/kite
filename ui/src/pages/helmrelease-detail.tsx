@@ -857,7 +857,7 @@ function HelmReleaseChartVersionDetail({
   currentVersion: string
 }) {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, helmArtifactHubEnabled } = useAuth()
   const canReadChartCatalog = Boolean(user)
   const canCheck = Boolean(
     canReadChartCatalog && chartName && currentVersion && currentVersion !== '-'
@@ -874,7 +874,10 @@ function HelmReleaseChartVersionDetail({
     [chartName, chartsQuery.data?.items]
   )
   const shouldSearchArtifactHub =
-    canCheck && !chartsQuery.isLoading && managedChartCandidates.length === 0
+    canCheck &&
+    helmArtifactHubEnabled &&
+    !chartsQuery.isLoading &&
+    managedChartCandidates.length === 0
   const artifactHubQuery = useArtifactHubCharts({
     query: chartName,
     verifiedPublisher: false,

@@ -98,8 +98,16 @@ type K8sClient struct {
 	cancel context.CancelFunc
 }
 
+type ClientOptions struct {
+	DisableCache bool
+}
+
 // NewClient creates a K8sClient from a rest.Config
 func NewClient(config *rest.Config) (*K8sClient, error) {
+	return NewClientWithOptions(config, ClientOptions{})
+}
+
+func NewClientWithOptions(config *rest.Config, options ClientOptions) (*K8sClient, error) {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
@@ -111,7 +119,7 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cacheEnabled := os.Getenv("DISABLE_CACHE") != "true"
+	cacheEnabled := os.Getenv("DISABLE_CACHE") != "true" && !options.DisableCache
 
 	var c client.Client
 	if !cacheEnabled {

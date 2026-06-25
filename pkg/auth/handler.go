@@ -30,8 +30,9 @@ func (h *AuthHandler) GetProviders(c *gin.Context) {
 	providers := h.manager.GetAvailableProviders()
 	providers = append(providers, "password")
 	c.JSON(http.StatusOK, gin.H{
-		"providers":           providers,
-		"sealos_auth_enabled": common.SealosAuthEnabled,
+		"providers":                 providers,
+		"sealos_auth_enabled":       common.SealosAuthEnabled,
+		"helm_artifact_hub_enabled": common.HelmArtifactHubEnabled,
 	})
 }
 

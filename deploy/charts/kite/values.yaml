@@ -114,6 +114,28 @@ extraEnvs:
   - name: KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES
     value: 'ns-admin'
 
+# Helm chart catalog sources.
+helmCatalog:
+  artifactHub:
+    enabled: true
+  oci:
+    # Inline YAML/JSON catalog. Use this for small offline catalogs.
+    catalog: ''
+    # Catalog file path mounted into the Kite container. Takes precedence over catalog.
+    catalogFile: ''
+    # Convenience base URL for top-level catalog charts, for example:
+    # oci://registry.example.local/charts
+    base: ''
+    # Repository name used when catalog defines top-level charts.
+    repositoryName: offline
+    # OCI registry access options used by the server when loading chart details,
+    # installs, upgrades, AI tool resolutions, and scheduled auto-upgrades.
+    plainHTTP: false
+    insecureSkipTLSVerify: false
+    caFile: ''
+    username: ''
+    password: ''
+
 serviceAccount:
   create: true
   automount: true

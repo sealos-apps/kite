@@ -18,15 +18,33 @@ type toolPermission struct {
 	Namespace string
 }
 
-func permissionNamespace(resource resourceInfo, namespace string) string {
-	if resource.ClusterScoped {
-		return ""
-	}
+func isNamespaceScopeLocked(cs *cluster.ClientSet) bool {
+	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" &&
+		!common.IsNamespaceScopeExempt(cs.Namespace)
+}
+
+func scopedNamespaceForTool(cs *cluster.ClientSet, resource resourceInfo, namespace string) (string, error) {
 	namespace = strings.TrimSpace(namespace)
-	if namespace == "" {
-		return common.AllNamespaces
+	if isNamespaceScopeLocked(cs) && resource.ClusterScoped {
+		return "", fmt.Errorf("resource %s is cluster-scoped and is not available in namespace-scoped workspaces", resource.Resource)
 	}
-	return namespace
+	if resource.ClusterScoped {
+		return "", nil
+	}
+	if isNamespaceScopeLocked(cs) {
+		scopedNamespace := strings.TrimSpace(cs.Namespace)
+		if namespace == "" || namespace == common.AllNamespaces {
+			return scopedNamespace, nil
+		}
+		if namespace != scopedNamespace {
+			return "", fmt.Errorf("namespace %s is outside the current workspace scope %s", namespace, scopedNamespace)
+		}
+		return namespace, nil
+	}
+	if namespace == "" {
+		return common.AllNamespaces, nil
+	}
+	return namespace, nil
 }
 
 func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolName string, args map[string]interface{}) ([]toolPermission, error) {
@@ -38,10 +56,14 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 		}
 		namespace, _ := args["namespace"].(string)
 		resource := resolveResourceInfo(ctx, cs, kind)
+		namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  resource.Resource,
 			Verb:      string(common.VerbGet),
-			Namespace: permissionNamespace(resource, namespace),
+			Namespace: namespace,
 		}}, nil
 	case "list_resources":
 		kind, err := getRequiredString(args, "kind")
@@ -50,10 +72,14 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 		}
 		namespace, _ := args["namespace"].(string)
 		resource := resolveResourceInfo(ctx, cs, kind)
+		namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  resource.Resource,
 			Verb:      string(common.VerbGet),
-			Namespace: permissionNamespace(resource, namespace),
+			Namespace: namespace,
 		}}, nil
 	case "get_pod_logs":
 		if _, err := getRequiredString(args, "name"); err != nil {
@@ -63,12 +89,23 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 		if err != nil {
 			return nil, err
 		}
+		namespace, err = scopedNamespaceForTool(cs, resolveStaticResourceInfo(string(common.Pods)), namespace)
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  string(common.Pods),
 			Verb:      string(common.VerbLog),
 			Namespace: namespace,
 		}}, nil
 	case "get_cluster_overview":
+		if isNamespaceScopeLocked(cs) {
+			namespace := strings.TrimSpace(cs.Namespace)
+			return []toolPermission{
+				{Resource: string(common.Pods), Verb: string(common.VerbGet), Namespace: namespace},
+				{Resource: string(common.Services), Verb: string(common.VerbGet), Namespace: namespace},
+			}, nil
+		}
 		return []toolPermission{
 			{Resource: string(common.Nodes), Verb: string(common.VerbGet), Namespace: ""},
 			{Resource: string(common.Pods), Verb: string(common.VerbGet), Namespace: common.AllNamespaces},
@@ -81,10 +118,14 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 			return nil, err
 		}
 		resource := resolveResourceInfoForObject(ctx, cs, obj)
+		namespace, err := scopedNamespaceForTool(cs, resource, obj.GetNamespace())
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  resource.Resource,
 			Verb:      string(common.VerbCreate),
-			Namespace: permissionNamespace(resource, obj.GetNamespace()),
+			Namespace: namespace,
 		}}, nil
 	case "update_resource":
 		obj, err := parseResourceYAML(args)
@@ -92,10 +133,14 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 			return nil, err
 		}
 		resource := resolveResourceInfoForObject(ctx, cs, obj)
+		namespace, err := scopedNamespaceForTool(cs, resource, obj.GetNamespace())
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  resource.Resource,
 			Verb:      string(common.VerbUpdate),
-			Namespace: permissionNamespace(resource, obj.GetNamespace()),
+			Namespace: namespace,
 		}}, nil
 	case "patch_resource":
 		kind, err := getRequiredString(args, "kind")
@@ -107,10 +152,14 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 		}
 		namespace, _ := args["namespace"].(string)
 		resource := resolveResourceInfo(ctx, cs, kind)
+		namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  resource.Resource,
 			Verb:      string(common.VerbUpdate),
-			Namespace: permissionNamespace(resource, namespace),
+			Namespace: namespace,
 		}}, nil
 	case "delete_resource":
 		kind, err := getRequiredString(args, "kind")
@@ -122,12 +171,19 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 		}
 		namespace, _ := args["namespace"].(string)
 		resource := resolveResourceInfo(ctx, cs, kind)
+		namespace, err = scopedNamespaceForTool(cs, resource, namespace)
+		if err != nil {
+			return nil, err
+		}
 		return []toolPermission{{
 			Resource:  resource.Resource,
 			Verb:      string(common.VerbDelete),
-			Namespace: permissionNamespace(resource, namespace),
+			Namespace: namespace,
 		}}, nil
 	case "query_prometheus":
+		if isNamespaceScopeLocked(cs) {
+			return nil, fmt.Errorf("query_prometheus is not available in namespace-scoped workspaces")
+		}
 		// Prometheus queries can access metrics from any namespace
 		// Require at least read permission on pods in all namespaces
 		// This ensures users can only query metrics if they have cluster-wide read access
@@ -136,9 +192,74 @@ func requiredToolPermissions(ctx context.Context, cs *cluster.ClientSet, toolNam
 			Verb:      string(common.VerbGet),
 			Namespace: common.AllNamespaces,
 		}}, nil
+	case "list_helm_releases":
+		namespace, _ := args["namespace"].(string)
+		namespace, err := scopedNamespaceForTool(cs, helmReleaseResourceInfo(), namespace)
+		if err != nil {
+			return nil, err
+		}
+		return []toolPermission{{
+			Resource:  string(common.HelmReleases),
+			Verb:      string(common.VerbGet),
+			Namespace: namespace,
+		}}, nil
+	case "get_helm_release", "get_helm_release_history":
+		namespace, err := requiredHelmReleaseNamespace(cs, args)
+		if err != nil {
+			return nil, err
+		}
+		return []toolPermission{{
+			Resource:  string(common.HelmReleases),
+			Verb:      string(common.VerbGet),
+			Namespace: namespace,
+		}}, nil
+	case "dry_run_install_helm_release", "install_helm_release":
+		namespace, err := requiredHelmReleaseNamespace(cs, args)
+		if err != nil {
+			return nil, err
+		}
+		return []toolPermission{{
+			Resource:  string(common.HelmReleases),
+			Verb:      string(common.VerbCreate),
+			Namespace: namespace,
+		}}, nil
+	case "dry_run_upgrade_helm_release", "upgrade_helm_release", "rollback_helm_release":
+		namespace, err := requiredHelmReleaseNamespace(cs, args)
+		if err != nil {
+			return nil, err
+		}
+		return []toolPermission{{
+			Resource:  string(common.HelmReleases),
+			Verb:      string(common.VerbUpdate),
+			Namespace: namespace,
+		}}, nil
+	case "uninstall_helm_release":
+		namespace, err := requiredHelmReleaseNamespace(cs, args)
+		if err != nil {
+			return nil, err
+		}
+		return []toolPermission{{
+			Resource:  string(common.HelmReleases),
+			Verb:      string(common.VerbDelete),
+			Namespace: namespace,
+		}}, nil
 	default:
 		return nil, nil
 	}
+}
+
+func helmReleaseResourceInfo() resourceInfo {
+	info := resolveStaticResourceInfo(string(common.HelmReleases))
+	info.ClusterScoped = false
+	return info
+}
+
+func requiredHelmReleaseNamespace(cs *cluster.ClientSet, args map[string]interface{}) (string, error) {
+	namespace, err := getRequiredString(args, "namespace")
+	if err != nil {
+		return "", err
+	}
+	return scopedNamespaceForTool(cs, helmReleaseResourceInfo(), namespace)
 }
 
 func currentUserFromGin(c *gin.Context) (pkgmodel.User, bool) {
@@ -203,6 +324,24 @@ func ExecuteTool(ctx context.Context, c *gin.Context, cs *cluster.ClientSet, too
 		return executeDeleteResource(ctx, cs, user, args)
 	case "query_prometheus":
 		return executeQueryPrometheus(ctx, cs, args)
+	case "list_helm_releases":
+		return executeListHelmReleases(ctx, c, cs, args)
+	case "get_helm_release":
+		return executeGetHelmRelease(ctx, cs, args)
+	case "get_helm_release_history":
+		return executeGetHelmReleaseHistory(ctx, cs, args)
+	case "dry_run_install_helm_release":
+		return executeInstallHelmRelease(ctx, c, cs, user, args, true)
+	case "install_helm_release":
+		return executeInstallHelmRelease(ctx, c, cs, user, args, false)
+	case "dry_run_upgrade_helm_release":
+		return executeUpgradeHelmRelease(ctx, c, cs, user, args, true)
+	case "upgrade_helm_release":
+		return executeUpgradeHelmRelease(ctx, c, cs, user, args, false)
+	case "rollback_helm_release":
+		return executeRollbackHelmRelease(ctx, c, cs, user, args)
+	case "uninstall_helm_release":
+		return executeUninstallHelmRelease(ctx, c, cs, user, args)
 	default:
 		return fmt.Sprintf("Unknown tool: %s", toolName), true
 	}

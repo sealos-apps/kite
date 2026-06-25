@@ -6,14 +6,23 @@ import (
 	"testing"
 
 	"github.com/zxh326/kite/pkg/cluster"
+	"github.com/zxh326/kite/pkg/common"
 )
 
-func TestPermissionNamespace(t *testing.T) {
+func TestScopedNamespaceForTool(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+
 	tests := []struct {
 		name      string
+		cs        *cluster.ClientSet
 		resource  resourceInfo
 		namespace string
 		want      string
+		wantErr   bool
 	}{
 		{
 			name:      "cluster scoped ignores namespace",
@@ -33,11 +42,49 @@ func TestPermissionNamespace(t *testing.T) {
 			namespace: " default ",
 			want:      "default",
 		},
+		{
+			name:      "namespace-scoped empty defaults to current namespace",
+			cs:        &cluster.ClientSet{NamespaceScoped: true, Namespace: "team-a"},
+			resource:  resourceInfo{},
+			namespace: " ",
+			want:      "team-a",
+		},
+		{
+			name:      "namespace-scoped all defaults to current namespace",
+			cs:        &cluster.ClientSet{NamespaceScoped: true, Namespace: "team-a"},
+			resource:  resourceInfo{},
+			namespace: common.AllNamespaces,
+			want:      "team-a",
+		},
+		{
+			name:      "namespace-scoped rejects other namespace",
+			cs:        &cluster.ClientSet{NamespaceScoped: true, Namespace: "team-a"},
+			resource:  resourceInfo{},
+			namespace: "team-b",
+			wantErr:   true,
+		},
+		{
+			name:      "namespace-scoped rejects cluster-scoped resource",
+			cs:        &cluster.ClientSet{NamespaceScoped: true, Namespace: "team-a"},
+			resource:  resourceInfo{Resource: "nodes", ClusterScoped: true},
+			namespace: "",
+			wantErr:   true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := permissionNamespace(tc.resource, tc.namespace); got != tc.want {
+			got, err := scopedNamespaceForTool(tc.cs, tc.resource, tc.namespace)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
 				t.Fatalf("unexpected namespace: want %q, got %q", tc.want, got)
 			}
 		})
@@ -131,6 +178,57 @@ func TestRequiredToolPermissions(t *testing.T) {
 			args:     map[string]interface{}{"query": "up"},
 			want:     []toolPermission{{Resource: "pods", Verb: "get", Namespace: "_all"}},
 		},
+		{
+			name:     "list helm releases across namespaces",
+			toolName: "list_helm_releases",
+			args:     map[string]interface{}{},
+			want:     []toolPermission{{Resource: "helmreleases", Verb: "get", Namespace: "_all"}},
+		},
+		{
+			name:     "dry-run install helm release",
+			toolName: "dry_run_install_helm_release",
+			args: map[string]interface{}{
+				"release_name": "api",
+				"namespace":    "default",
+			},
+			want: []toolPermission{{Resource: "helmreleases", Verb: "create", Namespace: "default"}},
+		},
+		{
+			name:     "get helm release",
+			toolName: "get_helm_release",
+			args: map[string]interface{}{
+				"release_name": "api",
+				"namespace":    "default",
+			},
+			want: []toolPermission{{Resource: "helmreleases", Verb: "get", Namespace: "default"}},
+		},
+		{
+			name:     "install helm release",
+			toolName: "install_helm_release",
+			args: map[string]interface{}{
+				"release_name": "api",
+				"namespace":    "default",
+			},
+			want: []toolPermission{{Resource: "helmreleases", Verb: "create", Namespace: "default"}},
+		},
+		{
+			name:     "dry-run upgrade helm release",
+			toolName: "dry_run_upgrade_helm_release",
+			args: map[string]interface{}{
+				"release_name": "api",
+				"namespace":    "default",
+			},
+			want: []toolPermission{{Resource: "helmreleases", Verb: "update", Namespace: "default"}},
+		},
+		{
+			name:     "uninstall helm release",
+			toolName: "uninstall_helm_release",
+			args: map[string]interface{}{
+				"release_name": "api",
+				"namespace":    "default",
+			},
+			want: []toolPermission{{Resource: "helmreleases", Verb: "delete", Namespace: "default"}},
+		},
 	}
 
 	for _, tc := range tests {
@@ -143,5 +241,75 @@ func TestRequiredToolPermissions(t *testing.T) {
 				t.Fatalf("unexpected permissions:\nwant: %#v\ngot:  %#v", tc.want, got)
 			}
 		})
+	}
+}
+
+func TestRequiredToolPermissionsNamespaceScoped(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
+
+	cs := &cluster.ClientSet{Name: "cluster-a", NamespaceScoped: true, Namespace: "team-a"}
+
+	got, err := requiredToolPermissions(context.Background(), cs, "list_resources", map[string]interface{}{
+		"kind": "Deployment",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []toolPermission{{Resource: "deployments", Verb: "get", Namespace: "team-a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected permissions:\nwant: %#v\ngot:  %#v", want, got)
+	}
+
+	_, err = requiredToolPermissions(context.Background(), cs, "get_resource", map[string]interface{}{
+		"kind":      "Pod",
+		"name":      "nginx",
+		"namespace": "team-b",
+	})
+	if err == nil {
+		t.Fatalf("expected cross-namespace request to fail")
+	}
+
+	_, err = requiredToolPermissions(context.Background(), cs, "list_resources", map[string]interface{}{
+		"kind": "Node",
+	})
+	if err == nil {
+		t.Fatalf("expected cluster-scoped resource request to fail")
+	}
+
+	got, err = requiredToolPermissions(context.Background(), cs, "get_cluster_overview", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want = []toolPermission{
+		{Resource: "pods", Verb: "get", Namespace: "team-a"},
+		{Resource: "services", Verb: "get", Namespace: "team-a"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected overview permissions:\nwant: %#v\ngot:  %#v", want, got)
+	}
+
+	if _, err = requiredToolPermissions(context.Background(), cs, "query_prometheus", map[string]interface{}{"query": "up"}); err == nil {
+		t.Fatalf("expected prometheus tool to be unavailable in namespace-scoped workspace")
+	}
+
+	got, err = requiredToolPermissions(context.Background(), cs, "list_helm_releases", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want = []toolPermission{{Resource: "helmreleases", Verb: "get", Namespace: "team-a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected helm list permissions:\nwant: %#v\ngot:  %#v", want, got)
+	}
+
+	_, err = requiredToolPermissions(context.Background(), cs, "get_helm_release", map[string]interface{}{
+		"release_name": "api",
+		"namespace":    "team-b",
+	})
+	if err == nil {
+		t.Fatalf("expected cross-namespace helm request to fail")
 	}
 }

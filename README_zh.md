@@ -61,7 +61,7 @@ _全面的集群概览，包含实时指标和资源统计_
 - 💻 **Pod/Node/Kubectl 终端** - 直接在浏览器中进入 Pod、Node，或使用由运维启用的 kubectl 会话
 - 📈 **节点监控** - 详细的节点级别性能指标和利用率
 - 📊 **Pod 监控** - 单个 Pod 资源使用情况和性能跟踪
-- 🤖 **AI 助手** - 可选的 OpenAI/Anthropic compatible 聊天面板，支持集群巡检、日志、Prometheus 查询和需确认的资源操作
+- 🤖 **AI 助手** - 可选的 OpenAI/Anthropic compatible 聊天面板，支持集群巡检、日志、Prometheus 查询、需确认的资源操作和 Helm Release 工作流
 
 ### 🔐 **安全**
 

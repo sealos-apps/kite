@@ -127,12 +127,52 @@ func (h *HelmChartHandler) loadChartContent(repository model.HelmRepository, ent
 	return content, nil
 }
 
+func (h *HelmChartHandler) loadOCIChartContent(ref helmutil.OCIChartVersionRef) (helmChartContent, error) {
+	cacheKey := chartArchiveContentCacheKey(ref.ChartURL)
+	now := time.Now()
+
+	h.contentCacheMu.Lock()
+	cached, ok := h.contentCache[cacheKey]
+	if ok && now.Before(cached.expiresAt) {
+		h.contentCacheMu.Unlock()
+		return cached.content, nil
+	}
+	h.contentCacheMu.Unlock()
+
+	loadedChart, err := helmutil.LoadOCIArchive(ref)
+	if err != nil {
+		return helmChartContent{}, err
+	}
+	values, err := chartValues(loadedChart)
+	if err != nil {
+		return helmChartContent{}, err
+	}
+	content := helmChartContent{
+		Readme:    findReadme(loadedChart.Files),
+		Values:    values,
+		Templates: chartTemplates(loadedChart.Templates),
+	}
+
+	h.contentCacheMu.Lock()
+	h.contentCache[cacheKey] = cachedChartContent{
+		content:   content,
+		expiresAt: now.Add(helmChartContentCacheTTL),
+	}
+	h.contentCacheMu.Unlock()
+
+	return content, nil
+}
+
 func repositoryIndexCacheKey(repository model.HelmRepository) string {
 	return repository.URL
 }
 
 func chartContentCacheKey(repository model.HelmRepository, entry *repo.ChartVersion) string {
 	return helmutil.ResolveURL(repository.URL, entry.URLs[0])
+}
+
+func chartArchiveContentCacheKey(chartURL string) string {
+	return chartURL
 }
 
 func (h *HelmChartHandler) clearRepositoryCache(repository model.HelmRepository) {

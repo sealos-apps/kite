@@ -18,6 +18,12 @@ Kite supports several environment variables by default to change the default val
 - **SEALOS_DEFAULT_PROMETHEUS_URL**: Default Prometheus URL for Sealos-managed clusters. If set, Kite writes this value for newly synced Sealos clusters and backfills existing Sealos clusters with empty `prometheus_url` during startup.
 - **KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES**: Comma-separated namespace allowlist (for example `ns-admin,platform-admin`). For these namespaces, Kite bypasses kubeconfig `current-context.namespace` namespace-scope lock, Sealos SSO auto-roles are granted `*` namespaces on their managed cluster, and those Sealos users are assigned Kite's built-in `admin` role for admin-only app settings such as AI Agent configuration. Use this only for namespaces whose credentials are truly cluster-admin/global.
 
+- **KITE_HELM_ARTIFACT_HUB_ENABLED**: Enable Artifact Hub chart source APIs and UI fallback. Defaults to `true`. Set to `false` for offline deployments.
+- **KITE_HELM_OCI_CATALOG**: Inline YAML/JSON catalog for offline OCI Helm charts.
+- **KITE_HELM_OCI_CATALOG_FILE**: Path to a mounted OCI chart catalog file. Takes precedence over `KITE_HELM_OCI_CATALOG`.
+- **KITE_HELM_OCI_CATALOG_BASE**: Base `oci://` registry repository used when the catalog defines top-level `charts`.
+- **KITE_HELM_OCI_CATALOG_REPOSITORY_NAME**: Repository name shown in Kite for top-level OCI catalog entries. Defaults to `offline`.
+
 - **HOST**: Used for generating OAuth 2.0 authorization callback addresses, default will be obtained from request headers. If you find the result not as expected, you can manually configure this environment variable.
 
 - **NODE_TERMINAL_IMAGE**: Docker image used for generating Node Terminal Agent.

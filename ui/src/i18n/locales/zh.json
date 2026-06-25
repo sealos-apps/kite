@@ -1644,6 +1644,7 @@
     "filters": {
       "allRepositories": "全部仓库",
       "artifactHub": "Artifact Hub",
+      "oci": "离线 OCI",
       "repositories": "仓库",
       "verifiedPublisher": "已验证发布者"
     },
@@ -1745,8 +1746,9 @@
       "rollbackStarted": "已发起回滚",
       "rollbackConfirmTitle": "确认回滚 Release？",
       "rollbackConfirmDescription": "将 {{namespace}}/{{name}} 回滚到 revision {{revision}}。",
-      "chartNotFound": "在已管理的 Helm 仓库和 Artifact Hub 中均未找到这个 Chart。",
+      "chartNotFound": "在已配置的 Helm Chart 来源中未找到这个 Chart。",
       "chartSourceManagedRepository": "当前使用已管理的 Chart 仓库：{{repository}}。",
+      "chartSourceOCI": "当前使用离线 OCI Chart 来源：{{repository}}。",
       "chartSourceArtifactHubVerified": "当前使用 Artifact Hub Chart：{{repository}}（已验证发布者）。",
       "chartSourceArtifactHubVerifiedShort": "Artifact Hub（已验证）",
       "chartSourceArtifactHub": "当前使用 Artifact Hub Chart：{{repository}}。",

@@ -6,6 +6,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { useAIChatContext } from '@/contexts/ai-chat-context'
+import { useAuth } from '@/contexts/auth-context'
 import {
   Bot,
   Clock,
@@ -42,6 +43,7 @@ export function AIChatPanel({
 }) {
   const { i18n, t } = useTranslation()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { closeChat, pageContext } = useAIChatContext()
   const {
     messages,
@@ -63,6 +65,7 @@ export function AIChatPanel({
   const [showHistory, setShowHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const canConfigureAI = user?.isAdmin() ?? false
 
   useEffect(() => {
     if (!standalone || !sessionId) return
@@ -210,21 +213,23 @@ export function AIChatPanel({
             </TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={openSettings}
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {t('aiChat.actions.configure')}
-            </TooltipContent>
-          </Tooltip>
+          {canConfigureAI && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={openSettings}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {t('aiChat.actions.configure')}
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {!standalone && (
             <Tooltip>

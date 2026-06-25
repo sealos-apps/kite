@@ -230,9 +230,11 @@ func toolDefinitions(cs *cluster.ClientSet) []agentToolDefinition {
 			Required: []string{"kind", "name"},
 		},
 	}
+	tools = append(tools, helmToolDefinitions()...)
 
-	// Only add Prometheus tool if Prometheus client is available
-	if cs != nil && cs.PromClient != nil {
+	// Only add Prometheus tool if Prometheus client is available and the current
+	// workspace is allowed to query cluster-wide metrics.
+	if cs != nil && cs.PromClient != nil && !isNamespaceScopeLocked(cs) {
 		tools = append(tools, agentToolDefinition{
 			Name:        "query_prometheus",
 			Description: "Execute a PromQL query against Prometheus to retrieve metrics data. Use this to get monitoring information like CPU usage, memory usage, network traffic, custom application metrics, etc. Returns time series data or instant values. Note: Requires cluster-wide read access as metrics can span multiple namespaces.",

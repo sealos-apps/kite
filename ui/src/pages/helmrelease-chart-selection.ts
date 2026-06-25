@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from 'react-i18next'
 
 import type { HelmChart } from '@/types/api'
@@ -27,6 +28,7 @@ export function useHelmReleaseChartSelection({
   enabled?: boolean
 }) {
   const { t } = useTranslation()
+  const { helmArtifactHubEnabled } = useAuth()
   const chartsQuery = useHelmCharts({
     query: chartName,
     enabled: enabled && open && !!chartName,
@@ -42,6 +44,7 @@ export function useHelmReleaseChartSelection({
     open &&
     enabled &&
     !!chartName &&
+    helmArtifactHubEnabled &&
     !chartsQuery.isLoading &&
     managedChartCandidates.length === 0
   const verifiedArtifactHubQuery = useArtifactHubCharts({
@@ -98,6 +101,9 @@ export function useHelmReleaseChartSelection({
       (candidate) => chartKey(candidate) === chartKey(chart)
     )
   const chartOptionSourceLabel = (chart: HelmChart) => {
+    if (chart.source === 'oci') {
+      return t('helmCharts.filters.oci')
+    }
     if (chart.source !== 'artifacthub') {
       return t('helmCharts.filters.repositories')
     }
@@ -130,7 +136,7 @@ export function useHelmReleaseChartSelection({
           chartCandidates.length === 0
         ? t('helm.messages.chartNotFound', {
             defaultValue:
-              'Chart not found in managed Helm repositories or Artifact Hub.',
+              'Chart not found in configured Helm chart sources.',
           })
         : ''
   const chartSourceLabel = activeChart
@@ -147,10 +153,15 @@ export function useHelmReleaseChartSelection({
             repository: activeRepository,
             defaultValue: 'Using Artifact Hub chart from {{repository}}.',
           })
-      : t('helm.messages.chartSourceManagedRepository', {
-          repository: activeRepository,
-          defaultValue: 'Using managed chart repository {{repository}}.',
-        })
+      : activeChartSource === 'oci'
+        ? t('helm.messages.chartSourceOCI', {
+            repository: activeRepository,
+            defaultValue: 'Using offline OCI chart source {{repository}}.',
+          })
+        : t('helm.messages.chartSourceManagedRepository', {
+            repository: activeRepository,
+            defaultValue: 'Using managed chart repository {{repository}}.',
+          })
     : chartCandidates.length > 1
       ? t('helm.messages.chartSourceSelectChart', {
           defaultValue: 'Select a chart to use a different chart package.',

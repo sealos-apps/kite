@@ -162,11 +162,13 @@ export interface HelmRepository {
   updatedAt: string
 }
 
+export type HelmChartSource = 'repository' | 'artifacthub' | 'oci'
+
 export interface HelmChart {
   repositoryId: number
   repositoryName: string
   repositoryUrl: string
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
   name: string
   version: string
   appVersion?: string
@@ -222,7 +224,7 @@ export interface HelmReleaseInstallRequest {
   chartName?: string
   chartVersion?: string
   repositoryName?: string
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
   values?: Record<string, unknown>
   description?: string
   createNamespace?: boolean
@@ -233,7 +235,7 @@ export interface HelmReleaseUpgradeRequest {
   chartUrl?: string
   chartVersion?: string
   repositoryName?: string
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
   values?: Record<string, unknown>
   description?: string
   forceConflicts?: boolean
@@ -251,7 +253,7 @@ export interface HelmReleaseAutoUpgrade {
   scheduleTime: string
   timeoutMinutes: number
   rollbackOnFailure: boolean
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
   repositoryName?: string
   chartName?: string
   lastCheckedAt?: string
@@ -266,7 +268,7 @@ export interface HelmReleaseAutoUpgradeRequest {
   scheduleTime: string
   timeoutMinutes: number
   rollbackOnFailure: boolean
-  source?: 'repository' | 'artifacthub'
+  source?: HelmChartSource
   repositoryName?: string
   chartName?: string
 }

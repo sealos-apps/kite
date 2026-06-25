@@ -109,6 +109,36 @@ spec:
             - name: KITE_BASE
               value: {{ .Values.basePath }}
             {{- end }}
+            - name: KITE_HELM_ARTIFACT_HUB_ENABLED
+              value: {{ .Values.helmCatalog.artifactHub.enabled | quote }}
+            {{- if .Values.helmCatalog.oci.catalog }}
+            - name: KITE_HELM_OCI_CATALOG
+              value: {{ .Values.helmCatalog.oci.catalog | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.oci.catalogFile }}
+            - name: KITE_HELM_OCI_CATALOG_FILE
+              value: {{ .Values.helmCatalog.oci.catalogFile | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.oci.base }}
+            - name: KITE_HELM_OCI_CATALOG_BASE
+              value: {{ .Values.helmCatalog.oci.base | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.oci.repositoryName }}
+            - name: KITE_HELM_OCI_CATALOG_REPOSITORY_NAME
+              value: {{ .Values.helmCatalog.oci.repositoryName | quote }}
+            {{- end }}
+            - name: KITE_HELM_OCI_REGISTRY_PLAIN_HTTP
+              value: {{ .Values.helmCatalog.oci.plainHTTP | quote }}
+            - name: KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY
+              value: {{ .Values.helmCatalog.oci.insecureSkipTLSVerify | quote }}
+            {{- if .Values.helmCatalog.oci.caFile }}
+            - name: KITE_HELM_OCI_REGISTRY_CA_FILE
+              value: {{ .Values.helmCatalog.oci.caFile | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.oci.username }}
+            - name: KITE_HELM_OCI_REGISTRY_USERNAME
+              value: {{ .Values.helmCatalog.oci.username | quote }}
+            {{- end }}
           {{- with .Values.extraEnvs }}
           {{- toYaml . | nindent 12 }}
           {{- end }}

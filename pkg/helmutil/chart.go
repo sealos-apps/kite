@@ -2,8 +2,12 @@ package helmutil
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -41,6 +45,14 @@ func LoadRepositoryArchive(repository model.HelmRepository, entry *repo.ChartVer
 }
 
 func LoadArchive(chartURL string, repository *model.HelmRepository) (*chart.Chart, error) {
+	return loadArchive(chartURL, repository, nil)
+}
+
+func LoadOCIArchive(ref OCIChartVersionRef) (*chart.Chart, error) {
+	return loadArchive(ref.ChartURL, nil, &ref.Registry)
+}
+
+func loadArchive(chartURL string, repository *model.HelmRepository, ociRegistryOptions *OCIRegistryOptions) (*chart.Chart, error) {
 	chartURL = strings.TrimSpace(chartURL)
 	parsedURL, err := url.Parse(chartURL)
 	if err != nil || parsedURL.Scheme == "" {
@@ -75,11 +87,11 @@ func LoadArchive(chartURL string, repository *model.HelmRepository) (*chart.Char
 	}
 
 	if parsedURL.Scheme == "oci" {
-		registryOptions := []registry.ClientOption{}
-		if useRepositoryCredentials {
-			registryOptions = append(registryOptions, registry.ClientOptBasicAuth(repository.Username, string(repository.Password)))
+		optionsFromCatalog, err := registryOptionsForArchive(chartURL, repository, useRepositoryCredentials, ociRegistryOptions)
+		if err != nil {
+			return nil, err
 		}
-		registryClient, err := registry.NewClient(registryOptions...)
+		registryClient, err := newOCIRegistryClient(optionsFromCatalog)
 		if err != nil {
 			return nil, err
 		}
@@ -123,6 +135,72 @@ func LoadArchive(chartURL string, repository *model.HelmRepository) (*chart.Char
 	return loadedChart, nil
 }
 
+func registryOptionsForArchive(chartURL string, repository *model.HelmRepository, useRepositoryCredentials bool, explicitOptions *OCIRegistryOptions) (OCIRegistryOptions, error) {
+	options := OCIRegistryOptions{}
+	if explicitOptions != nil {
+		options = *explicitOptions
+	} else {
+		matched, ok, err := OCIRegistryOptionsForChartURL(chartURL)
+		if err != nil {
+			return OCIRegistryOptions{}, err
+		}
+		if ok {
+			options = matched
+		}
+	}
+	if useRepositoryCredentials && repository != nil {
+		options.Username = repository.Username
+		options.Password = string(repository.Password)
+	}
+	return options, nil
+}
+
+func newOCIRegistryClient(options OCIRegistryOptions) (*registry.Client, error) {
+	registryOptions := []registry.ClientOption{}
+	if options.Username != "" {
+		registryOptions = append(registryOptions, registry.ClientOptBasicAuth(options.Username, options.Password))
+	}
+	if options.PlainHTTP {
+		registryOptions = append(registryOptions, registry.ClientOptPlainHTTP())
+	}
+	if options.InsecureSkipTLSVerify || strings.TrimSpace(options.CAFile) != "" {
+		tlsConfig, err := newOCITLSConfig(options)
+		if err != nil {
+			return nil, err
+		}
+		registryOptions = append(registryOptions, registry.ClientOptHTTPClient(&http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+				Proxy:           http.ProxyFromEnvironment,
+			},
+		}))
+	}
+	return registry.NewClient(registryOptions...)
+}
+
+func newOCITLSConfig(options OCIRegistryOptions) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: options.InsecureSkipTLSVerify, //nolint:gosec // User-configured for private offline registries.
+	}
+	caFile := strings.TrimSpace(options.CAFile)
+	if caFile == "" {
+		return tlsConfig, nil
+	}
+	certPool, err := x509.SystemCertPool()
+	if err != nil || certPool == nil {
+		certPool = x509.NewCertPool()
+	}
+	caData, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	if ok := certPool.AppendCertsFromPEM(caData); !ok {
+		return nil, fmt.Errorf("failed to append OCI registry CA certificate")
+	}
+	tlsConfig.RootCAs = certPool
+	return tlsConfig, nil
+}
+
 func ValidateChartURLSource(chartURL string, repository *model.HelmRepository, source string) error {
 	chartURL = strings.TrimSpace(chartURL)
 	parsedURL, err := url.Parse(chartURL)
@@ -136,6 +214,12 @@ func ValidateChartURLSource(chartURL string, repository *model.HelmRepository, s
 	if source == ChartSourceArtifactHub {
 		if scheme != "https" || !strings.EqualFold(parsedURL.Hostname(), "artifacthub.io") {
 			return fmt.Errorf("artifacthub chartUrl must come from artifacthub.io")
+		}
+		return nil
+	}
+	if source == ChartSourceOCI {
+		if scheme != "oci" {
+			return fmt.Errorf("oci chartUrl must use oci scheme")
 		}
 		return nil
 	}

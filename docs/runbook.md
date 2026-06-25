@@ -150,7 +150,7 @@ make docs-build
 - `ANONYMOUS_USER_ENABLED`: bypass normal auth. Do not enable in production unless the deployment is intentionally trusted.
 - `SEALOS_AUTH_ENABLED`: enables the Sealos login API.
 - `SEALOS_JWT_SECRET`: JWT secret used for Sealos auth validation.
-- `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`: comma-separated Sealos workspace namespaces that represent global/admin credentials. Matching Sealos users receive `*` namespaces on their managed cluster and Kite's built-in `admin` role.
+- `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`: comma-separated Sealos workspace namespaces that represent global/admin credentials. Matching Sealos users receive `*` namespaces on their managed cluster and Kite's built-in `admin` role. When the same Sealos user logs into a non-exempt workspace, Kite removes that user's stale built-in `admin` assignment before RBAC sync.
 - `AUTH_COOKIE_SAMESITE` and `AUTH_COOKIE_SECURE`: cookie settings for normal and iframe deployments.
 - `VITE_SEALOS_AUTO_LOGIN`: frontend build-time flag controlling Sealos SDK session login attempts.
 
@@ -163,7 +163,8 @@ Sealos auth notes:
 
 - Kite does not block Sealos auth solely because the app is opened as the top-level window. Standalone local development and `sealos-app-dev-bridge` can still attempt Sealos SDK auto-login when `SEALOS_AUTH_ENABLED=true`.
 - `/login` can show a non-blocking Sealos SDK availability notice when the SDK session channel is unavailable. Treat it as a diagnostic hint for Sealos Desktop or `sealos-app-dev-bridge`, not as an access gate.
-- The display name `admin` is not enough for Kite admin-only settings. Check `/api/auth/user` or the `role_assignments` table: the user must have the built-in `admin` role. For Sealos workspaces in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`, the next Sealos login/sync assigns that role automatically.
+- The display name `admin` is not enough for Kite admin-only settings. Check `/api/auth/user` or the `role_assignments` table: the user must have the built-in `admin` role. For Sealos workspaces in `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`, the next Sealos login/sync assigns that role automatically; for non-exempt workspaces, the next Sealos login/sync removes stale built-in `admin` assignments for that Sealos username.
+- Non-exempt Sealos kubeconfigs with a current-context namespace are loaded as namespace-scoped clients. Kite disables the controller-runtime informer cache for those clients, so direct Kubernetes API reads are expected even when the global process cache is enabled.
 - If Sealos auto-login fails in standalone/local development, verify the bridge or Sealos Desktop session first, then inspect `/api/auth/login/sealos` responses and backend logs.
 
 ## Auth Fault Page
@@ -202,6 +203,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 - If managed Kubernetes kubeconfigs use an `exec` plugin such as `aws`, `gcloud`, or `kubelogin`, use a Service Account token kubeconfig instead. See `docs/config/managed-k8s-auth.md`.
 - If resource access fails with permission errors, verify Kite RBAC first, then Kubernetes RBAC for the service account or imported kubeconfig.
+- If a Sealos personal workspace stays on a loading spinner while the backend logs repeat `failed to wait for cache sync`, inspect the kubeconfig current-context namespace. Non-exempt namespace-scoped kubeconfigs should use direct Kubernetes API reads instead of the controller-runtime informer cache; backend cluster build failures are rate-limited, and a new Sealos login or cluster config update triggers an immediate retry.
 - If a production image has no shell, use a temporary debug/client pod rather than `kubectl exec` into Kite.
 
 ## AI Assistant Operations
@@ -209,14 +211,39 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - The AI assistant UI is enabled by default for new installs. The visible settings entry is the configure button in the AI chat panel; only Kite admins can edit the Settings page, which only shows AI Agent settings.
 - Chat requests require an OpenAI-compatible or Anthropic-compatible provider configuration with an API key. If the API key is missing, the runtime treats AI as not enabled.
 - Read-only tools still use the current authenticated user, cluster, and namespace scope.
+- In namespace-scoped non-exempt Sealos workspaces, AI tools resolve omitted namespace and `_all` to the current workspace namespace, reject ordinary cluster-scoped resources such as Nodes/Namespaces, hide arbitrary Prometheus queries, and show namespace-local cluster overview data only.
 - Mutating tools require both Kite RBAC and an explicit continue/confirmation step. Pending sessions are scoped to the same user and cluster.
+- Helm actions in AI chat are structured tool calls backed by Kite's Helm SDK integration, not direct `helm` shell commands inside the Kite pod. The pod does not need a Helm CLI binary for AI Helm workflows.
+- AI Helm install and upgrade should run the matching dry-run tool first. The dry-run response summarizes rendered resources for review; the actual install, upgrade, rollback, or uninstall tool then enters the same confirmation flow as other mutating tools.
+- AI Helm tools require `helmreleases` RBAC for the release action and rendered-resource RBAC through `pkg/helmguard`. If a tool fails with a permission error, check both the `helmreleases` verb on the target namespace and the rendered Kubernetes resources in the dry-run summary.
 - If AI chat returns an AI Agent configuration, disabled, or provider error, check the general settings record, provider base URL, API key, model name, and whether the current user has Kite's built-in `admin` role when trying to edit `/settings`.
 
 ## Helm Operations
 
 - Chart catalog read APIs live under `/api/v1/charts` for authenticated users. Repository create/delete and catalog management APIs remain admin-only under `/api/v1/admin/charts`; stored repository credentials must not be exposed in responses.
+- Offline environments can disable Artifact Hub with `KITE_HELM_ARTIFACT_HUB_ENABLED=false` or `helmCatalog.artifactHub.enabled=false`. This disables the backend Artifact Hub proxy endpoints and the frontend fallback.
+- Kite can consume a static OCI chart catalog through `KITE_HELM_OCI_CATALOG` or `KITE_HELM_OCI_CATALOG_FILE`. This catalog points to charts already mirrored into an offline OCI registry; Kite does not discover registry contents by scanning the registry.
+- OCI catalog `url` and `chartUrl` values must not include credentials, query parameters, or fragments because chart read APIs return those URLs to authenticated users. If a `chartUrl` includes a tag, the tag must match the declared version using Helm OCI encoding (`+` becomes `_`); digest-only references are not supported for catalog update detection.
+- Minimal inline OCI catalog example:
+
+```yaml
+helmCatalog:
+  artifactHub:
+    enabled: false
+  oci:
+    base: oci://registry.internal/charts
+    repositoryName: offline
+    catalog: |
+      charts:
+        - name: demo-chart
+          versions:
+            - version: 0.1.0
+            - version: 0.2.0
+```
+
 - Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
 - Helm install, upgrade, rollback, uninstall, and auto-upgrade render target manifests before writing. Added resources require `create`, retained resources require `update`, and removed resources require `delete` on the rendered Kubernetes resource.
+- The AI assistant uses the same Helm SDK and rendered-manifest guard path as the HTTP Helm release API. Do not troubleshoot AI Helm failures by installing a shell or Helm CLI into the Kite container unless a separate debug session explicitly needs those tools.
 - Cluster-scoped rendered resources such as CRDs, Namespaces, ClusterRoles, and ClusterRoleBindings require the Kite admin role and are rejected on namespace-scoped Sealos clusters.
 - If an upgrade or rollback fails with a rendered resource permission error, inspect the dry-run manifest diff and grant the specific resource verb in Kite RBAC or choose a chart/values set that stays inside the user's namespace scope.
 

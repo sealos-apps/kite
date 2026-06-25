@@ -41,3 +41,60 @@ func TestLoadArchiveFromOCIRepository(t *testing.T) {
 	require.Equal(t, "kite", loadedChart.Metadata.Name)
 	require.NotEmpty(t, loadedChart.Metadata.Version)
 }
+
+func TestRegistryOptionsForArchiveUsesCatalogOptions(t *testing.T) {
+	t.Setenv(ociRegistryPlainHTTPEnv, "true")
+	t.Setenv(ociRegistryInsecureTLSEnv, "true")
+	t.Setenv(ociRegistryUsernameEnv, "admin")
+	t.Setenv(ociRegistryPasswordEnv, "secret")
+	t.Setenv(ociCatalogEnv, `
+repositories:
+  - name: offline
+    url: oci://registry.local/charts
+    charts:
+      - name: postgres
+        version: 12.0.0
+`)
+
+	options, err := registryOptionsForArchive("oci://registry.local/charts/postgres:12.0.0", nil, false, nil)
+	require.NoError(t, err)
+	require.True(t, options.PlainHTTP)
+	require.True(t, options.InsecureSkipTLSVerify)
+	require.Equal(t, "admin", options.Username)
+	require.Equal(t, "secret", options.Password)
+}
+
+func TestRegistryOptionsForArchivePrefersExplicitOptions(t *testing.T) {
+	t.Setenv(ociRegistryPlainHTTPEnv, "true")
+	t.Setenv(ociRegistryUsernameEnv, "catalog-user")
+	t.Setenv(ociRegistryPasswordEnv, "catalog-secret")
+	t.Setenv(ociCatalogEnv, `
+repositories:
+  - name: offline
+    url: oci://registry.local/charts
+    charts:
+      - name: postgres
+        version: 12.0.0
+`)
+
+	explicit := OCIRegistryOptions{
+		Username: "explicit-user",
+		Password: "explicit-secret",
+	}
+	options, err := registryOptionsForArchive("oci://registry.local/charts/postgres:12.0.0", nil, false, &explicit)
+	require.NoError(t, err)
+	require.False(t, options.PlainHTTP)
+	require.Equal(t, "explicit-user", options.Username)
+	require.Equal(t, "explicit-secret", options.Password)
+}
+
+func TestNewOCIRegistryClientAllowsPlainHTTPWithInsecureTokenRealm(t *testing.T) {
+	client, err := newOCIRegistryClient(OCIRegistryOptions{
+		PlainHTTP:             true,
+		InsecureSkipTLSVerify: true,
+		Username:              "admin",
+		Password:              "secret",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, client)
+}
