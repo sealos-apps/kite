@@ -1,3 +1,92 @@
-# Default Sealos cloud override file for Kite.
-# User overrides are loaded from /root/.sealos/cloud/values/apps/kite/*-values.yaml.
-{}
+# Default values for kite.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+#image:
+#  repository: crpi-7jr40k6elhldekqp.cn-hangzhou.personal.cr.aliyuncs.com/mlhiter/kite
+#  pullPolicy: IfNotPresent
+#  tag: '1.0.8'
+
+debug: false
+
+
+# Database configuration
+# type: sqlite | postgres | mysql
+db:
+  type: postgres
+  dsn: ''
+  autoCreate: true
+
+  postgres:
+    database: postgres
+    sslMode: disable
+    extraOptions: ''
+
+    native:
+      enabled: true
+      clusterName: kite-pg
+      credentialSecretName: ''
+      kubeblocksVersion: '0.8.2'
+      version: postgresql-14.8.0
+      replicas: 3
+      storage: 3Gi
+      backup:
+        enabled: false
+        cron: '0 7 * * *'
+        retentionPeriod: 7d
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1024Mi
+        requests:
+          cpu: 10m
+          memory: 50Mi
+      terminationPolicy: Delete
+
+extraEnvs:
+  - name: SEALOS_AUTH_ENABLED
+    value: 'true'
+  - name: AUTH_COOKIE_SAMESITE
+    value: 'none'
+  - name: AUTH_COOKIE_SECURE
+    value: 'true'
+  - name: SEALOS_DEFAULT_PROMETHEUS_URL
+    value: 'http://vmselect-vm-stack-victoria-metrics-k8s-stack.vm.svc:8481/select/0/prometheus'
+  - name: KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES
+    value: 'ns-admin'
+
+# Helm chart catalog sources.
+helmCatalog:
+  artifactHub:
+    enabled: false
+
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 5
+  failureThreshold: 24
+  timeoutSeconds: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+volumes: []
+volumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
