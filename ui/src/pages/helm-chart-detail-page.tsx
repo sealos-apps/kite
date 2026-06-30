@@ -29,6 +29,10 @@ import { YamlFileTreeViewerNative as YamlFileTreeViewer } from '@/components/yam
 const artifactHubSource = 'artifacthub'
 const ociSource = 'oci'
 
+function stripHtmlComments(markdown: string) {
+  return markdown.replace(/<!--[\s\S]*?-->/g, '').trim()
+}
+
 function chartDetailPath(chart: HelmChartDetail, version: string) {
   const params = new URLSearchParams({
     version,
@@ -76,7 +80,7 @@ function MarkdownCard({
                 },
               }}
             >
-              {content}
+              {stripHtmlComments(content)}
             </ReactMarkdown>
           </div>
         ) : (
