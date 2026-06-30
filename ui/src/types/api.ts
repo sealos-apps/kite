@@ -285,8 +285,17 @@ export interface HelmReleaseDryRunResource {
   namespace?: string
 }
 
+export interface HelmReleaseImageCheck {
+  enabled: boolean
+  registry?: string
+  allImages?: string[]
+  externalImages?: string[]
+  injectedValues?: boolean
+}
+
 export interface HelmReleaseDryRunResponse {
   resources: HelmReleaseDryRunResource[]
+  imageCheck?: HelmReleaseImageCheck
 }
 
 // Resource type definitions

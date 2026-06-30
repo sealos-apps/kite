@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import {
   IconCircleCheckFilled,
   IconExclamationCircle,
@@ -10,7 +11,6 @@ import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { useAuth } from '@/contexts/auth-context'
 import type {
   HelmChartVersion,
   HelmRelease,
@@ -36,8 +36,8 @@ import { getCRDResourcePath } from '@/lib/k8s'
 import {
   getResourceDetailPath,
   resourceMetadataList,
-  type ResourceMetadata,
   type ResourceType as CatalogResourceType,
+  type ResourceMetadata,
 } from '@/lib/resource-metadata'
 import {
   formatDate,
@@ -67,6 +67,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { HelmChartIcon } from '@/components/helm-chart-icon'
+import { HelmOfflineImageCheckNotice } from '@/components/helm-offline-image-check-notice'
 import { LogViewer } from '@/components/log-viewer'
 import {
   CompactRelatedResourcesCard,
@@ -223,7 +224,9 @@ function getHelmReleaseResourceMetadata(resource: HelmReleaseResource) {
   )
 }
 
-function toHelmRelatedResource(resource: HelmReleaseResource): HelmRelatedResource {
+function toHelmRelatedResource(
+  resource: HelmReleaseResource
+): HelmRelatedResource {
   const metadata = getHelmReleaseResourceMetadata(resource)
   return {
     type: (metadata?.type ||
@@ -1337,12 +1340,17 @@ function UpgradeHelmReleaseDialog({
                     {t('helm.fields.ignoreLabelsAnnotationsChanges')}
                   </Label>
                 </div>
-                <YamlFileTreeDiffViewer
-                  files={dryRunDiffFiles}
-                  title={t('helm.fields.dryRunPreview')}
-                  emptyMessage={t('helm.messages.noDryRunResources')}
-                  fillHeight
-                />
+                <div className="flex min-h-0 flex-1 flex-col gap-3">
+                  <HelmOfflineImageCheckNotice
+                    imageCheck={dryRunPreview.imageCheck}
+                  />
+                  <YamlFileTreeDiffViewer
+                    files={dryRunDiffFiles}
+                    title={t('helm.fields.dryRunPreview')}
+                    emptyMessage={t('helm.messages.noDryRunResources')}
+                    fillHeight
+                  />
+                </div>
               </div>
             ) : (
               <div className="grid min-h-0 gap-4 lg:grid-cols-2">

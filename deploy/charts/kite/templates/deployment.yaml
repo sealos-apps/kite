@@ -139,6 +139,21 @@ spec:
             - name: KITE_HELM_OCI_REGISTRY_USERNAME
               value: {{ .Values.helmCatalog.oci.username | quote }}
             {{- end }}
+            {{- if .Values.helmCatalog.oci.passwordSecretName }}
+            - name: KITE_HELM_OCI_REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.helmCatalog.oci.passwordSecretName | quote }}
+                  key: {{ .Values.helmCatalog.oci.passwordSecretKey | quote }}
+            {{- end }}
+            - name: KITE_HELM_OFFLINE_IMAGES_ENABLED
+              value: {{ .Values.helmCatalog.offlineImages.enabled | quote }}
+            {{- if .Values.helmCatalog.offlineImages.registry }}
+            - name: KITE_HELM_OFFLINE_IMAGE_REGISTRY
+              value: {{ .Values.helmCatalog.offlineImages.registry | quote }}
+            {{- end }}
+            - name: KITE_HELM_OFFLINE_IMAGES_ENFORCE
+              value: {{ .Values.helmCatalog.offlineImages.enforce | quote }}
           {{- with .Values.extraEnvs }}
           {{- toYaml . | nindent 12 }}
           {{- end }}

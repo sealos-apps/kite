@@ -78,7 +78,12 @@ When `db.autoCreate` is enabled, the configured database user must have permissi
 | `helmCatalog.oci.insecureSkipTLSVerify`        | Skip TLS verification for private registry and token endpoints          | `false`   |
 | `helmCatalog.oci.caFile`                       | CA bundle path mounted inside the Kite container for private registry TLS | `""`    |
 | `helmCatalog.oci.username`                     | Username used by Kite when listing and pulling OCI chart packages       | `""`      |
-| `helmCatalog.oci.password`                     | Password stored in the Kite Secret and used for OCI registry access     | `""`      |
+| `helmCatalog.oci.password`                     | Password stored in the Kite Secret and used for OCI registry access; prefer `passwordSecretName` for production installs | `""` |
+| `helmCatalog.oci.passwordSecretName`           | Existing Secret containing the OCI registry password                    | `""`      |
+| `helmCatalog.oci.passwordSecretKey`            | Key inside `passwordSecretName` used as `KITE_HELM_OCI_REGISTRY_PASSWORD` | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
+| `helmCatalog.offlineImages.enabled`            | Inject offline container image defaults for OCI catalog installs/upgrades | `false` |
+| `helmCatalog.offlineImages.registry`           | Registry host expected in rendered workload images from offline OCI charts | `""` |
+| `helmCatalog.offlineImages.enforce`            | Block OCI chart installs/upgrades when rendered workload images still point outside the offline registry | `true` |
 
 Offline deployments can disable Artifact Hub and expose a local OCI-backed
 chart catalog without a Helm `index.yaml`. Kite scans only the configured
@@ -94,7 +99,12 @@ helmCatalog:
     plainHTTP: true
     insecureSkipTLSVerify: true
     username: admin
-    password: change-me
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+  offlineImages:
+    enabled: true
+    registry: registry.internal
+    enforce: true
 ```
 
 If the registry contains `kite-helm/demo-chart` tags `0.1.0` and `0.2.0`, Kite
@@ -103,15 +113,30 @@ for browsing, install, upgrade, and auto-upgrade.
 
 The configured `base` must be an `oci://` URL with a repository prefix and must
 not include credentials, tokens, query parameters, fragments, tags, or digests.
-Use `helmCatalog.oci.username` and `helmCatalog.oci.password` for private
-registries instead; the password is injected through the chart Secret and is not
-part of catalog API responses. For self-signed registries, either mount a CA
+Use `helmCatalog.oci.username` plus `helmCatalog.oci.passwordSecretName` for
+private registries in production; `helmCatalog.oci.password` remains available
+for simple installs and is copied into the chart-managed Secret. Credentials are
+not part of catalog API responses. For self-signed registries, either mount a CA
 bundle and set `helmCatalog.oci.caFile`, or set
 `helmCatalog.oci.insecureSkipTLSVerify` in trusted offline environments. Some
 private registries expose chart manifests over HTTP but advertise an HTTPS token
 realm, so `plainHTTP` and `insecureSkipTLSVerify` may need to be enabled
 together. Helm OCI tag encoding is preserved (`+` in SemVer build metadata
 becomes `_` in the registry tag).
+
+`helmCatalog.offlineImages` is separate from OCI chart discovery. Keep Helm OCI
+chart artifacts under the configured chart prefix such as
+`oci://registry.internal/kite-helm/nginx:25.0.12`, and mirror container images
+into the same registry host using their normal repository paths such as
+`registry.internal/bitnami/nginx:latest`. For OCI catalog charts, Kite injects
+`global.imageRegistry=<registry>` and
+`global.security.allowInsecureImages=true` when those values are absent, renders
+the release, and blocks the write if rendered workload images still reference an
+external registry. Kite records the chart source on installed releases, so
+current-chart upgrades of releases installed from the OCI catalog keep the same
+offline image policy even when the client omits `source`. Kite does not copy
+container images during install; mirror them ahead of time with
+`scripts/mirror-helm-chart-images.sh` or an equivalent registry sync process.
 
 ## Sealos App Configuration
 

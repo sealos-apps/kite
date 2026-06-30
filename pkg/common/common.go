@@ -52,7 +52,10 @@ var (
 
 	AgentPodNamespace = "kube-system"
 
-	HelmArtifactHubEnabled = true
+	HelmArtifactHubEnabled    = true
+	HelmOfflineImagesEnabled  = false
+	HelmOfflineImagesRegistry = ""
+	HelmOfflineImagesEnforce  = true
 
 	AuthCookieSameSite = "lax"
 	AuthCookieSecure   = "auto"
@@ -200,6 +203,29 @@ func LoadEnvs() {
 			HelmArtifactHubEnabled = false
 		default:
 			klog.Warningf("Invalid KITE_HELM_ARTIFACT_HUB_ENABLED=%q, use true|false, fallback to true", v)
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("KITE_HELM_OFFLINE_IMAGES_ENABLED")); v != "" {
+		switch strings.ToLower(v) {
+		case "true":
+			HelmOfflineImagesEnabled = true
+		case "false":
+			HelmOfflineImagesEnabled = false
+		default:
+			klog.Warningf("Invalid KITE_HELM_OFFLINE_IMAGES_ENABLED=%q, use true|false, fallback to false", v)
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("KITE_HELM_OFFLINE_IMAGE_REGISTRY")); v != "" {
+		HelmOfflineImagesRegistry = strings.TrimRight(strings.TrimPrefix(strings.TrimPrefix(v, "https://"), "http://"), "/")
+	}
+	if v := strings.TrimSpace(os.Getenv("KITE_HELM_OFFLINE_IMAGES_ENFORCE")); v != "" {
+		switch strings.ToLower(v) {
+		case "true":
+			HelmOfflineImagesEnforce = true
+		case "false":
+			HelmOfflineImagesEnforce = false
+		default:
+			klog.Warningf("Invalid KITE_HELM_OFFLINE_IMAGES_ENFORCE=%q, use true|false, fallback to true", v)
 		}
 	}
 }

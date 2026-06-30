@@ -27,7 +27,10 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 - **KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY**：是否跳过私有 registry/token endpoint 的 TLS 校验，默认 `false`。
 - **KITE_HELM_OCI_REGISTRY_CA_FILE**：挂载到 Kite 容器内的私有 registry CA bundle 路径。
 - **KITE_HELM_OCI_REGISTRY_USERNAME**：Kite 访问 OCI registry 列表和 Chart 包时使用的用户名。
-- **KITE_HELM_OCI_REGISTRY_PASSWORD**：Kite 访问 OCI registry 列表和 Chart 包时使用的密码。
+- **KITE_HELM_OCI_REGISTRY_PASSWORD**：Kite 访问 OCI registry 列表和 Chart 包时使用的密码。建议通过 Kubernetes Secret 注入，而不是写进 Helm values。
+- **KITE_HELM_OFFLINE_IMAGES_ENABLED**：是否为 OCI catalog 安装的 Chart 启用离线容器镜像默认值，默认 `false`。
+- **KITE_HELM_OFFLINE_IMAGE_REGISTRY**：离线 OCI Chart 渲染 workload 镜像时使用的容器镜像仓库 host，例如 `registry.internal` 或 `registry.internal:5000`。不要包含 `http://`、`https://` 或 `oci://` 前缀。
+- **KITE_HELM_OFFLINE_IMAGES_ENFORCE**：启用离线镜像默认值后，如果渲染出的 workload 镜像仍指向 `KITE_HELM_OFFLINE_IMAGE_REGISTRY` 之外的仓库，则阻止安装和升级，默认 `true`。
 
 - **HOST**: 用户 OAuth 2.0 授权回调地址生成，默认会从请求头获取，如果您发现结果不及预期可以手动配置此环境变量。
 

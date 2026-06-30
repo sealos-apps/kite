@@ -78,7 +78,12 @@
 | `helmCatalog.oci.insecureSkipTLSVerify`        | 是否跳过私有 registry/token endpoint 的 TLS 校验 | `false` |
 | `helmCatalog.oci.caFile`                       | 挂载到 Kite 容器内的私有 registry CA bundle 路径 | `""` |
 | `helmCatalog.oci.username`                     | Kite 访问 OCI registry 列表和 Chart 包时使用的用户名 | `""` |
-| `helmCatalog.oci.password`                     | 写入 Kite Secret 的 OCI registry 密码          | `""`      |
+| `helmCatalog.oci.password`                     | 写入 Kite Secret 的 OCI registry 密码；生产安装优先使用 `passwordSecretName` | `""` |
+| `helmCatalog.oci.passwordSecretName`           | 保存 OCI registry 密码的已有 Secret           | `""`      |
+| `helmCatalog.oci.passwordSecretKey`            | `passwordSecretName` 中作为 `KITE_HELM_OCI_REGISTRY_PASSWORD` 使用的 key | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
+| `helmCatalog.offlineImages.enabled`            | 为 OCI catalog 安装/升级注入离线容器镜像默认值 | `false` |
+| `helmCatalog.offlineImages.registry`           | 离线 OCI Chart 渲染 workload 镜像时应使用的 registry host | `""` |
+| `helmCatalog.offlineImages.enforce`            | 当渲染出的 workload 镜像仍指向离线 registry 之外时阻止安装/升级 | `true` |
 
 离线部署可以关闭 Artifact Hub，并让 Kite 只扫描一个受控 OCI registry
 前缀：
@@ -93,14 +98,34 @@ helmCatalog:
     plainHTTP: true
     insecureSkipTLSVerify: true
     username: admin
-    password: change-me
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+  offlineImages:
+    enabled: true
+    registry: registry.internal
+    enforce: true
 ```
 
 如果 registry 中存在 `kite-helm/demo-chart` 的 `0.1.0` 和 `0.2.0`
 tag，Kite 会解析为
 `oci://registry.internal/kite-helm/demo-chart:0.2.0`，用于浏览、安装、
 升级和自动升级。`base` 必须是带 repository 前缀的 `oci://` URL，不能包含
-凭据、查询参数、fragment、tag 或 digest。
+凭据、查询参数、fragment、tag 或 digest。私有 registry 在生产安装中推荐使用
+`helmCatalog.oci.username` 加 `helmCatalog.oci.passwordSecretName`；简易安装
+仍可使用 `helmCatalog.oci.password`，它会写入 chart 管理的 Secret。
+
+`helmCatalog.offlineImages` 与 OCI Chart 发现是两件事。Helm OCI Chart
+artifact 放在配置的 Chart 前缀下，例如
+`oci://registry.internal/kite-helm/nginx:25.0.12`；容器镜像放在同一个
+registry host 的原始仓库路径下，例如
+`registry.internal/bitnami/nginx:latest`。对 OCI catalog Chart，Kite 会在
+用户未显式配置时注入 `global.imageRegistry=<registry>` 和
+`global.security.allowInsecureImages=true`，渲染 release，并在 workload 镜像
+仍指向外部 registry 时阻止写入。Kite 会把 Chart 来源记录在已安装 release
+中，所以从 OCI catalog 安装的 release 后续即使客户端沿用当前 Chart、没有
+再次传 `source`，升级时也会继续应用离线镜像策略。Kite 安装时不会复制容器
+镜像；需要提前使用 `scripts/mirror-helm-chart-images.sh` 或等价 registry
+同步流程完成镜像同步。
 
 ## Sealos App 配置
 

@@ -61,6 +61,8 @@ extraEnvs:
 helmCatalog:
   artifactHub:
     enabled: false
+  offlineImages:
+    enabled: true
 
 startupProbe:
   httpGet:

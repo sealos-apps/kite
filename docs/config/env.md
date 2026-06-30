@@ -28,7 +28,10 @@ Kite supports several environment variables by default to change the default val
 - **KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY**: Skip TLS verification for private registry and token endpoints. Defaults to `false`.
 - **KITE_HELM_OCI_REGISTRY_CA_FILE**: CA bundle path mounted inside the Kite container for private registry TLS.
 - **KITE_HELM_OCI_REGISTRY_USERNAME**: Username used by Kite when listing and pulling OCI chart packages.
-- **KITE_HELM_OCI_REGISTRY_PASSWORD**: Password used by Kite when listing and pulling OCI chart packages.
+- **KITE_HELM_OCI_REGISTRY_PASSWORD**: Password used by Kite when listing and pulling OCI chart packages. Prefer injecting it from a Kubernetes Secret instead of Helm values.
+- **KITE_HELM_OFFLINE_IMAGES_ENABLED**: Enable offline container image defaults for charts installed from the OCI catalog. Defaults to `false`.
+- **KITE_HELM_OFFLINE_IMAGE_REGISTRY**: Registry host used for rendered workload images from offline OCI charts, for example `registry.internal` or `registry.internal:5000`. Do not include `http://`, `https://`, or an `oci://` prefix.
+- **KITE_HELM_OFFLINE_IMAGES_ENFORCE**: When offline image defaults are enabled, block installs and upgrades if rendered workload images still point outside `KITE_HELM_OFFLINE_IMAGE_REGISTRY`. Defaults to `true`.
 
 - **HOST**: Used for generating OAuth 2.0 authorization callback addresses, default will be obtained from request headers. If you find the result not as expected, you can manually configure this environment variable.
 

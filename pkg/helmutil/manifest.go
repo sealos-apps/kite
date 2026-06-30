@@ -36,6 +36,12 @@ func ToHelmReleaseDryRunResponse(rel *release.Release) HelmReleaseDryRunResponse
 	}
 }
 
+func ToHelmReleaseDryRunResponseWithImageCheck(rel *release.Release, imageCheck ImageCheckResult) HelmReleaseDryRunResponse {
+	response := ToHelmReleaseDryRunResponse(rel)
+	response.ImageCheck = imageCheck
+	return response
+}
+
 func ToHelmReleaseDryRunDiffResponse(current, next *release.Release) HelmReleaseDryRunResponse {
 	return HelmReleaseDryRunResponse{
 		Resources: diffManifestPreviewResources(
@@ -45,6 +51,12 @@ func ToHelmReleaseDryRunDiffResponse(current, next *release.Release) HelmRelease
 			next.Namespace,
 		),
 	}
+}
+
+func ToHelmReleaseDryRunDiffResponseWithImageCheck(current, next *release.Release, imageCheck ImageCheckResult) HelmReleaseDryRunResponse {
+	response := ToHelmReleaseDryRunDiffResponse(current, next)
+	response.ImageCheck = imageCheck
+	return response
 }
 
 func resolveManifestResources(manifest, defaultNamespace string) []HelmReleaseResource {

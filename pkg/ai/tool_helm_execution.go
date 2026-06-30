@@ -34,6 +34,7 @@ type helmReleaseToolResponse struct {
 	AppVersion   string                            `json:"appVersion,omitempty"`
 	Description  string                            `json:"description,omitempty"`
 	Resources    []helmReleaseToolResource         `json:"resources,omitempty"`
+	ImageCheck   helmutil.ImageCheckResult         `json:"imageCheck,omitempty"`
 	History      []helmutil.HelmReleaseHistoryItem `json:"history,omitempty"`
 	Message      string                            `json:"message,omitempty"`
 }
@@ -162,7 +163,8 @@ func executeInstallHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 	if err != nil {
 		return "Error: " + err.Error(), true
 	}
-	cfg, err := helmActionConfig(cs, helmutil.StorageNamespace(req.Namespace))
+	values, imagePolicy, injectedValues := helmutil.PrepareReleaseValues(req.Values, req.Source)
+	previewCfg, err := helmActionConfig(cs, helmutil.StorageNamespace(req.Namespace))
 	if err != nil {
 		return "Error: " + err.Error(), true
 	}
@@ -175,17 +177,28 @@ func executeInstallHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 		}
 	}
 	opts := helmutil.InstallReleaseOptions{
-		ReleaseName:     req.ReleaseName,
-		Namespace:       req.Namespace,
+		ReleaseName: req.ReleaseName,
+		Namespace:   req.Namespace,
+		ChartProvenance: helmutil.ChartProvenance{
+			Source:         req.Source,
+			RepositoryName: req.RepositoryName,
+			ChartName:      req.ChartName,
+			Version:        chartPackage.Version,
+			URL:            chartPackage.URL,
+		},
 		Timeout:         aiHelmActionTimeout,
 		Description:     description,
 		CreateNamespace: req.CreateNamespace,
 		DryRun:          dryRun,
 		Wait:            req.Wait,
 	}
-	preview, err := helmutil.DryRunInstallRelease(ctx, cfg, loadedChart, req.Values, opts)
+	preview, err := helmutil.DryRunInstallRelease(ctx, previewCfg, loadedChart, values, opts)
 	if err != nil {
 		return fmt.Sprintf("Error rendering Helm install for %s/%s: %v", req.Namespace, req.ReleaseName, err), true
+	}
+	imageCheck, err := helmutil.CheckReleaseImages(preview, imagePolicy, injectedValues)
+	if err != nil {
+		return "Error: " + err.Error(), true
 	}
 	if err := helmguard.AuthorizeCreateNamespace(user, cs, req.CreateNamespace); err != nil {
 		return "Forbidden: " + err.Error(), true
@@ -194,7 +207,7 @@ func executeInstallHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 		return "Forbidden: " + err.Error(), true
 	}
 	if dryRun {
-		return marshalToolResult(helmDryRunResponse(preview, chartPackage.Version))
+		return marshalToolResult(helmDryRunResponse(preview, chartPackage.Version, imageCheck))
 	}
 
 	var rel *release.Release
@@ -202,7 +215,12 @@ func executeInstallHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 	defer func() {
 		helmutil.RecordReleaseHistory(cs.Name, user.ID, "ai", "install", req.ReleaseName, req.Namespace, nil, rel, runErr == nil, runErr)
 	}()
-	rel, runErr = helmutil.InstallRelease(ctx, cfg, loadedChart, req.Values, opts)
+	runCfg, err := helmActionConfig(cs, helmutil.StorageNamespace(req.Namespace))
+	if err != nil {
+		runErr = err
+		return "Error: " + err.Error(), true
+	}
+	rel, runErr = helmutil.InstallRelease(ctx, runCfg, loadedChart, values, opts)
 	if runErr != nil {
 		return fmt.Sprintf("Error installing Helm release %s/%s: %v", req.Namespace, req.ReleaseName, runErr), true
 	}
@@ -227,18 +245,39 @@ func executeUpgradeHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 	}
 
 	chartToUpgrade := current.Chart
+	chartProvenance := helmutil.ReleaseChartProvenance(current)
 	resolvedVersion := ""
+	source := helmutil.NormalizeChartSource(req.Source, req.ChartURL)
+	if source == "" && strings.TrimSpace(req.ChartURL) == "" {
+		source = chartProvenance.Source
+	}
 	if req.ChartURL != "" || req.ChartName != "" || req.RepositoryName != "" || req.Source != "" || req.ChartVersion != "" {
 		chartName := req.ChartName
 		if chartName == "" && current.Chart.Metadata != nil {
 			chartName = current.Chart.Metadata.Name
 		}
-		chartPackage, loadedChart, err := loadHelmChart(ctx, req.Source, req.RepositoryName, chartName, req.ChartVersion, req.ChartURL)
+		chartPackage, loadedChart, err := loadHelmChart(ctx, source, req.RepositoryName, chartName, req.ChartVersion, req.ChartURL)
 		if err != nil {
 			return "Error: " + err.Error(), true
 		}
 		chartToUpgrade = loadedChart
 		resolvedVersion = chartPackage.Version
+		chartProvenance = helmutil.ChartProvenance{
+			Source:         source,
+			RepositoryName: req.RepositoryName,
+			ChartName:      chartName,
+			Version:        chartPackage.Version,
+			URL:            chartPackage.URL,
+		}
+	} else if source != "" && chartProvenance.URL != "" {
+		chartPackage, loadedChart, err := loadHelmChart(ctx, source, chartProvenance.RepositoryName, chartProvenance.ChartName, chartProvenance.Version, chartProvenance.URL)
+		if err != nil {
+			return "Error: " + err.Error(), true
+		}
+		chartToUpgrade = loadedChart
+		resolvedVersion = chartPackage.Version
+		chartProvenance.Version = chartPackage.Version
+		chartProvenance.URL = chartPackage.URL
 	}
 	description := req.Description
 	if description == "" {
@@ -250,6 +289,7 @@ func executeUpgradeHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 	}
 	opts := helmutil.UpgradeReleaseOptions{
 		Namespace:         req.Namespace,
+		ChartProvenance:   chartProvenance,
 		Timeout:           aiHelmActionTimeout,
 		ReuseValues:       req.Values == nil,
 		Description:       description,
@@ -262,15 +302,24 @@ func executeUpgradeHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 	if values == nil {
 		values = map[string]interface{}{}
 	}
-	preview, err := helmutil.DryRunUpgradeRelease(ctx, cfg, req.ReleaseName, chartToUpgrade, values, opts)
+	values, imagePolicy, injectedValues := helmutil.PrepareReleaseValues(values, source)
+	previewCfg, err := helmActionConfig(cs, helmutil.StorageNamespace(req.Namespace))
+	if err != nil {
+		return "Error: " + err.Error(), true
+	}
+	preview, err := helmutil.DryRunUpgradeRelease(ctx, previewCfg, req.ReleaseName, chartToUpgrade, values, opts)
 	if err != nil {
 		return fmt.Sprintf("Error rendering Helm upgrade for %s/%s: %v", req.Namespace, req.ReleaseName, err), true
+	}
+	imageCheck, err := helmutil.CheckReleaseImages(preview, imagePolicy, injectedValues)
+	if err != nil {
+		return "Error: " + err.Error(), true
 	}
 	if err := helmguard.AuthorizeReleaseChange(ctx, user, cs, current, preview); err != nil {
 		return "Forbidden: " + err.Error(), true
 	}
 	if dryRun {
-		response := helmDryRunDiffResponse(current, preview, resolvedVersion)
+		response := helmDryRunDiffResponse(current, preview, resolvedVersion, imageCheck)
 		return marshalToolResult(response)
 	}
 
@@ -279,7 +328,12 @@ func executeUpgradeHelmRelease(ctx context.Context, c *gin.Context, cs *cluster.
 	defer func() {
 		helmutil.RecordReleaseHistory(cs.Name, user.ID, "ai", "upgrade", req.ReleaseName, req.Namespace, current, rel, runErr == nil, runErr)
 	}()
-	rel, runErr = helmutil.UpgradeRelease(ctx, cfg, req.ReleaseName, chartToUpgrade, values, opts)
+	runCfg, err := helmActionConfig(cs, helmutil.StorageNamespace(req.Namespace))
+	if err != nil {
+		runErr = err
+		return "Error: " + err.Error(), true
+	}
+	rel, runErr = helmutil.UpgradeRelease(ctx, runCfg, req.ReleaseName, chartToUpgrade, values, opts)
 	if runErr != nil {
 		return fmt.Sprintf("Error upgrading Helm release %s/%s: %v", req.Namespace, req.ReleaseName, runErr), true
 	}
@@ -397,7 +451,7 @@ func parseHelmInstallToolRequest(cs *cluster.ClientSet, args map[string]interfac
 	return helmInstallToolRequest{
 		ReleaseName:     releaseName,
 		Namespace:       namespace,
-		Source:          getOptionalString(args, "source"),
+		Source:          helmutil.NormalizeChartSource(getOptionalString(args, "source"), getOptionalString(args, "chart_url")),
 		RepositoryName:  getOptionalString(args, "repository_name"),
 		ChartName:       getOptionalString(args, "chart_name"),
 		ChartVersion:    getOptionalString(args, "chart_version"),
@@ -421,7 +475,7 @@ func parseHelmUpgradeToolRequest(cs *cluster.ClientSet, args map[string]interfac
 	return helmUpgradeToolRequest{
 		ReleaseName:       releaseName,
 		Namespace:         namespace,
-		Source:            getOptionalString(args, "source"),
+		Source:            helmutil.NormalizeChartSource(getOptionalString(args, "source"), getOptionalString(args, "chart_url")),
 		RepositoryName:    getOptionalString(args, "repository_name"),
 		ChartName:         getOptionalString(args, "chart_name"),
 		ChartVersion:      getOptionalString(args, "chart_version"),
@@ -450,8 +504,9 @@ func requiredHelmReleaseNameAndNamespace(cs *cluster.ClientSet, args map[string]
 }
 
 func loadHelmChart(ctx context.Context, source, repositoryName, chartName, chartVersion, chartURL string) (helmutil.ChartPackage, *chart.Chart, error) {
+	source = helmutil.NormalizeChartSource(source, chartURL)
 	chartPackage, err := helmutil.ResolveChartPackage(ctx, helmutil.ChartSourceRef{
-		Source:         strings.TrimSpace(source),
+		Source:         source,
 		RepositoryName: strings.TrimSpace(repositoryName),
 		ChartName:      strings.TrimSpace(chartName),
 		Version:        strings.TrimSpace(chartVersion),
@@ -493,24 +548,26 @@ func helmReleaseSummary(rel *release.Release, details bool) helmReleaseToolRespo
 	return response
 }
 
-func helmDryRunResponse(rel *release.Release, resolvedVersion string) helmReleaseToolResponse {
+func helmDryRunResponse(rel *release.Release, resolvedVersion string, imageCheck helmutil.ImageCheckResult) helmReleaseToolResponse {
 	response := helmReleaseSummary(rel, false)
 	if response.ChartVersion == "" {
 		response.ChartVersion = resolvedVersion
 	}
-	preview := helmutil.ToHelmReleaseDryRunResponse(rel)
+	preview := helmutil.ToHelmReleaseDryRunResponseWithImageCheck(rel, imageCheck)
 	response.Resources = helmToolResourcesFromDryRunResources(preview.Resources)
+	response.ImageCheck = preview.ImageCheck
 	response.Message = "Dry run rendered successfully; review resources before confirming install."
 	return response
 }
 
-func helmDryRunDiffResponse(current, next *release.Release, resolvedVersion string) helmReleaseToolResponse {
+func helmDryRunDiffResponse(current, next *release.Release, resolvedVersion string, imageCheck helmutil.ImageCheckResult) helmReleaseToolResponse {
 	response := helmReleaseSummary(next, false)
 	if response.ChartVersion == "" {
 		response.ChartVersion = resolvedVersion
 	}
-	preview := helmutil.ToHelmReleaseDryRunDiffResponse(current, next)
+	preview := helmutil.ToHelmReleaseDryRunDiffResponseWithImageCheck(current, next, imageCheck)
 	response.Resources = helmToolResourcesFromDryRunResources(preview.Resources)
+	response.ImageCheck = preview.ImageCheck
 	response.Message = "Dry run rendered successfully; review resource diff before confirming upgrade."
 	return response
 }

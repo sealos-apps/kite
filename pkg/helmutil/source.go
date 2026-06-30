@@ -40,6 +40,17 @@ type ChartSourceRef struct {
 	URL            string
 }
 
+func NormalizeChartSource(source, chartURL string) string {
+	source = strings.TrimSpace(source)
+	if source != "" {
+		return source
+	}
+	if strings.HasPrefix(strings.TrimSpace(chartURL), "oci://") {
+		return ChartSourceOCI
+	}
+	return ""
+}
+
 type artifactHubPackage struct {
 	Version    string `json:"version"`
 	ContentURL string `json:"content_url"`

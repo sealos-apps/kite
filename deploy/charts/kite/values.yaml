@@ -143,6 +143,15 @@ helmCatalog:
     caFile: ''
     username: ''
     password: ''
+    passwordSecretName: ''
+    passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+  offlineImages:
+    # Applies to charts installed from the offline OCI catalog. Kite injects
+    # global.imageRegistry when absent, then blocks installs whose rendered
+    # workload images still point outside this registry.
+    enabled: false
+    registry: ''
+    enforce: true
 
 serviceAccount:
   create: true
