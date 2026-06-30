@@ -127,15 +127,15 @@ helmCatalog:
   artifactHub:
     enabled: true
   oci:
-    # Inline YAML/JSON catalog. Use this for small offline catalogs.
-    catalog: ''
-    # Catalog file path mounted into the Kite container. Takes precedence over catalog.
-    catalogFile: ''
-    # Convenience base URL for top-level catalog charts, for example:
+    # OCI registry repository prefix to discover, for example:
     # oci://registry.example.local/charts
     base: ''
-    # Repository name used when catalog defines top-level charts.
+    # Repository name shown in Kite for discovered OCI charts.
     repositoryName: offline
+    # Registry API pagination and safety limits for prefix discovery.
+    discoveryPageSize: 100
+    discoveryMaxRepositories: 1000
+    discoveryMaxTagsPerRepository: 200
     # OCI registry access options used by the server when loading chart details,
     # installs, upgrades, AI tool resolutions, and scheduled auto-upgrades.
     plainHTTP: false

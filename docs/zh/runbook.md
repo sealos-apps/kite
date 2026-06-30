@@ -150,23 +150,21 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 
 - Chart catalog 只读 API 面向认证用户开放在 `/api/v1/charts`。仓库创建/删除和 catalog 管理 API 仍在 `/api/v1/admin/charts`，只允许管理员使用；响应里不能暴露已存储的仓库凭据。
 - 离线环境可以通过 `KITE_HELM_ARTIFACT_HUB_ENABLED=false` 或 `helmCatalog.artifactHub.enabled=false` 关闭 Artifact Hub。关闭后，后端 Artifact Hub 代理接口和前端 fallback 都不会再使用线上 Artifact Hub。
-- Kite 可以通过 `KITE_HELM_OCI_CATALOG` 或 `KITE_HELM_OCI_CATALOG_FILE` 消费静态 OCI Chart catalog。这个 catalog 指向已经同步到离线 OCI registry 的 Chart；Kite 不会扫描 registry 来自动发现所有内容。
-- OCI catalog 的 `url` 和 `chartUrl` 不能包含凭据、查询参数或 fragment，因为 Chart 只读 API 会把这些 URL 返回给已认证用户。如果 `chartUrl` 显式带 tag，tag 必须按 Helm OCI 规则匹配声明版本（SemVer build metadata 里的 `+` 在 registry tag 中写成 `_`）；当前 catalog 更新检测不支持 digest-only 引用。
-- 最小 inline OCI catalog 示例：
+- Kite 通过 `helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE` 扫描受控 OCI registry 前缀来发现离线 Helm Chart；只会暴露该前缀下的内容，不做无边界的全 registry 展示。
+- registry 凭据和 TLS 配置只在服务端使用。Chart 只读 API 返回干净的 `oci://host/prefix/chart:version` URL，不包含凭据、查询参数或 fragment。Helm OCI tag 会把 SemVer build metadata 中的 `+` 编码为 `_`。
+- 最小 OCI discovery 示例：
 
 ```yaml
 helmCatalog:
   artifactHub:
     enabled: false
   oci:
-    base: oci://registry.internal/charts
+    base: oci://registry.internal/kite-helm
     repositoryName: offline
-    catalog: |
-      charts:
-        - name: demo-chart
-          versions:
-            - version: 0.1.0
-            - version: 0.2.0
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    password: change-me
 ```
 
 - Helm Release API 使用规范资源路径 `helmreleases`。旧的 `helmrelease` 路由仅保留兼容。

@@ -30,3 +30,24 @@ func TestValidateHelmReleaseAutoUpgradeRejectsDisabledArtifactHub(t *testing.T) 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Artifact Hub chart source is disabled")
 }
+
+func TestValidateHelmReleaseAutoUpgradeAllowsOCIWhenArtifactHubDisabled(t *testing.T) {
+	original := common.HelmArtifactHubEnabled
+	common.HelmArtifactHubEnabled = false
+	defer func() {
+		common.HelmArtifactHubEnabled = original
+	}()
+
+	err := validateHelmReleaseAutoUpgradeRequest(helmReleaseAutoUpgradeRequest{
+		Enabled:           true,
+		Source:            helmutil.ChartSourceOCI,
+		RepositoryName:    "offline",
+		ChartName:         "nginx",
+		ScheduleType:      model.ScheduledTaskScheduleTypeInterval,
+		IntervalMinutes:   60,
+		ScheduleTime:      "03:00",
+		TimeoutMinutes:    5,
+		RollbackOnFailure: true,
+	})
+	require.NoError(t, err)
+}

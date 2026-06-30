@@ -163,7 +163,7 @@ func newOCIRegistryClient(options OCIRegistryOptions) (*registry.Client, error) 
 	if options.PlainHTTP {
 		registryOptions = append(registryOptions, registry.ClientOptPlainHTTP())
 	}
-	if options.InsecureSkipTLSVerify || strings.TrimSpace(options.CAFile) != "" {
+	if !options.PlainHTTP && (options.InsecureSkipTLSVerify || strings.TrimSpace(options.CAFile) != "") {
 		tlsConfig, err := newOCITLSConfig(options)
 		if err != nil {
 			return nil, err

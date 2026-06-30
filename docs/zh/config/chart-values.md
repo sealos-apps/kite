@@ -64,6 +64,44 @@
 | ----------- | ------------------ | ------ |
 | `extraEnvs` | 额外的环境变量列表 | `[]`   |
 
+## Helm Chart Catalog 配置
+
+| 参数                                           | 描述                                           | 默认值    |
+| ---------------------------------------------- | ---------------------------------------------- | --------- |
+| `helmCatalog.artifactHub.enabled`              | 是否启用 Artifact Hub Chart 搜索/详情代理 API | `true`    |
+| `helmCatalog.oci.base`                         | 用于发现离线 Helm OCI Chart 的 `oci://` registry 前缀 | `""` |
+| `helmCatalog.oci.repositoryName`               | Kite 页面中展示的 OCI Chart 仓库名称          | `offline` |
+| `helmCatalog.oci.discoveryPageSize`            | 列出 registry repositories/tags 时使用的分页大小 | `100` |
+| `helmCatalog.oci.discoveryMaxRepositories`     | 查找配置前缀时最多检查的 registry repository 数量 | `1000` |
+| `helmCatalog.oci.discoveryMaxTagsPerRepository` | 每个 repository 最多扫描的 tag 数量           | `200`     |
+| `helmCatalog.oci.plainHTTP`                    | 是否使用 HTTP 访问 OCI registry API 和 Chart 包 | `false` |
+| `helmCatalog.oci.insecureSkipTLSVerify`        | 是否跳过私有 registry/token endpoint 的 TLS 校验 | `false` |
+| `helmCatalog.oci.caFile`                       | 挂载到 Kite 容器内的私有 registry CA bundle 路径 | `""` |
+| `helmCatalog.oci.username`                     | Kite 访问 OCI registry 列表和 Chart 包时使用的用户名 | `""` |
+| `helmCatalog.oci.password`                     | 写入 Kite Secret 的 OCI registry 密码          | `""`      |
+
+离线部署可以关闭 Artifact Hub，并让 Kite 只扫描一个受控 OCI registry
+前缀：
+
+```yaml
+helmCatalog:
+  artifactHub:
+    enabled: false
+  oci:
+    base: oci://registry.internal/kite-helm
+    repositoryName: offline
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    password: change-me
+```
+
+如果 registry 中存在 `kite-helm/demo-chart` 的 `0.1.0` 和 `0.2.0`
+tag，Kite 会解析为
+`oci://registry.internal/kite-helm/demo-chart:0.2.0`，用于浏览、安装、
+升级和自动升级。`base` 必须是带 repository 前缀的 `oci://` URL，不能包含
+凭据、查询参数、fragment、tag 或 digest。
+
 ## Sealos App 配置
 
 | 参数          | 描述                                  | 默认值 |

@@ -222,23 +222,21 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 - Chart catalog read APIs live under `/api/v1/charts` for authenticated users. Repository create/delete and catalog management APIs remain admin-only under `/api/v1/admin/charts`; stored repository credentials must not be exposed in responses.
 - Offline environments can disable Artifact Hub with `KITE_HELM_ARTIFACT_HUB_ENABLED=false` or `helmCatalog.artifactHub.enabled=false`. This disables the backend Artifact Hub proxy endpoints and the frontend fallback.
-- Kite can consume a static OCI chart catalog through `KITE_HELM_OCI_CATALOG` or `KITE_HELM_OCI_CATALOG_FILE`. This catalog points to charts already mirrored into an offline OCI registry; Kite does not discover registry contents by scanning the registry.
-- OCI catalog `url` and `chartUrl` values must not include credentials, query parameters, or fragments because chart read APIs return those URLs to authenticated users. If a `chartUrl` includes a tag, the tag must match the declared version using Helm OCI encoding (`+` becomes `_`); digest-only references are not supported for catalog update detection.
-- Minimal inline OCI catalog example:
+- Kite discovers offline Helm OCI charts by scanning only the configured registry repository prefix (`helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE`). It does not expose arbitrary registry contents outside that prefix.
+- Registry credentials and TLS options are server-side only. Chart read APIs return clean `oci://host/prefix/chart:version` URLs without credentials, query parameters, or fragments. Helm OCI tags encode SemVer build metadata by replacing `+` with `_`.
+- Minimal OCI discovery example:
 
 ```yaml
 helmCatalog:
   artifactHub:
     enabled: false
   oci:
-    base: oci://registry.internal/charts
+    base: oci://registry.internal/kite-helm
     repositoryName: offline
-    catalog: |
-      charts:
-        - name: demo-chart
-          versions:
-            - version: 0.1.0
-            - version: 0.2.0
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    password: change-me
 ```
 
 - Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
