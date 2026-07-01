@@ -74,6 +74,7 @@ When `db.autoCreate` is enabled, the configured database user must have permissi
 | `helmCatalog.oci.discoveryPageSize`            | Registry API page size used when listing repositories and tags          | `100`     |
 | `helmCatalog.oci.discoveryMaxRepositories`     | Maximum registry repositories checked while searching the configured prefix | `1000` |
 | `helmCatalog.oci.discoveryMaxTagsPerRepository` | Maximum tags scanned per repository                                    | `200`     |
+| `helmCatalog.oci.uploadMaxBytes`               | Maximum Helm chart package size accepted by the admin upload API        | `512MiB`  |
 | `helmCatalog.oci.plainHTTP`                    | Use plain HTTP for OCI registry API and chart pulls                     | `false`   |
 | `helmCatalog.oci.insecureSkipTLSVerify`        | Skip TLS verification for private registry and token endpoints          | `false`   |
 | `helmCatalog.oci.caFile`                       | CA bundle path mounted inside the Kite container for private registry TLS | `""`    |
@@ -81,6 +82,16 @@ When `db.autoCreate` is enabled, the configured database user must have permissi
 | `helmCatalog.oci.password`                     | Password stored in the Kite Secret and used for OCI registry access; prefer `passwordSecretName` for production installs | `""` |
 | `helmCatalog.oci.passwordSecretName`           | Existing Secret containing the OCI registry password                    | `""`      |
 | `helmCatalog.oci.passwordSecretKey`            | Key inside `passwordSecretName` used as `KITE_HELM_OCI_REGISTRY_PASSWORD` | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
+| `helmCatalog.imageUploads.registry`            | Registry host for uploaded container image archives; empty reuses `helmCatalog.offlineImages.registry` when set | `""` |
+| `helmCatalog.imageUploads.repositoryPrefix`    | Repository prefix prepended to uploaded container image archives        | `kite-images` |
+| `helmCatalog.imageUploads.maxBytes`            | Maximum container image archive size accepted by the admin upload API   | `4GiB`    |
+| `helmCatalog.imageUploads.plainHTTP`           | Use plain HTTP for container image archive uploads                      | `false`   |
+| `helmCatalog.imageUploads.insecureSkipTLSVerify` | Skip TLS verification for the container image upload registry and token endpoints | `false` |
+| `helmCatalog.imageUploads.caFile`              | CA bundle path mounted inside the Kite container for container image upload registry TLS | `""` |
+| `helmCatalog.imageUploads.username`            | Username used by Kite when pushing uploaded container image archives    | `""`      |
+| `helmCatalog.imageUploads.password`            | Password stored in the Kite Secret for container image archive uploads; prefer `passwordSecretName` for production installs | `""` |
+| `helmCatalog.imageUploads.passwordSecretName`  | Existing Secret containing the container image upload registry password | `""`      |
+| `helmCatalog.imageUploads.passwordSecretKey`   | Key inside `passwordSecretName` used as `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` | `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` |
 | `helmCatalog.offlineImages.enabled`            | Inject offline container image defaults for OCI catalog installs/upgrades | `false` |
 | `helmCatalog.offlineImages.registry`           | Registry host expected in rendered workload images from offline OCI charts | `""` |
 | `helmCatalog.offlineImages.enforce`            | Block OCI chart installs/upgrades when rendered workload images still point outside the offline registry | `true` |
@@ -101,6 +112,16 @@ helmCatalog:
     username: admin
     passwordSecretName: registry-credentials
     passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
   offlineImages:
     enabled: true
     registry: registry.internal
@@ -123,6 +144,17 @@ private registries expose chart manifests over HTTP but advertise an HTTPS token
 realm, so `plainHTTP` and `insecureSkipTLSVerify` may need to be enabled
 together. Helm OCI tag encoding is preserved (`+` in SemVer build metadata
 becomes `_` in the registry tag).
+
+Kite exposes one admin upload entry in the UI, but it keeps the backend flows
+separate. Helm chart packages (`.tgz`) are pushed through the chart upload API
+into the configured `helmCatalog.oci.base` prefix and then appear in the OCI
+chart catalog. Container image archives are pushed through a separate image
+upload API into `helmCatalog.imageUploads.registry` plus
+`helmCatalog.imageUploads.repositoryPrefix`; they do not become chart catalog
+entries. If `helmCatalog.imageUploads.registry` is empty, Kite falls back to
+`helmCatalog.offlineImages.registry` when that offline image registry is set.
+Use a separate Secret key for `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` when the
+chart and image registry credentials differ.
 
 `helmCatalog.offlineImages` is separate from OCI chart discovery. Keep Helm OCI
 chart artifacts under the configured chart prefix such as
@@ -199,6 +231,7 @@ rbac:
 | Parameter             | Description                | Default           |
 | --------------------- | -------------------------- | ----------------- |
 | `ingress.enabled`     | Whether to enable Ingress  | `true`            |
+| `ingress.proxyBodySize` | NGINX body size limit for repository uploads; keep at least as large as the largest upload limit | `4g` |
 
 Ingress behavior is fixed in templates:
 - host: `kite.<cloudDomain>`
@@ -208,6 +241,7 @@ Ingress behavior is fixed in templates:
 - annotations:
   - `nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'`
   - `nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'`
+  - `nginx.ingress.kubernetes.io/proxy-body-size: <ingress.proxyBodySize>`
 
 ### Ingress Example
 

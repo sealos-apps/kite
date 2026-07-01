@@ -74,6 +74,7 @@
 | `helmCatalog.oci.discoveryPageSize`            | 列出 registry repositories/tags 时使用的分页大小 | `100` |
 | `helmCatalog.oci.discoveryMaxRepositories`     | 查找配置前缀时最多检查的 registry repository 数量 | `1000` |
 | `helmCatalog.oci.discoveryMaxTagsPerRepository` | 每个 repository 最多扫描的 tag 数量           | `200`     |
+| `helmCatalog.oci.uploadMaxBytes`               | 管理员上传 Helm chart 包 API 接受的最大包大小 | `512MiB` |
 | `helmCatalog.oci.plainHTTP`                    | 是否使用 HTTP 访问 OCI registry API 和 Chart 包 | `false` |
 | `helmCatalog.oci.insecureSkipTLSVerify`        | 是否跳过私有 registry/token endpoint 的 TLS 校验 | `false` |
 | `helmCatalog.oci.caFile`                       | 挂载到 Kite 容器内的私有 registry CA bundle 路径 | `""` |
@@ -81,6 +82,16 @@
 | `helmCatalog.oci.password`                     | 写入 Kite Secret 的 OCI registry 密码；生产安装优先使用 `passwordSecretName` | `""` |
 | `helmCatalog.oci.passwordSecretName`           | 保存 OCI registry 密码的已有 Secret           | `""`      |
 | `helmCatalog.oci.passwordSecretKey`            | `passwordSecretName` 中作为 `KITE_HELM_OCI_REGISTRY_PASSWORD` 使用的 key | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
+| `helmCatalog.imageUploads.registry`            | 上传容器镜像归档使用的 registry host；留空时复用已配置的 `helmCatalog.offlineImages.registry` | `""` |
+| `helmCatalog.imageUploads.repositoryPrefix`    | 上传容器镜像归档时追加的 repository 前缀      | `kite-images` |
+| `helmCatalog.imageUploads.maxBytes`            | 管理员上传容器镜像归档 API 接受的最大归档大小 | `4GiB` |
+| `helmCatalog.imageUploads.plainHTTP`           | 容器镜像归档上传是否使用 HTTP                 | `false` |
+| `helmCatalog.imageUploads.insecureSkipTLSVerify` | 是否跳过容器镜像上传 registry/token endpoint 的 TLS 校验 | `false` |
+| `helmCatalog.imageUploads.caFile`              | 挂载到 Kite 容器内的容器镜像上传 registry CA bundle 路径 | `""` |
+| `helmCatalog.imageUploads.username`            | Kite 推送上传的容器镜像归档时使用的用户名     | `""` |
+| `helmCatalog.imageUploads.password`            | 写入 Kite Secret 的容器镜像上传 registry 密码；生产安装优先使用 `passwordSecretName` | `""` |
+| `helmCatalog.imageUploads.passwordSecretName`  | 保存容器镜像上传 registry 密码的已有 Secret   | `""` |
+| `helmCatalog.imageUploads.passwordSecretKey`   | `passwordSecretName` 中作为 `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` 使用的 key | `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` |
 | `helmCatalog.offlineImages.enabled`            | 为 OCI catalog 安装/升级注入离线容器镜像默认值 | `false` |
 | `helmCatalog.offlineImages.registry`           | 离线 OCI Chart 渲染 workload 镜像时应使用的 registry host | `""` |
 | `helmCatalog.offlineImages.enforce`            | 当渲染出的 workload 镜像仍指向离线 registry 之外时阻止安装/升级 | `true` |
@@ -100,6 +111,16 @@ helmCatalog:
     username: admin
     passwordSecretName: registry-credentials
     passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
   offlineImages:
     enabled: true
     registry: registry.internal
@@ -113,6 +134,16 @@ tag，Kite 会解析为
 凭据、查询参数、fragment、tag 或 digest。私有 registry 在生产安装中推荐使用
 `helmCatalog.oci.username` 加 `helmCatalog.oci.passwordSecretName`；简易安装
 仍可使用 `helmCatalog.oci.password`，它会写入 chart 管理的 Secret。
+
+Kite 在 UI 上提供一个管理员“上传到仓库”入口，但后端流程仍然分开。Helm
+chart 包（`.tgz`）通过 Chart 上传 API 推送到 `helmCatalog.oci.base` 配置的
+前缀下，并进入 OCI Chart catalog；容器镜像归档通过独立的镜像上传 API 推送到
+`helmCatalog.imageUploads.registry` 加
+`helmCatalog.imageUploads.repositoryPrefix`，不会变成 Chart catalog 条目。
+如果 `helmCatalog.imageUploads.registry` 为空，Kite 会在已配置
+`helmCatalog.offlineImages.registry` 时复用该离线镜像 registry。Chart registry
+和镜像 registry 凭据不同时，请使用单独的 Secret key 注入
+`KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD`。
 
 `helmCatalog.offlineImages` 与 OCI Chart 发现是两件事。Helm OCI Chart
 artifact 放在配置的 Chart 前缀下，例如
@@ -188,6 +219,7 @@ rbac:
 | 参数                  | 描述             | 默认值     |
 | --------------------- | ---------------- | ---------- |
 | `ingress.enabled`     | 是否启用 Ingress | `true`     |
+| `ingress.proxyBodySize` | NGINX 请求体大小限制，用于仓库上传；应不小于最大的上传限制 | `4g` |
 
 Ingress 行为在模板中固定：
 - host: `kite.<cloudDomain>`
@@ -197,6 +229,7 @@ Ingress 行为在模板中固定：
 - annotations：
   - `nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'`
   - `nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'`
+  - `nginx.ingress.kubernetes.io/proxy-body-size: <ingress.proxyBodySize>`
 
 ### Ingress 配置示例
 

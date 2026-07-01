@@ -23,11 +23,20 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 - **KITE_HELM_OCI_DISCOVERY_PAGE_SIZE**：列出 registry repositories/tags 时使用的分页大小，默认 `100`。
 - **KITE_HELM_OCI_DISCOVERY_MAX_REPOSITORIES**：查找配置前缀时最多检查的 registry repository 数量，默认 `1000`。
 - **KITE_HELM_OCI_DISCOVERY_MAX_TAGS_PER_REPOSITORY**：每个 repository 最多扫描的 tag 数量，默认 `200`。
+- **KITE_HELM_OCI_UPLOAD_MAX_BYTES**：管理员上传 Helm chart 包 API 接受的最大包大小，默认 `512MiB`。
 - **KITE_HELM_OCI_REGISTRY_PLAIN_HTTP**：是否使用 HTTP 访问 OCI registry API 和 Chart 包，默认 `false`。
 - **KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY**：是否跳过私有 registry/token endpoint 的 TLS 校验，默认 `false`。
 - **KITE_HELM_OCI_REGISTRY_CA_FILE**：挂载到 Kite 容器内的私有 registry CA bundle 路径。
 - **KITE_HELM_OCI_REGISTRY_USERNAME**：Kite 访问 OCI registry 列表和 Chart 包时使用的用户名。
 - **KITE_HELM_OCI_REGISTRY_PASSWORD**：Kite 访问 OCI registry 列表和 Chart 包时使用的密码。建议通过 Kubernetes Secret 注入，而不是写进 Helm values。
+- **KITE_IMAGE_UPLOAD_REGISTRY**：管理员上传容器镜像归档 API 使用的 registry host，例如 `registry.internal` 或 `registry.internal:5000`。留空时会复用已配置的 `KITE_HELM_OFFLINE_IMAGE_REGISTRY`。
+- **KITE_IMAGE_UPLOAD_REPOSITORY_PREFIX**：上传容器镜像归档时追加的 repository 前缀，默认 `kite-images`。
+- **KITE_IMAGE_UPLOAD_MAX_BYTES**：管理员上传容器镜像归档 API 接受的最大归档大小，默认 `4GiB`。
+- **KITE_IMAGE_UPLOAD_REGISTRY_PLAIN_HTTP**：容器镜像归档上传是否使用 HTTP，默认 `false`。
+- **KITE_IMAGE_UPLOAD_REGISTRY_INSECURE_SKIP_TLS_VERIFY**：是否跳过容器镜像上传 registry/token endpoint 的 TLS 校验，默认 `false`。
+- **KITE_IMAGE_UPLOAD_REGISTRY_CA_FILE**：挂载到 Kite 容器内的容器镜像上传 registry CA bundle 路径。
+- **KITE_IMAGE_UPLOAD_REGISTRY_USERNAME**：Kite 推送上传的容器镜像归档时使用的用户名。
+- **KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD**：Kite 推送上传的容器镜像归档时使用的密码。建议通过 Kubernetes Secret 注入，而不是写进 Helm values。
 - **KITE_HELM_OFFLINE_IMAGES_ENABLED**：是否为 OCI catalog 安装的 Chart 启用离线容器镜像默认值，默认 `false`。
 - **KITE_HELM_OFFLINE_IMAGE_REGISTRY**：离线 OCI Chart 渲染 workload 镜像时使用的容器镜像仓库 host，例如 `registry.internal` 或 `registry.internal:5000`。不要包含 `http://`、`https://` 或 `oci://` 前缀。
 - **KITE_HELM_OFFLINE_IMAGES_ENFORCE**：启用离线镜像默认值后，如果渲染出的 workload 镜像仍指向 `KITE_HELM_OFFLINE_IMAGE_REGISTRY` 之外的仓库，则阻止安装和升级，默认 `true`。

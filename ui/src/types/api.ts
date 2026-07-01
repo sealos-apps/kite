@@ -162,6 +162,42 @@ export interface HelmRepository {
   updatedAt: string
 }
 
+export interface RepositoryUploadTargetConfig {
+  configured: boolean
+  maxBytes: number
+}
+
+export interface OCIChartUploadConfig extends RepositoryUploadTargetConfig {
+  registryBase?: string
+  repositoryName?: string
+}
+
+export interface ContainerImageUploadConfig extends RepositoryUploadTargetConfig {
+  registry?: string
+  repositoryPrefix?: string
+}
+
+export interface RepositoryUploadConfig {
+  chart: OCIChartUploadConfig
+  image: ContainerImageUploadConfig
+}
+
+export interface OCIChartUploadResult {
+  repositoryName: string
+  chartName: string
+  version: string
+  chartUrl: string
+  pushedRef: string
+  digest?: string
+  size: number
+}
+
+export interface ContainerImageUploadResult {
+  imageRef: string
+  digest?: string
+  size: number
+}
+
 export type HelmChartSource = 'repository' | 'artifacthub' | 'oci'
 
 export interface HelmChart {

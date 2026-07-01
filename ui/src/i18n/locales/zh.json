@@ -1629,11 +1629,18 @@
     "actions": {
       "addRepository": "添加 Helm 仓库",
       "deleteRepository": "删除 Helm 仓库",
-      "install": "安装"
+      "copyReference": "复制引用",
+      "install": "安装",
+      "upload": "上传"
     },
     "fields": {
       "repository": "仓库",
+      "chartPackage": "Chart 包",
+      "containerImage": "容器镜像",
       "deprecated": "已废弃",
+      "imageArchive": "镜像归档",
+      "imageRepository": "镜像仓库路径",
+      "imageTag": "标签",
       "sources": "源码",
       "keywords": "关键词",
       "versions": "版本",
@@ -1661,9 +1668,22 @@
       "noChartUrl": "缺少 Chart 包 URL。",
       "invalidValues": "配置值必须是 YAML 对象。",
       "artifactHubTrafficNotice": "从该来源搜索或查看 Chart 信息时，Kite 会访问 <artifactHub>Artifact Hub</artifactHub>。Kite 仅展示第三方数据，不对其中内容负责。",
+      "uploadDescription": "上传 Helm Chart 包或容器镜像归档到已配置的仓库。",
+      "chartUploadDescription": "上传已打包的 Helm Chart 归档。上传成功后会出现在离线 OCI 应用目录中。",
+      "imageUploadDescription": "上传 docker save tarball 或 OCI 镜像归档。镜像会推送到已配置的镜像仓库，可用于 Chart values。",
+      "chartUploadTarget": "目标：{{target}}。限制：{{limit}}。",
+      "imageUploadTarget": "目标：{{target}}。限制：{{limit}}。",
+      "chartUploadNotConfigured": "未配置 Helm OCI Chart 上传。",
+      "imageUploadNotConfigured": "未配置容器镜像上传。",
+      "selectChartPackage": "请选择 Helm Chart 包。",
+      "selectImageArchive": "请选择容器镜像归档。",
+      "chartUploadSuccess": "已上传 Chart {{name}}",
+      "imageUploadSuccess": "已上传镜像 {{name}}",
       "installed": "Helm 发布已安装"
     },
     "placeholders": {
+      "imageRepository": "apps/demo",
+      "imageTag": "1.0.0",
       "search": "搜索 Chart..."
     }
   },

@@ -136,8 +136,11 @@ helmCatalog:
     discoveryPageSize: 100
     discoveryMaxRepositories: 1000
     discoveryMaxTagsPerRepository: 200
+    # Maximum Helm chart package size accepted by the admin upload API.
+    uploadMaxBytes: 512MiB
     # OCI registry access options used by the server when loading chart details,
-    # installs, upgrades, AI tool resolutions, and scheduled auto-upgrades.
+    # installs, upgrades, AI tool resolutions, scheduled auto-upgrades, and
+    # Helm chart package uploads.
     plainHTTP: false
     insecureSkipTLSVerify: false
     caFile: ''
@@ -145,6 +148,19 @@ helmCatalog:
     password: ''
     passwordSecretName: ''
     passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+  imageUploads:
+    # Container image archive upload target. Leave registry empty to reuse
+    # helmCatalog.offlineImages.registry when that offline registry is set.
+    registry: ''
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: false
+    insecureSkipTLSVerify: false
+    caFile: ''
+    username: ''
+    password: ''
+    passwordSecretName: ''
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
   offlineImages:
     # Applies to charts installed from the offline OCI catalog. Kite injects
     # global.imageRegistry when absent, then blocks installs whose rendered
@@ -181,6 +197,9 @@ service:
 # Sealos-style simplified ingress config.
 ingress:
   enabled: true
+  # NGINX body size limit for repository uploads. Keep this at least as large
+  # as helmCatalog.imageUploads.maxBytes when large image archives are enabled.
+  proxyBodySize: 4g
 
 # Sealos App CR creation.
 app:

@@ -153,6 +153,7 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 - Kite 通过 `helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE` 扫描受控 OCI registry 前缀来发现离线 Helm Chart；只会暴露该前缀下的内容，不做无边界的全 registry 展示。
 - registry 凭据和 TLS 配置只在服务端使用。Chart 只读 API 返回干净的 `oci://host/prefix/chart:version` URL，不包含凭据、查询参数或 fragment。Helm OCI tag 会把 SemVer build metadata 中的 `+` 编码为 `_`。
 - 离线 Chart artifact 和容器镜像可以共用同一个 registry host，但使用不同 repository 路径。Chart 放在专用前缀下，例如 `oci://registry.internal/kite-helm/<chart>:<version>`；容器镜像放在原始仓库路径下，例如 `registry.internal/bitnami/nginx:<tag>`。
+- 管理员 UI 上是一个“上传到仓库”入口，但 Kite 后端流程保持分离。Helm chart 包走 `POST /api/v1/admin/charts/oci/upload`，推送到 `helmCatalog.oci.base` 下；容器镜像归档走 `POST /api/v1/admin/images/upload`，推送到 `helmCatalog.imageUploads.registry` 加 `helmCatalog.imageUploads.repositoryPrefix` 下。
 - 最小 OCI discovery 示例：
 
 ```yaml
@@ -167,11 +168,27 @@ helmCatalog:
     username: admin
     passwordSecretName: registry-credentials
     passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
   offlineImages:
     enabled: true
     registry: registry.internal
     enforce: true
 ```
+
+如果 `helmCatalog.imageUploads.registry` 为空，Kite 会在已配置
+`helmCatalog.offlineImages.registry` 时复用它作为镜像上传 registry。Chart OCI
+registry 和镜像上传 registry 凭据不同时，请使用不同 Secret key。上传大小限制会
+渲染为 `KITE_HELM_OCI_UPLOAD_MAX_BYTES` 和 `KITE_IMAGE_UPLOAD_MAX_BYTES`；
+ingress 或网关 body-size limit 至少要高于服务端限制。
 
 - 安装离线 OCI Chart 前，先同步它渲染出的 workload 容器镜像：
 

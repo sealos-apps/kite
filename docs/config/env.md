@@ -24,11 +24,20 @@ Kite supports several environment variables by default to change the default val
 - **KITE_HELM_OCI_DISCOVERY_PAGE_SIZE**: Registry API page size used when listing repositories and tags. Defaults to `100`.
 - **KITE_HELM_OCI_DISCOVERY_MAX_REPOSITORIES**: Maximum registry repositories checked while searching the configured prefix. Defaults to `1000`.
 - **KITE_HELM_OCI_DISCOVERY_MAX_TAGS_PER_REPOSITORY**: Maximum tags scanned per repository. Defaults to `200`.
+- **KITE_HELM_OCI_UPLOAD_MAX_BYTES**: Maximum Helm chart package size accepted by the admin upload API. Defaults to `512MiB`.
 - **KITE_HELM_OCI_REGISTRY_PLAIN_HTTP**: Use plain HTTP for the OCI registry API and chart pulls. Defaults to `false`.
 - **KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY**: Skip TLS verification for private registry and token endpoints. Defaults to `false`.
 - **KITE_HELM_OCI_REGISTRY_CA_FILE**: CA bundle path mounted inside the Kite container for private registry TLS.
 - **KITE_HELM_OCI_REGISTRY_USERNAME**: Username used by Kite when listing and pulling OCI chart packages.
 - **KITE_HELM_OCI_REGISTRY_PASSWORD**: Password used by Kite when listing and pulling OCI chart packages. Prefer injecting it from a Kubernetes Secret instead of Helm values.
+- **KITE_IMAGE_UPLOAD_REGISTRY**: Registry host used by the admin container image archive upload API, for example `registry.internal` or `registry.internal:5000`. Leave empty to reuse `KITE_HELM_OFFLINE_IMAGE_REGISTRY` when configured.
+- **KITE_IMAGE_UPLOAD_REPOSITORY_PREFIX**: Repository prefix prepended to uploaded container image archives. Defaults to `kite-images`.
+- **KITE_IMAGE_UPLOAD_MAX_BYTES**: Maximum container image archive size accepted by the admin upload API. Defaults to `4GiB`.
+- **KITE_IMAGE_UPLOAD_REGISTRY_PLAIN_HTTP**: Use plain HTTP for container image archive uploads. Defaults to `false`.
+- **KITE_IMAGE_UPLOAD_REGISTRY_INSECURE_SKIP_TLS_VERIFY**: Skip TLS verification for the container image upload registry and token endpoints. Defaults to `false`.
+- **KITE_IMAGE_UPLOAD_REGISTRY_CA_FILE**: CA bundle path mounted inside the Kite container for the container image upload registry TLS.
+- **KITE_IMAGE_UPLOAD_REGISTRY_USERNAME**: Username used by Kite when pushing uploaded container image archives.
+- **KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD**: Password used by Kite when pushing uploaded container image archives. Prefer injecting it from a Kubernetes Secret instead of Helm values.
 - **KITE_HELM_OFFLINE_IMAGES_ENABLED**: Enable offline container image defaults for charts installed from the OCI catalog. Defaults to `false`.
 - **KITE_HELM_OFFLINE_IMAGE_REGISTRY**: Registry host used for rendered workload images from offline OCI charts, for example `registry.internal` or `registry.internal:5000`. Do not include `http://`, `https://`, or an `oci://` prefix.
 - **KITE_HELM_OFFLINE_IMAGES_ENFORCE**: When offline image defaults are enabled, block installs and upgrades if rendered workload images still point outside `KITE_HELM_OFFLINE_IMAGE_REGISTRY`. Defaults to `true`.

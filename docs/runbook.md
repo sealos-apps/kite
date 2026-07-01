@@ -225,6 +225,7 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - Kite discovers offline Helm OCI charts by scanning only the configured registry repository prefix (`helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE`). It does not expose arbitrary registry contents outside that prefix.
 - Registry credentials and TLS options are server-side only. Chart read APIs return clean `oci://host/prefix/chart:version` URLs without credentials, query parameters, or fragments. Helm OCI tags encode SemVer build metadata by replacing `+` with `_`.
 - Offline chart artifacts and container images can share one registry host, but they use different repository paths. Keep charts under a dedicated prefix such as `oci://registry.internal/kite-helm/<chart>:<version>` and container images under their normal repositories such as `registry.internal/bitnami/nginx:<tag>`.
+- The admin UI shows one upload entry for repository uploads, but Kite keeps the backend flows separate. Helm chart packages use `POST /api/v1/admin/charts/oci/upload` and are pushed under `helmCatalog.oci.base`; container image archives use `POST /api/v1/admin/images/upload` and are pushed under `helmCatalog.imageUploads.registry` plus `helmCatalog.imageUploads.repositoryPrefix`.
 - Minimal OCI discovery example:
 
 ```yaml
@@ -239,11 +240,29 @@ helmCatalog:
     username: admin
     passwordSecretName: registry-credentials
     passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
   offlineImages:
     enabled: true
     registry: registry.internal
     enforce: true
 ```
+
+If `helmCatalog.imageUploads.registry` is empty, Kite reuses
+`helmCatalog.offlineImages.registry` as the image upload registry when that
+offline image registry is configured. Use separate Secret keys when the chart
+OCI registry and image upload registry credentials differ. The upload limits are
+rendered as `KITE_HELM_OCI_UPLOAD_MAX_BYTES` and
+`KITE_IMAGE_UPLOAD_MAX_BYTES`; keep any ingress or gateway body-size limit at
+least as high as the server-side limit.
 
 - Before installing an offline OCI chart, mirror its rendered workload images:
 

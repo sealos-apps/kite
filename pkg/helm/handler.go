@@ -36,10 +36,15 @@ func (h *HelmChartHandler) RegisterAdminRoutes(group *gin.RouterGroup) {
 	g.GET("/repositories", h.ListRepositories)
 	g.GET("/artifacthub", h.ListArtifactHubCharts)
 	g.GET("", h.ListCharts)
+	g.GET("/uploads/config", h.GetRepositoryUploadConfig)
+	g.POST("/repositories", h.CreateRepository)
+	g.POST("/oci/upload", h.UploadOCIChart)
+	g.DELETE("/repositories/:id", h.DeleteRepository)
 	g.GET("/artifacthub/:repository/:name/content/:content", h.GetArtifactHubChartContent)
 	g.GET("/artifacthub/:repository/:name", h.GetArtifactHubChart)
 	g.GET("/:repository/:name/content/:content", h.GetChartContent)
 	g.GET("/:repository/:name", h.GetChart)
-	g.POST("/repositories", h.CreateRepository)
-	g.DELETE("/repositories/:id", h.DeleteRepository)
+
+	images := group.Group("/images")
+	images.POST("/upload", h.UploadContainerImage)
 }

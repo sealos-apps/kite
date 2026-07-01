@@ -127,6 +127,8 @@ spec:
               value: {{ .Values.helmCatalog.oci.discoveryMaxRepositories | quote }}
             - name: KITE_HELM_OCI_DISCOVERY_MAX_TAGS_PER_REPOSITORY
               value: {{ .Values.helmCatalog.oci.discoveryMaxTagsPerRepository | quote }}
+            - name: KITE_HELM_OCI_UPLOAD_MAX_BYTES
+              value: {{ .Values.helmCatalog.oci.uploadMaxBytes | quote }}
             - name: KITE_HELM_OCI_REGISTRY_PLAIN_HTTP
               value: {{ .Values.helmCatalog.oci.plainHTTP | quote }}
             - name: KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY
@@ -145,6 +147,33 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.helmCatalog.oci.passwordSecretName | quote }}
                   key: {{ .Values.helmCatalog.oci.passwordSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.imageUploads.registry }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY
+              value: {{ .Values.helmCatalog.imageUploads.registry | quote }}
+            {{- end }}
+            - name: KITE_IMAGE_UPLOAD_REPOSITORY_PREFIX
+              value: {{ .Values.helmCatalog.imageUploads.repositoryPrefix | quote }}
+            - name: KITE_IMAGE_UPLOAD_MAX_BYTES
+              value: {{ .Values.helmCatalog.imageUploads.maxBytes | quote }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_PLAIN_HTTP
+              value: {{ .Values.helmCatalog.imageUploads.plainHTTP | quote }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_INSECURE_SKIP_TLS_VERIFY
+              value: {{ .Values.helmCatalog.imageUploads.insecureSkipTLSVerify | quote }}
+            {{- if .Values.helmCatalog.imageUploads.caFile }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_CA_FILE
+              value: {{ .Values.helmCatalog.imageUploads.caFile | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.imageUploads.username }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_USERNAME
+              value: {{ .Values.helmCatalog.imageUploads.username | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.imageUploads.passwordSecretName }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.helmCatalog.imageUploads.passwordSecretName | quote }}
+                  key: {{ .Values.helmCatalog.imageUploads.passwordSecretKey | quote }}
             {{- end }}
             - name: KITE_HELM_OFFLINE_IMAGES_ENABLED
               value: {{ .Values.helmCatalog.offlineImages.enabled | quote }}

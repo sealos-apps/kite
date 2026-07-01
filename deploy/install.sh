@@ -164,6 +164,9 @@ ensure_registry_secret() {
     --set-string "helmCatalog.oci.username=${username}"
     --set-string "helmCatalog.oci.passwordSecretName=${secret_name}"
     --set-string "helmCatalog.oci.passwordSecretKey=KITE_HELM_OCI_REGISTRY_PASSWORD"
+    --set-string "helmCatalog.imageUploads.username=${username}"
+    --set-string "helmCatalog.imageUploads.passwordSecretName=${secret_name}"
+    --set-string "helmCatalog.imageUploads.passwordSecretKey=KITE_HELM_OCI_REGISTRY_PASSWORD"
   )
 }
 
@@ -270,6 +273,7 @@ registry_password="$(fetch_configmap_data_key registry-config ADMIN_PASSWORD sea
 
 helm_set_args+=(
   --set "helmCatalog.oci.base=oci://hub.${sealos_cloud_domain}/kite-helm"
+  --set "helmCatalog.imageUploads.registry=hub.${sealos_cloud_domain}"
   --set "helmCatalog.offlineImages.enabled=true"
   --set "helmCatalog.offlineImages.registry=hub.${sealos_cloud_domain}"
   --set "helmCatalog.offlineImages.enforce=true"
@@ -277,11 +281,14 @@ helm_set_args+=(
 ensure_registry_secret "${registry_username}" "${registry_password}"
 if bool_is_true "${sealos_disable_https}"; then
   helm_set_args+=(--set "helmCatalog.oci.plainHTTP=true")
+  helm_set_args+=(--set "helmCatalog.imageUploads.plainHTTP=true")
 else
   helm_set_args+=(--set "helmCatalog.oci.plainHTTP=false")
+  helm_set_args+=(--set "helmCatalog.imageUploads.plainHTTP=false")
 fi
 
 helm_set_args+=(--set "helmCatalog.oci.insecureSkipTLSVerify=$(read_cert_tls_skip)")
+helm_set_args+=(--set "helmCatalog.imageUploads.insecureSkipTLSVerify=$(read_cert_tls_skip)")
 
 
 helm_opts_arr=()

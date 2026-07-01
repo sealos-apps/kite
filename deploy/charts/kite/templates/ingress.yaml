@@ -10,6 +10,9 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
     nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    {{- if .Values.ingress.proxyBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ .Values.ingress.proxyBodySize | quote }}
+    {{- end }}
 spec:
   ingressClassName: nginx
   {{- if eq (include "kite.ingressTlsEnabled" .) "true" }}

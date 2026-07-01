@@ -9,6 +9,7 @@ import {
   AuditLogResponse,
   Cluster,
   clusterScopeResources,
+  ContainerImageUploadResult,
   FetchUserListResponse,
   GeneralSetting,
   GeneralSettingUpdateRequest,
@@ -27,9 +28,11 @@ import {
   HelmRepository,
   ImageTagInfo,
   OAuthProvider,
+  OCIChartUploadResult,
   OverviewData,
   PodMetrics,
   RelatedResources,
+  RepositoryUploadConfig,
   ResourceHistoryResponse,
   ResourcesTypeMap,
   ResourceTemplate,
@@ -349,6 +352,41 @@ export const deleteHelmRepository = (
 ): Promise<{ message: string }> => {
   return apiClient.delete<{ message: string }>(
     `/admin/charts/repositories/${id}`
+  )
+}
+
+export const fetchRepositoryUploadConfig =
+  (): Promise<RepositoryUploadConfig> => {
+    return apiClient.get<RepositoryUploadConfig>('/admin/charts/uploads/config')
+  }
+
+export const uploadOCIHelmChart = (
+  file: File
+): Promise<OCIChartUploadResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post<OCIChartUploadResult>(
+    '/admin/charts/oci/upload',
+    formData
+  )
+}
+
+export const uploadContainerImageArchive = ({
+  file,
+  repository,
+  tag,
+}: {
+  file: File
+  repository: string
+  tag: string
+}): Promise<ContainerImageUploadResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('repository', repository)
+  formData.append('tag', tag)
+  return apiClient.post<ContainerImageUploadResult>(
+    '/admin/images/upload',
+    formData
   )
 }
 

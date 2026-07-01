@@ -12,22 +12,36 @@ import {
 } from '@tanstack/react-table'
 import {
   Box,
+  Copy,
   Database,
+  FileArchive,
+  Image as ImageIcon,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
   Settings2,
   Trash2,
+  Upload,
   XCircle,
 } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { HelmChart, HelmRepository } from '@/types/api'
+import {
+  ContainerImageUploadResult,
+  HelmChart,
+  HelmRepository,
+  OCIChartUploadResult,
+  RepositoryUploadConfig,
+} from '@/types/api'
 import {
   createHelmRepository,
   deleteHelmRepository,
+  fetchRepositoryUploadConfig,
+  uploadContainerImageArchive,
+  uploadOCIHelmChart,
   useArtifactHubCharts,
   useHelmCharts,
   useHelmRepositories,
@@ -61,6 +75,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog'
 import { ErrorMessage } from '@/components/error-message'
@@ -71,11 +86,14 @@ const allRepositories = 'all'
 const artifactHubSource = 'artifacthub'
 const repositoriesSource = 'repositories'
 const ociSource = 'oci'
+const uploadTypeChart = 'chart'
+const uploadTypeImage = 'image'
 const columnHelper = createColumnHelper<HelmChart>()
 type ChartSource =
   | typeof artifactHubSource
   | typeof repositoriesSource
   | typeof ociSource
+type UploadType = typeof uploadTypeChart | typeof uploadTypeImage
 type HelmChartListSessionState = {
   verifiedPublisherOnly?: boolean
   searchQuery?: string
@@ -157,6 +175,21 @@ function chartMatchesSearch(chart: HelmChart, query: string) {
     chart.description,
     ...(chart.keywords || []),
   ].some((value) => value?.toLowerCase().includes(searchQuery))
+}
+
+function formatUploadLimit(bytes?: number) {
+  if (!bytes || bytes <= 0) {
+    return '-'
+  }
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+  let value = bytes
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  const digits = value >= 10 || unitIndex === 0 ? 0 : 1
+  return `${value.toFixed(digits)} ${units[unitIndex]}`
 }
 
 function AddRepositoryDialog({
@@ -274,6 +307,294 @@ function AddRepositoryDialog({
   )
 }
 
+function UploadRepositoryDialog({
+  open,
+  onOpenChange,
+  onChartUploaded,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onChartUploaded: () => Promise<unknown>
+}) {
+  const { t } = useTranslation()
+  const [uploadType, setUploadType] = useState<UploadType>(uploadTypeChart)
+  const [config, setConfig] = useState<RepositoryUploadConfig | null>(null)
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false)
+  const [chartFile, setChartFile] = useState<File | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageRepository, setImageRepository] = useState('')
+  const [imageTag, setImageTag] = useState('')
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [lastChartResult, setLastChartResult] =
+    useState<OCIChartUploadResult | null>(null)
+  const [lastImageResult, setLastImageResult] =
+    useState<ContainerImageUploadResult | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    setIsLoadingConfig(true)
+    setError('')
+    void fetchRepositoryUploadConfig()
+      .then(setConfig)
+      .catch((err) => setError(translateError(err, t)))
+      .finally(() => setIsLoadingConfig(false))
+  }, [open, t])
+
+  const resetForm = () => {
+    setChartFile(null)
+    setImageFile(null)
+    setImageRepository('')
+    setImageTag('')
+    setLastChartResult(null)
+    setLastImageResult(null)
+  }
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !isSubmitting) {
+      resetForm()
+    }
+    onOpenChange(nextOpen)
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    setIsSubmitting(true)
+    setLastChartResult(null)
+    setLastImageResult(null)
+    try {
+      if (uploadType === uploadTypeChart) {
+        if (!chartFile) {
+          throw new Error(t('helmCharts.messages.selectChartPackage'))
+        }
+        const result = await uploadOCIHelmChart(chartFile)
+        setLastChartResult(result)
+        toast.success(
+          t('helmCharts.messages.chartUploadSuccess', {
+            name: `${result.chartName}:${result.version}`,
+          })
+        )
+        await onChartUploaded()
+      } else {
+        if (!imageFile) {
+          throw new Error(t('helmCharts.messages.selectImageArchive'))
+        }
+        const result = await uploadContainerImageArchive({
+          file: imageFile,
+          repository: imageRepository,
+          tag: imageTag,
+        })
+        setLastImageResult(result)
+        toast.success(
+          t('helmCharts.messages.imageUploadSuccess', {
+            name: result.imageRef,
+          })
+        )
+      }
+    } catch (err) {
+      setError(translateError(err, t))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const activeConfig =
+    uploadType === uploadTypeChart ? config?.chart : config?.image
+  const isConfigured = activeConfig?.configured ?? false
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[620px]">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>{t('helmCharts.actions.upload')}</DialogTitle>
+            <DialogDescription>
+              {t('helmCharts.messages.uploadDescription')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs
+            value={uploadType}
+            onValueChange={(value) => {
+              setUploadType(value as UploadType)
+              setError('')
+            }}
+            className="gap-4"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value={uploadTypeChart}>
+                <FileArchive className="size-4" />
+                {t('helmCharts.fields.chartPackage')}
+              </TabsTrigger>
+              <TabsTrigger value={uploadTypeImage}>
+                <ImageIcon className="size-4" />
+                {t('helmCharts.fields.containerImage')}
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              {isLoadingConfig ? (
+                <span>{t('common.loading')}</span>
+              ) : uploadType === uploadTypeChart ? (
+                <span>
+                  {t('helmCharts.messages.chartUploadTarget', {
+                    target: config?.chart.registryBase || '-',
+                    limit: formatUploadLimit(config?.chart.maxBytes),
+                  })}
+                </span>
+              ) : (
+                <span>
+                  {t('helmCharts.messages.imageUploadTarget', {
+                    target: config?.image.registry
+                      ? `${config.image.registry}/${config.image.repositoryPrefix || ''}`.replace(
+                          /\/$/,
+                          ''
+                        )
+                      : '-',
+                    limit: formatUploadLimit(config?.image.maxBytes),
+                  })}
+                </span>
+              )}
+            </div>
+
+            <TabsContent value={uploadTypeChart} className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {t('helmCharts.messages.chartUploadDescription')}
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="helm-chart-upload-file">
+                  {t('helmCharts.fields.chartPackage')}
+                </Label>
+                <Input
+                  id="helm-chart-upload-file"
+                  type="file"
+                  accept=".tgz,application/gzip,application/x-gzip"
+                  onChange={(event) =>
+                    setChartFile(event.target.files?.[0] ?? null)
+                  }
+                  disabled={isSubmitting}
+                />
+              </div>
+              {lastChartResult ? (
+                <UploadResult value={lastChartResult.chartUrl} />
+              ) : null}
+            </TabsContent>
+
+            <TabsContent value={uploadTypeImage} className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {t('helmCharts.messages.imageUploadDescription')}
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="image-upload-file">
+                  {t('helmCharts.fields.imageArchive')}
+                </Label>
+                <Input
+                  id="image-upload-file"
+                  type="file"
+                  accept=".tar,.oci,application/x-tar,application/gzip,application/x-gzip"
+                  onChange={(event) =>
+                    setImageFile(event.target.files?.[0] ?? null)
+                  }
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+                <div className="space-y-2">
+                  <Label htmlFor="image-upload-repository">
+                    {t('helmCharts.fields.imageRepository')}
+                  </Label>
+                  <Input
+                    id="image-upload-repository"
+                    value={imageRepository}
+                    onChange={(event) => setImageRepository(event.target.value)}
+                    placeholder={t('helmCharts.placeholders.imageRepository')}
+                    disabled={isSubmitting}
+                    required={uploadType === uploadTypeImage}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="image-upload-tag">
+                    {t('helmCharts.fields.imageTag')}
+                  </Label>
+                  <Input
+                    id="image-upload-tag"
+                    value={imageTag}
+                    onChange={(event) => setImageTag(event.target.value)}
+                    placeholder={t('helmCharts.placeholders.imageTag')}
+                    disabled={isSubmitting}
+                    required={uploadType === uploadTypeImage}
+                  />
+                </div>
+              </div>
+              {lastImageResult ? (
+                <UploadResult value={lastImageResult.imageRef} />
+              ) : null}
+            </TabsContent>
+          </Tabs>
+
+          {!isConfigured && !isLoadingConfig ? (
+            <p className="text-sm text-destructive">
+              {uploadType === uploadTypeChart
+                ? t('helmCharts.messages.chartUploadNotConfigured')
+                : t('helmCharts.messages.imageUploadNotConfigured')}
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || isLoadingConfig || !isConfigured}
+            >
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Upload className="size-4" />
+              )}
+              {t('helmCharts.actions.upload')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function UploadResult({ value }: { value: string }) {
+  const { t } = useTranslation()
+  const copyValue = async () => {
+    await navigator.clipboard.writeText(value)
+    toast.success(t('common.copied'))
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border bg-muted/20 p-2">
+      <code className="min-w-0 flex-1 truncate text-xs">{value}</code>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="size-8 shrink-0"
+        onClick={() => void copyValue()}
+        aria-label={t('helmCharts.actions.copyReference')}
+      >
+        <Copy className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 export function HelmChartListPage() {
   const { t } = useTranslation()
   const { user, helmArtifactHubEnabled } = useAuth()
@@ -289,6 +610,7 @@ export function HelmChartListPage() {
     initialSessionState.repositoryFilter ?? allRepositories
   )
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [repositoryToDelete, setRepositoryToDelete] =
     useState<HelmRepository | null>(null)
   const [isDeletingRepository, setIsDeletingRepository] = useState(false)
@@ -441,6 +763,11 @@ export function HelmChartListPage() {
     await Promise.all([refetchRepositories(), localChartsQuery.refetch()])
   }
 
+  const handleChartUploaded = async () => {
+    setChartSource(ociSource)
+    await localChartsQuery.refetch()
+  }
+
   const handleDeleteRepository = async () => {
     if (!repositoryToDelete) {
       return
@@ -521,6 +848,16 @@ export function HelmChartListPage() {
           <h3 className="mb-1 text-lg font-medium">
             {t('helmCharts.messages.noCharts')}
           </h3>
+          {isOCISource && canManageRepositories ? (
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setUploadDialogOpen(true)}
+            >
+              <Upload className="size-4" />
+              {t('helmCharts.actions.upload')}
+            </Button>
+          ) : null}
           {!isArtifactHubSource && !isOCISource && canManageRepositories ? (
             <Button
               variant="outline"
@@ -656,6 +993,15 @@ export function HelmChartListPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              {canManageRepositories ? (
+                <Button
+                  variant={isOCISource ? 'default' : 'outline'}
+                  onClick={() => setUploadDialogOpen(true)}
+                >
+                  <Upload className="size-4" />
+                  {t('helmCharts.actions.upload')}
+                </Button>
+              ) : null}
               {!isArtifactHubSource && !isOCISource && canManageRepositories ? (
                 <Button onClick={() => setDialogOpen(true)}>
                   <Plus className="size-4" />
@@ -745,6 +1091,11 @@ export function HelmChartListPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={handleCreated}
+      />
+      <UploadRepositoryDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onChartUploaded={handleChartUploaded}
       />
       <DeleteConfirmationDialog
         open={Boolean(repositoryToDelete)}
