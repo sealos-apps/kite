@@ -73,6 +73,100 @@ samp {
   }
 }
 
+@layer components {
+  .ai-markdown {
+    @apply leading-7;
+  }
+
+  .ai-markdown > *:first-child {
+    @apply mt-0;
+  }
+
+  .ai-markdown > *:last-child {
+    @apply mb-0;
+  }
+
+  .ai-markdown h1 {
+    @apply mb-4 mt-6 border-b pb-2 text-2xl font-semibold tracking-normal text-foreground;
+  }
+
+  .ai-markdown h2 {
+    @apply mb-3 mt-6 border-b pb-2 text-xl font-semibold tracking-normal text-foreground;
+  }
+
+  .ai-markdown h3 {
+    @apply mb-2 mt-5 text-lg font-semibold tracking-normal text-foreground;
+  }
+
+  .ai-markdown h4,
+  .ai-markdown h5,
+  .ai-markdown h6 {
+    @apply mb-2 mt-4 font-semibold tracking-normal text-foreground;
+  }
+
+  .ai-markdown p {
+    @apply my-3;
+  }
+
+  .ai-markdown a {
+    @apply text-primary underline underline-offset-4 hover:text-primary/80;
+  }
+
+  .ai-markdown ul,
+  .ai-markdown ol {
+    @apply my-3 pl-6;
+  }
+
+  .ai-markdown ul {
+    @apply list-disc;
+  }
+
+  .ai-markdown ol {
+    @apply list-decimal;
+  }
+
+  .ai-markdown li {
+    @apply my-1;
+  }
+
+  .ai-markdown blockquote {
+    @apply my-4 border-l-4 pl-4 text-muted-foreground;
+  }
+
+  .ai-markdown code {
+    @apply rounded bg-muted px-1.5 py-0.5 text-[0.92em] text-foreground;
+  }
+
+  .ai-markdown pre {
+    @apply my-4 overflow-x-auto rounded-md bg-muted p-3 text-sm leading-6;
+  }
+
+  .ai-markdown pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  .ai-markdown table {
+    @apply my-4 w-full border-collapse text-left text-sm;
+  }
+
+  .ai-markdown th,
+  .ai-markdown td {
+    @apply border px-3 py-2 align-top;
+  }
+
+  .ai-markdown th {
+    @apply bg-muted font-semibold text-foreground;
+  }
+
+  .ai-markdown img {
+    @apply my-4 max-w-full rounded-md border;
+  }
+
+  .ai-markdown hr {
+    @apply my-6 border-border;
+  }
+}
+
 /* Breathing animation for log viewer connection indicator */
 @keyframes breathing {
   0%,

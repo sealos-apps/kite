@@ -41,10 +41,10 @@ class ApiClient {
     return this.refreshPromise
   }
 
-  private async makeRequest<T>(
+  private async makeResponse(
     url: string,
     options: RequestInit = {}
-  ): Promise<T> {
+  ): Promise<Response> {
     const fullUrl = withSubPath(this.baseUrl + url)
 
     const headers: Record<string, string> = {
@@ -99,16 +99,23 @@ class ApiClient {
         )
       }
 
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json()
-      } else {
-        return (await response.text()) as T
-      }
+      return response
     } catch (error) {
       console.error('API request failed:', error)
       throw error
     }
+  }
+
+  private async makeRequest<T>(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const response = await this.makeResponse(url, options)
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json()
+    }
+    return (await response.text()) as T
   }
 
   async get<T>(url: string, options?: RequestInit): Promise<T> {
@@ -130,6 +137,28 @@ class ApiClient {
           ? JSON.stringify(data)
           : undefined,
     })
+  }
+
+  async postBlob(
+    url: string,
+    data?: unknown,
+    options?: RequestInit
+  ): Promise<{ blob: Blob; filename?: string }> {
+    const isFormData = data instanceof FormData
+    const response = await this.makeResponse(url, {
+      ...options,
+      method: 'POST',
+      body: isFormData
+        ? (data as BodyInit)
+        : data
+          ? JSON.stringify(data)
+          : undefined,
+    })
+    const disposition = response.headers.get('content-disposition')
+    return {
+      blob: await response.blob(),
+      filename: filenameFromContentDisposition(disposition),
+    }
   }
 
   async put<T>(url: string, data?: unknown, options?: RequestInit): Promise<T> {
@@ -165,6 +194,20 @@ class ApiClient {
           : undefined,
     })
   }
+}
+
+function filenameFromContentDisposition(
+  value: string | null
+): string | undefined {
+  if (!value) {
+    return undefined
+  }
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+  const match = value.match(/filename="?([^";]+)"?/i)
+  return match?.[1]
 }
 
 export const API_BASE_URL = '/api/v1'

@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { HelmOfflineImageCheckNotice } from '@/components/helm-offline-image-check-notice'
 import { NamespaceSelector } from '@/components/selector/namespace-selector'
 import { SimpleYamlEditor } from '@/components/simple-yaml-editor'
 import { YamlFileTreeViewerNative as YamlFileTreeViewer } from '@/components/yaml-file-tree-viewer-native'
@@ -283,12 +284,17 @@ export function HelmInstallDialog({
             </div>
 
             {dryRunPreview ? (
-              <YamlFileTreeViewer
-                files={dryRunPreview.resources}
-                title={t('helm.fields.dryRunPreview')}
-                emptyMessage={t('helm.messages.noDryRunResources')}
-                fillHeight
-              />
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                <HelmOfflineImageCheckNotice
+                  imageCheck={dryRunPreview.imageCheck}
+                />
+                <YamlFileTreeViewer
+                  files={dryRunPreview.resources}
+                  title={t('helm.fields.dryRunPreview')}
+                  emptyMessage={t('helm.messages.noDryRunResources')}
+                  fillHeight
+                />
+              </div>
             ) : (
               <div className="grid min-h-0 gap-4 lg:grid-cols-2">
                 <div className="grid min-h-0 gap-2">

@@ -19,7 +19,6 @@ import (
 	"github.com/zxh326/kite/pkg/scheduler"
 	"gorm.io/gorm"
 	"helm.sh/helm/v4/pkg/action"
-	chart "helm.sh/helm/v4/pkg/chart/v2"
 	release "helm.sh/helm/v4/pkg/release/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -32,8 +31,9 @@ const (
 type HelmReleaseHandler struct{}
 
 type helmReleaseRunResult struct {
-	current *release.Release
-	release *release.Release
+	current    *release.Release
+	release    *release.Release
+	imageCheck helmutil.ImageCheckResult
 }
 
 type helmReleaseInstallRequest struct {
@@ -67,36 +67,35 @@ func (h *HelmReleaseHandler) ListHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 func (h *HelmReleaseHandler) Create(c *gin.Context) {
-	rel, status, err := h.runInstall(c, false)
+	result, status, err := h.runInstall(c, false)
 	if err != nil {
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
-	result := helmutil.ToHelmRelease(rel, true)
-	c.JSON(http.StatusCreated, result)
+	c.JSON(http.StatusCreated, helmutil.ToHelmRelease(result.release, true))
 }
 
 func (h *HelmReleaseHandler) DryRunInstall(c *gin.Context) {
-	rel, status, err := h.runInstall(c, true)
+	result, status, err := h.runInstall(c, true)
 	if err != nil {
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, helmutil.ToHelmReleaseDryRunResponse(rel))
+	c.JSON(http.StatusOK, helmutil.ToHelmReleaseDryRunResponseWithImageCheck(result.release, result.imageCheck))
 }
 
-func (h *HelmReleaseHandler) runInstall(c *gin.Context, dryRun bool) (rel *release.Release, status int, err error) {
+func (h *HelmReleaseHandler) runInstall(c *gin.Context, dryRun bool) (result helmReleaseRunResult, status int, err error) {
 	ctx := c.Request.Context()
 	namespace := strings.TrimSpace(c.Param("namespace"))
 	if namespace == "" || namespace == common.AllNamespaces {
-		return nil, http.StatusBadRequest, fmt.Errorf("namespace is required")
+		return helmReleaseRunResult{}, http.StatusBadRequest, fmt.Errorf("namespace is required")
 	}
 
 	var req helmReleaseInstallRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		return nil, http.StatusBadRequest, err
+		return helmReleaseRunResult{}, http.StatusBadRequest, err
 	}
 	req.ReleaseName = strings.TrimSpace(req.ReleaseName)
 	req.Namespace = strings.TrimSpace(req.Namespace)
@@ -104,16 +103,16 @@ func (h *HelmReleaseHandler) runInstall(c *gin.Context, dryRun bool) (rel *relea
 	req.ChartName = strings.TrimSpace(req.ChartName)
 	req.ChartVersion = strings.TrimSpace(req.ChartVersion)
 	req.RepositoryName = strings.TrimSpace(req.RepositoryName)
-	req.Source = strings.TrimSpace(req.Source)
+	req.Source = helmutil.NormalizeChartSource(req.Source, req.ChartURL)
 	if req.ReleaseName == "" {
-		return nil, http.StatusBadRequest, fmt.Errorf("releaseName is required")
+		return helmReleaseRunResult{}, http.StatusBadRequest, fmt.Errorf("releaseName is required")
 	}
 	if req.Namespace != "" && req.Namespace != namespace {
-		return nil, http.StatusBadRequest, fmt.Errorf("request namespace does not match URL namespace")
+		return helmReleaseRunResult{}, http.StatusBadRequest, fmt.Errorf("request namespace does not match URL namespace")
 	}
 	if !dryRun {
 		defer func() {
-			h.recordHistory(c, "install", req.ReleaseName, namespace, nil, rel, err == nil, err)
+			h.recordHistory(c, "install", req.ReleaseName, namespace, nil, result.release, err == nil, err)
 		}()
 	}
 
@@ -125,21 +124,21 @@ func (h *HelmReleaseHandler) runInstall(c *gin.Context, dryRun bool) (rel *relea
 		URL:            req.ChartURL,
 	})
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return helmReleaseRunResult{}, http.StatusBadRequest, err
 	}
 	loadedChart, err := helmutil.LoadArchive(chartPackage.URL, chartPackage.Repository)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return helmReleaseRunResult{}, http.StatusBadRequest, err
 	}
-
-	cfg, err := h.actionConfig(c, namespace)
+	previewCfg, err := h.actionConfig(c, namespace)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
 	}
 	values := req.Values
 	if values == nil {
 		values = map[string]interface{}{}
 	}
+	values, imagePolicy, injectedValues := helmutil.PrepareReleaseValues(values, req.Source)
 	description := req.Description
 	if description == "" {
 		description = "Install requested from Kite"
@@ -148,23 +147,49 @@ func (h *HelmReleaseHandler) runInstall(c *gin.Context, dryRun bool) (rel *relea
 		}
 	}
 	opts := helmutil.InstallReleaseOptions{
-		ReleaseName:     req.ReleaseName,
-		Namespace:       namespace,
+		ReleaseName: req.ReleaseName,
+		Namespace:   namespace,
+		ChartProvenance: helmutil.ChartProvenance{
+			Source:         req.Source,
+			RepositoryName: req.RepositoryName,
+			ChartName:      req.ChartName,
+			Version:        chartPackage.Version,
+			URL:            chartPackage.URL,
+		},
 		Timeout:         helmActionTimeout,
 		Description:     description,
 		CreateNamespace: req.CreateNamespace,
 		DryRun:          dryRun,
 		Wait:            req.Wait,
 	}
-	if err := h.authorizeHelmInstall(c, loadedChart, values, opts); err != nil {
-		return nil, http.StatusForbidden, err
+	previewOpts := opts
+	previewOpts.DryRun = true
+	preview, err := helmutil.DryRunInstallRelease(ctx, previewCfg, loadedChart, values, previewOpts)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
+	}
+	imageCheck, err := helmutil.CheckReleaseImages(preview, imagePolicy, injectedValues)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusBadRequest, err
+	}
+	result.imageCheck = imageCheck
+	if err := h.authorizeHelmInstallPreview(c, preview, opts.CreateNamespace); err != nil {
+		return helmReleaseRunResult{}, http.StatusForbidden, err
 	}
 
-	rel, err = helmutil.InstallRelease(ctx, cfg, loadedChart, values, opts)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
+	if dryRun {
+		result.release = preview
+		return result, http.StatusOK, nil
 	}
-	return rel, http.StatusOK, nil
+	runCfg, err := h.actionConfig(c, namespace)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
+	}
+	result.release, err = helmutil.InstallRelease(ctx, runCfg, loadedChart, values, opts)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
+	}
+	return result, http.StatusOK, nil
 }
 
 func (h *HelmReleaseHandler) Update(c *gin.Context) {
@@ -314,7 +339,7 @@ func (h *HelmReleaseHandler) DryRunUpgrade(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, helmutil.ToHelmReleaseDryRunDiffResponse(result.current, result.release))
+	c.JSON(http.StatusOK, helmutil.ToHelmReleaseDryRunDiffResponseWithImageCheck(result.current, result.release, result.imageCheck))
 }
 
 func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result helmReleaseRunResult, status int, err error) {
@@ -325,11 +350,11 @@ func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result hel
 		return helmReleaseRunResult{}, http.StatusBadRequest, err
 	}
 
-	cfg, err := h.actionConfig(c, namespace)
+	currentCfg, err := h.actionConfig(c, namespace)
 	if err != nil {
 		return helmReleaseRunResult{}, http.StatusInternalServerError, err
 	}
-	current, err := helmutil.GetRelease(cfg, name)
+	current, err := helmutil.GetRelease(currentCfg, name)
 	if err != nil {
 		return helmReleaseRunResult{}, http.StatusInternalServerError, err
 	}
@@ -344,12 +369,17 @@ func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result hel
 	}
 
 	chartToUpgrade := current.Chart
+	chartProvenance := helmutil.ReleaseChartProvenance(current)
+	source := helmutil.NormalizeChartSource(req.Source, req.ChartURL)
+	if source == "" && strings.TrimSpace(req.ChartURL) == "" {
+		source = chartProvenance.Source
+	}
 	if strings.TrimSpace(req.ChartURL) != "" {
 		req.ChartURL = strings.TrimSpace(req.ChartURL)
 		req.ChartVersion = strings.TrimSpace(req.ChartVersion)
 		chartName := current.Chart.Metadata.Name
 		chartPackage, err := helmutil.ResolveChartPackage(ctx, helmutil.ChartSourceRef{
-			Source:         strings.TrimSpace(req.Source),
+			Source:         source,
 			RepositoryName: strings.TrimSpace(req.RepositoryName),
 			ChartName:      chartName,
 			Version:        req.ChartVersion,
@@ -362,12 +392,37 @@ func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result hel
 		if err != nil {
 			return helmReleaseRunResult{}, http.StatusBadRequest, err
 		}
+		chartProvenance = helmutil.ChartProvenance{
+			Source:         source,
+			RepositoryName: strings.TrimSpace(req.RepositoryName),
+			ChartName:      chartName,
+			Version:        chartPackage.Version,
+			URL:            chartPackage.URL,
+		}
+	} else if source != "" && chartProvenance.URL != "" {
+		chartPackage, err := helmutil.ResolveChartPackage(ctx, helmutil.ChartSourceRef{
+			Source:         source,
+			RepositoryName: chartProvenance.RepositoryName,
+			ChartName:      chartProvenance.ChartName,
+			Version:        chartProvenance.Version,
+			URL:            chartProvenance.URL,
+		})
+		if err != nil {
+			return helmReleaseRunResult{}, http.StatusBadRequest, err
+		}
+		chartToUpgrade, err = helmutil.LoadArchive(chartPackage.URL, chartPackage.Repository)
+		if err != nil {
+			return helmReleaseRunResult{}, http.StatusBadRequest, err
+		}
+		chartProvenance.Version = chartPackage.Version
+		chartProvenance.URL = chartPackage.URL
 	}
 
 	values := req.Values
 	if values == nil {
 		values = map[string]interface{}{}
 	}
+	values, imagePolicy, injectedValues := helmutil.PrepareReleaseValues(values, source)
 	description := req.Description
 	if description == "" {
 		description = "Dry run upgrade requested from Kite"
@@ -377,6 +432,7 @@ func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result hel
 	}
 	opts := helmutil.UpgradeReleaseOptions{
 		Namespace:         namespace,
+		ChartProvenance:   chartProvenance,
 		Timeout:           helmActionTimeout,
 		ReuseValues:       req.Values == nil,
 		Description:       description,
@@ -385,11 +441,34 @@ func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result hel
 		DryRun:            dryRun,
 		Wait:              req.Wait,
 	}
-	if err := h.authorizeHelmUpgrade(c, current, name, chartToUpgrade, values, opts); err != nil {
+	previewOpts := opts
+	previewOpts.DryRun = true
+	previewCfg, err := h.actionConfig(c, namespace)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
+	}
+	preview, err := helmutil.DryRunUpgradeRelease(ctx, previewCfg, name, chartToUpgrade, values, previewOpts)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
+	}
+	imageCheck, err := helmutil.CheckReleaseImages(preview, imagePolicy, injectedValues)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusBadRequest, err
+	}
+	result.imageCheck = imageCheck
+	if err := h.authorizeHelmUpgradePreview(c, current, preview); err != nil {
 		return helmReleaseRunResult{}, http.StatusForbidden, err
 	}
 
-	rel, err := helmutil.UpgradeRelease(ctx, cfg, name, chartToUpgrade, values, opts)
+	if dryRun {
+		result.release = preview
+		return result, http.StatusOK, nil
+	}
+	runCfg, err := h.actionConfig(c, namespace)
+	if err != nil {
+		return helmReleaseRunResult{}, http.StatusInternalServerError, err
+	}
+	rel, err := helmutil.UpgradeRelease(ctx, runCfg, name, chartToUpgrade, values, opts)
 	if err != nil {
 		return helmReleaseRunResult{}, http.StatusInternalServerError, err
 	}
@@ -458,16 +537,8 @@ func (h *HelmReleaseHandler) recordHistory(c *gin.Context, opType, name, namespa
 	helmutil.RecordReleaseHistory(cs.Name, user.ID, "manual", opType, name, namespace, prev, curr, success, err)
 }
 
-func (h *HelmReleaseHandler) authorizeHelmInstall(c *gin.Context, chartToInstall *chart.Chart, values map[string]interface{}, opts helmutil.InstallReleaseOptions) error {
-	cfg, err := h.actionConfig(c, opts.Namespace)
-	if err != nil {
-		return err
-	}
-	preview, err := helmutil.DryRunInstallRelease(c.Request.Context(), cfg, chartToInstall, values, opts)
-	if err != nil {
-		return err
-	}
-	if err := h.authorizeCreateNamespace(c, opts.Namespace, opts.CreateNamespace); err != nil {
+func (h *HelmReleaseHandler) authorizeHelmInstallPreview(c *gin.Context, preview *release.Release, createNamespace bool) error {
+	if err := h.authorizeCreateNamespace(c, preview.Namespace, createNamespace); err != nil {
 		return err
 	}
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
@@ -475,15 +546,7 @@ func (h *HelmReleaseHandler) authorizeHelmInstall(c *gin.Context, chartToInstall
 	return helmguard.AuthorizeRelease(c.Request.Context(), user, cs, preview, string(common.VerbCreate))
 }
 
-func (h *HelmReleaseHandler) authorizeHelmUpgrade(c *gin.Context, current *release.Release, name string, chartToUpgrade *chart.Chart, values map[string]interface{}, opts helmutil.UpgradeReleaseOptions) error {
-	cfg, err := h.actionConfig(c, opts.Namespace)
-	if err != nil {
-		return err
-	}
-	preview, err := helmutil.DryRunUpgradeRelease(c.Request.Context(), cfg, name, chartToUpgrade, values, opts)
-	if err != nil {
-		return err
-	}
+func (h *HelmReleaseHandler) authorizeHelmUpgradePreview(c *gin.Context, current, preview *release.Release) error {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 	user := c.MustGet("user").(model.User)
 	return helmguard.AuthorizeReleaseChange(c.Request.Context(), user, cs, current, preview)

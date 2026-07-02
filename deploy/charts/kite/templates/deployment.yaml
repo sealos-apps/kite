@@ -113,22 +113,22 @@ spec:
               value: {{ .Values.helmCatalog.artifactHub.enabled | quote }}
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: {{ .Values.platform.tlsRejectUnauthorized | quote }}
-            {{- if .Values.helmCatalog.oci.catalog }}
-            - name: KITE_HELM_OCI_CATALOG
-              value: {{ .Values.helmCatalog.oci.catalog | quote }}
-            {{- end }}
-            {{- if .Values.helmCatalog.oci.catalogFile }}
-            - name: KITE_HELM_OCI_CATALOG_FILE
-              value: {{ .Values.helmCatalog.oci.catalogFile | quote }}
-            {{- end }}
             {{- if .Values.helmCatalog.oci.base }}
-            - name: KITE_HELM_OCI_CATALOG_BASE
+            - name: KITE_HELM_OCI_REGISTRY_BASE
               value: {{ .Values.helmCatalog.oci.base | quote }}
             {{- end }}
             {{- if .Values.helmCatalog.oci.repositoryName }}
-            - name: KITE_HELM_OCI_CATALOG_REPOSITORY_NAME
+            - name: KITE_HELM_OCI_REPOSITORY_NAME
               value: {{ .Values.helmCatalog.oci.repositoryName | quote }}
             {{- end }}
+            - name: KITE_HELM_OCI_DISCOVERY_PAGE_SIZE
+              value: {{ .Values.helmCatalog.oci.discoveryPageSize | quote }}
+            - name: KITE_HELM_OCI_DISCOVERY_MAX_REPOSITORIES
+              value: {{ .Values.helmCatalog.oci.discoveryMaxRepositories | quote }}
+            - name: KITE_HELM_OCI_DISCOVERY_MAX_TAGS_PER_REPOSITORY
+              value: {{ .Values.helmCatalog.oci.discoveryMaxTagsPerRepository | quote }}
+            - name: KITE_HELM_OCI_UPLOAD_MAX_BYTES
+              value: {{ .Values.helmCatalog.oci.uploadMaxBytes | quote }}
             - name: KITE_HELM_OCI_REGISTRY_PLAIN_HTTP
               value: {{ .Values.helmCatalog.oci.plainHTTP | quote }}
             - name: KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY
@@ -141,6 +141,48 @@ spec:
             - name: KITE_HELM_OCI_REGISTRY_USERNAME
               value: {{ .Values.helmCatalog.oci.username | quote }}
             {{- end }}
+            {{- if .Values.helmCatalog.oci.passwordSecretName }}
+            - name: KITE_HELM_OCI_REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.helmCatalog.oci.passwordSecretName | quote }}
+                  key: {{ .Values.helmCatalog.oci.passwordSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.imageUploads.registry }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY
+              value: {{ .Values.helmCatalog.imageUploads.registry | quote }}
+            {{- end }}
+            - name: KITE_IMAGE_UPLOAD_REPOSITORY_PREFIX
+              value: {{ .Values.helmCatalog.imageUploads.repositoryPrefix | quote }}
+            - name: KITE_IMAGE_UPLOAD_MAX_BYTES
+              value: {{ .Values.helmCatalog.imageUploads.maxBytes | quote }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_PLAIN_HTTP
+              value: {{ .Values.helmCatalog.imageUploads.plainHTTP | quote }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_INSECURE_SKIP_TLS_VERIFY
+              value: {{ .Values.helmCatalog.imageUploads.insecureSkipTLSVerify | quote }}
+            {{- if .Values.helmCatalog.imageUploads.caFile }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_CA_FILE
+              value: {{ .Values.helmCatalog.imageUploads.caFile | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.imageUploads.username }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_USERNAME
+              value: {{ .Values.helmCatalog.imageUploads.username | quote }}
+            {{- end }}
+            {{- if .Values.helmCatalog.imageUploads.passwordSecretName }}
+            - name: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.helmCatalog.imageUploads.passwordSecretName | quote }}
+                  key: {{ .Values.helmCatalog.imageUploads.passwordSecretKey | quote }}
+            {{- end }}
+            - name: KITE_HELM_OFFLINE_IMAGES_ENABLED
+              value: {{ .Values.helmCatalog.offlineImages.enabled | quote }}
+            {{- if .Values.helmCatalog.offlineImages.registry }}
+            - name: KITE_HELM_OFFLINE_IMAGE_REGISTRY
+              value: {{ .Values.helmCatalog.offlineImages.registry | quote }}
+            {{- end }}
+            - name: KITE_HELM_OFFLINE_IMAGES_ENFORCE
+              value: {{ .Values.helmCatalog.offlineImages.enforce | quote }}
           {{- with .Values.extraEnvs }}
           {{- toYaml . | nindent 12 }}
           {{- end }}

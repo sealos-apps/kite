@@ -14,6 +14,7 @@ import (
 type InstallReleaseOptions struct {
 	ReleaseName     string
 	Namespace       string
+	ChartProvenance ChartProvenance
 	Timeout         time.Duration
 	Description     string
 	CreateNamespace bool
@@ -81,6 +82,7 @@ func GetReleaseRevision(cfg *action.Configuration, name string, version int) (*r
 }
 
 func InstallRelease(ctx context.Context, cfg *action.Configuration, chartToInstall *chart.Chart, values map[string]interface{}, opts InstallReleaseOptions) (*release.Release, error) {
+	AnnotateChartSource(chartToInstall, opts.ChartProvenance)
 	install := action.NewInstall(cfg)
 	install.ReleaseName = opts.ReleaseName
 	install.Namespace = opts.Namespace

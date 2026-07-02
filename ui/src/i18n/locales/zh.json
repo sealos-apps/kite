@@ -1629,11 +1629,17 @@
     "actions": {
       "addRepository": "添加 Helm 仓库",
       "deleteRepository": "删除 Helm 仓库",
-      "install": "安装"
+      "copyReference": "复制引用",
+      "install": "安装",
+      "upload": "上传",
+      "transferOfflineBundle": "离线应用包",
+      "importOfflineBundle": "导入离线应用包",
+      "exportOfflineBundle": "导出离线应用包"
     },
     "fields": {
       "repository": "仓库",
       "deprecated": "已废弃",
+      "offlineBundle": "离线应用包",
       "sources": "源码",
       "keywords": "关键词",
       "versions": "版本",
@@ -1644,7 +1650,7 @@
     "filters": {
       "allRepositories": "全部仓库",
       "artifactHub": "Artifact Hub",
-      "oci": "离线 OCI",
+      "oci": "离线应用",
       "repositories": "仓库",
       "verifiedPublisher": "已验证发布者"
     },
@@ -1661,6 +1667,20 @@
       "noChartUrl": "缺少 Chart 包 URL。",
       "invalidValues": "配置值必须是 YAML 对象。",
       "artifactHubTrafficNotice": "从该来源搜索或查看 Chart 信息时，Kite 会访问 <artifactHub>Artifact Hub</artifactHub>。Kite 仅展示第三方数据，不对其中内容负责。",
+      "uploadDescription": "上传离线应用包到已配置的仓库。",
+      "offlineBundleDescription": "离线应用包会把 Helm Chart 和它渲染需要的容器镜像绑定在一起，支持一次导入多个应用，也可以导出选中的离线应用给其他集群导入。",
+      "offlineBundleTarget": "Chart 目标：{{chartTarget}}。镜像目标：{{imageTarget}}。包大小限制：{{limit}}。",
+      "offlineBundleNotConfigured": "未完整配置 Helm OCI Chart 仓库和离线镜像仓库。",
+      "selectOfflineBundle": "请选择离线应用包。",
+      "offlineBundleUploadStarted": "离线应用包已开始上传，导入准备期间你可以继续使用 Kite。",
+      "offlineBundleImportStarted": "离线应用包导入任务已开始，Kite 会在后台推送镜像和 Chart。",
+      "offlineBundleImportCompleted": "离线应用包导入已完成",
+      "offlineBundleImportSuccess": "已导入 {{count}} 个离线应用",
+      "offlineBundleImportPartial": "{{count}} 个离线应用导入失败",
+      "offlineBundleImportFailed": "离线应用包导入失败：{{error}}",
+      "offlineBundleImportSummary": "导入结果：成功 {{success}} 个，失败 {{failed}} 个。",
+      "offlineBundleExportRequiresSelection": "请先选择要导出的离线应用。",
+      "offlineBundleExportSuccess": "已导出 {{count}} 个离线应用",
       "installed": "Helm 发布已安装"
     },
     "placeholders": {
@@ -1760,6 +1780,14 @@
       "loadingVersions": "正在加载版本...",
       "loadingChartPackage": "正在加载 Chart 包...",
       "loadingValues": "正在加载配置值...",
+      "offlineImagesReady": "离线镜像",
+      "externalImages_one": "{{count}} 个外部镜像",
+      "externalImages_other": "{{count}} 个外部镜像",
+      "offlineImageRegistry": "仓库：{{registry}}",
+      "offlineImageRegistryEnabled": "已启用离线镜像仓库",
+      "renderedImages_one": "渲染出 {{count}} 个镜像",
+      "renderedImages_other": "渲染出 {{count}} 个镜像",
+      "imageRegistryInjected": "已注入离线镜像默认值",
       "autoUpgradeSaved": "自动升级配置已保存",
       "autoUpgradeDescription": "发现新 Chart 版本时升级。",
       "autoUpgradeChartDescription": "用于检查版本的 Chart 来源。",

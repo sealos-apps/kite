@@ -14,6 +14,10 @@ FROM golang:1.26-alpine AS backend-builder
 
 WORKDIR /app
 
+ARG VERSION=dev
+ARG BUILD_DATE=unknown
+ARG COMMIT_ID=unknown
+
 COPY go.mod ./
 COPY go.sum ./
 
@@ -22,7 +26,10 @@ RUN go mod download
 COPY . .
 
 COPY --from=frontend-builder /app/static ./static
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o kite .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w \
+    -X 'github.com/zxh326/kite/pkg/version.Version=${VERSION}' \
+    -X 'github.com/zxh326/kite/pkg/version.BuildDate=${BUILD_DATE}' \
+    -X 'github.com/zxh326/kite/pkg/version.CommitID=${COMMIT_ID}'" -o kite .
 
 FROM gcr.io/distroless/static
 

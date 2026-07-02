@@ -8,6 +8,7 @@ import (
 
 	"github.com/zxh326/kite/pkg/cluster"
 	"github.com/zxh326/kite/pkg/common"
+	"github.com/zxh326/kite/pkg/helmutil"
 	chart "helm.sh/helm/v4/pkg/chart/v2"
 	releasecommon "helm.sh/helm/v4/pkg/release/common"
 	release "helm.sh/helm/v4/pkg/release/v1"
@@ -102,7 +103,7 @@ metadata:
 		},
 	}
 
-	result := helmDryRunResponse(rel, "")
+	result := helmDryRunResponse(rel, "", helmutil.ImageCheckResult{})
 	if result.ReleaseName != "api" || result.Namespace != "team-a" {
 		t.Fatalf("unexpected release identity: %#v", result)
 	}

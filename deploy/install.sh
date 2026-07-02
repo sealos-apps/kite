@@ -140,6 +140,36 @@ is_existing_release() {
   helm status "${RELEASE_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1
 }
 
+ensure_namespace() {
+  kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+}
+
+ensure_registry_secret() {
+  local username=$1
+  local password=$2
+  local secret_name="${RELEASE_NAME}-oci-registry"
+  local password_file
+
+  [ -n "${password}" ] || return 0
+  ensure_namespace
+  password_file="$(mktemp)"
+  trap 'rm -f "${password_file}"' RETURN
+  printf '%s' "${password}" > "${password_file}"
+  kubectl create secret generic "${secret_name}" -n "${NAMESPACE}" \
+    --from-file=KITE_HELM_OCI_REGISTRY_PASSWORD="${password_file}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  rm -f "${password_file}"
+  trap - RETURN
+  helm_set_args+=(
+    --set-string "helmCatalog.oci.username=${username}"
+    --set-string "helmCatalog.oci.passwordSecretName=${secret_name}"
+    --set-string "helmCatalog.oci.passwordSecretKey=KITE_HELM_OCI_REGISTRY_PASSWORD"
+    --set-string "helmCatalog.imageUploads.username=${username}"
+    --set-string "helmCatalog.imageUploads.passwordSecretName=${secret_name}"
+    --set-string "helmCatalog.imageUploads.passwordSecretKey=KITE_HELM_OCI_REGISTRY_PASSWORD"
+  )
+}
+
 read_cert_tls_skip() {
     local cert_mode
 
@@ -243,16 +273,22 @@ registry_password="$(fetch_configmap_data_key registry-config ADMIN_PASSWORD sea
 
 helm_set_args+=(
   --set "helmCatalog.oci.base=oci://hub.${sealos_cloud_domain}/kite-helm"
-  --set "helmCatalog.oci.username=${registry_username}"
-  --set "helmCatalog.oci.password=${registry_password}"
+  --set "helmCatalog.imageUploads.registry=hub.${sealos_cloud_domain}"
+  --set "helmCatalog.offlineImages.enabled=true"
+  --set "helmCatalog.offlineImages.registry=hub.${sealos_cloud_domain}"
+  --set "helmCatalog.offlineImages.enforce=true"
 )
+ensure_registry_secret "${registry_username}" "${registry_password}"
 if bool_is_true "${sealos_disable_https}"; then
   helm_set_args+=(--set "helmCatalog.oci.plainHTTP=true")
+  helm_set_args+=(--set "helmCatalog.imageUploads.plainHTTP=true")
 else
   helm_set_args+=(--set "helmCatalog.oci.plainHTTP=false")
+  helm_set_args+=(--set "helmCatalog.imageUploads.plainHTTP=false")
 fi
 
 helm_set_args+=(--set "helmCatalog.oci.insecureSkipTLSVerify=$(read_cert_tls_skip)")
+helm_set_args+=(--set "helmCatalog.imageUploads.insecureSkipTLSVerify=$(read_cert_tls_skip)")
 
 
 helm_opts_arr=()

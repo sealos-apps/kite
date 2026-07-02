@@ -1,34 +1,46 @@
 package helmutil
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	chart "helm.sh/helm/v4/pkg/chart/v2"
-	"sigs.k8s.io/yaml"
 )
 
 const (
-	ociCatalogEnv               = "KITE_HELM_OCI_CATALOG"
-	ociCatalogFileEnv           = "KITE_HELM_OCI_CATALOG_FILE"
-	ociCatalogBaseURLEnv        = "KITE_HELM_OCI_CATALOG_BASE"
-	ociCatalogRepositoryNameEnv = "KITE_HELM_OCI_CATALOG_REPOSITORY_NAME"
-	ociRegistryPlainHTTPEnv     = "KITE_HELM_OCI_REGISTRY_PLAIN_HTTP"
-	ociRegistryInsecureTLSEnv   = "KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY"
-	ociRegistryUsernameEnv      = "KITE_HELM_OCI_REGISTRY_USERNAME"
-	ociRegistryPasswordEnv      = "KITE_HELM_OCI_REGISTRY_PASSWORD"
-	ociRegistryCAFileEnv        = "KITE_HELM_OCI_REGISTRY_CA_FILE"
-	defaultOCIRepositoryName    = "offline"
+	ociRegistryBaseEnv                  = "KITE_HELM_OCI_REGISTRY_BASE"
+	ociRepositoryNameEnv                = "KITE_HELM_OCI_REPOSITORY_NAME"
+	ociRegistryPlainHTTPEnv             = "KITE_HELM_OCI_REGISTRY_PLAIN_HTTP"
+	ociRegistryInsecureTLSEnv           = "KITE_HELM_OCI_REGISTRY_INSECURE_SKIP_TLS_VERIFY"
+	ociRegistryUsernameEnv              = "KITE_HELM_OCI_REGISTRY_USERNAME"
+	ociRegistryPasswordEnv              = "KITE_HELM_OCI_REGISTRY_PASSWORD"
+	ociRegistryCAFileEnv                = "KITE_HELM_OCI_REGISTRY_CA_FILE"
+	ociDiscoveryPageSizeEnv             = "KITE_HELM_OCI_DISCOVERY_PAGE_SIZE"
+	ociDiscoveryMaxRepositoriesEnv      = "KITE_HELM_OCI_DISCOVERY_MAX_REPOSITORIES"
+	ociDiscoveryMaxTagsPerRepositoryEnv = "KITE_HELM_OCI_DISCOVERY_MAX_TAGS_PER_REPOSITORY"
+
+	defaultOCIRepositoryName                = "offline"
+	defaultOCIDiscoveryPageSize             = 100
+	defaultOCIDiscoveryMaxRepositories      = 1000
+	defaultOCIDiscoveryMaxTagsPerRepository = 200
+	ociDiscoveryCacheTTL                    = 5 * time.Minute
+
+	helmOCIConfigMediaType = "application/vnd.cncf.helm.config.v1+json"
+	helmOCIChartLayerType  = "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
 )
 
 type OCIChartCatalog struct {
 	Repositories []OCIChartRepository `json:"repositories,omitempty"`
-	Charts       []OCIChart           `json:"charts,omitempty"`
 }
 
 type OCIChartRepository struct {
@@ -83,67 +95,127 @@ type OCIRegistryOptions struct {
 	Password              string `json:"-"`
 }
 
+type OCIRegistryDiscoveryConfig struct {
+	Enabled              bool
+	BaseURL              string
+	RepositoryName       string
+	RepositoryPrefix     string
+	RegistryHost         string
+	RegistryOptions      OCIRegistryOptions
+	PageSize             int
+	MaxRepositories      int
+	MaxTagsPerRepository int
+}
+
+type cachedOCIDiscovery struct {
+	key       string
+	refs      []OCIChartVersionRef
+	expiresAt time.Time
+	loaded    bool
+}
+
+type registryCatalogResponse struct {
+	Repositories []string `json:"repositories"`
+}
+
+type registryTagsResponse struct {
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
+
+type ociManifest struct {
+	Config struct {
+		MediaType string `json:"mediaType"`
+	} `json:"config"`
+	Layers []struct {
+		MediaType string `json:"mediaType"`
+	} `json:"layers"`
+}
+
+type ociDiscoveryClient struct {
+	config OCIRegistryDiscoveryConfig
+	client *http.Client
+}
+
+var (
+	ociDiscoveryCacheMu sync.Mutex
+	ociDiscoveryCache   cachedOCIDiscovery
+)
+
 func LoadOCIChartCatalog() (OCIChartCatalog, error) {
-	registryOptions, err := loadOCIRegistryOptions()
+	refs, err := ListOCIChartVersions()
 	if err != nil {
 		return OCIChartCatalog{}, err
 	}
-
-	data := strings.TrimSpace(os.Getenv(ociCatalogEnv))
-	if file := strings.TrimSpace(os.Getenv(ociCatalogFileEnv)); file != "" {
-		content, err := os.ReadFile(file)
-		if err != nil {
-			return OCIChartCatalog{}, err
-		}
-		data = strings.TrimSpace(string(content))
+	if len(refs) == 0 {
+		return OCIChartCatalog{}, nil
 	}
 
-	var catalog OCIChartCatalog
-	if data != "" {
-		if err := yaml.Unmarshal([]byte(data), &catalog); err != nil {
-			return OCIChartCatalog{}, err
+	repository := OCIChartRepository{
+		Name:     refs[0].RepositoryName,
+		URL:      refs[0].RepositoryURL,
+		Registry: refs[0].Registry,
+	}
+	chartIndexes := map[string]int{}
+	for _, ref := range refs {
+		index, ok := chartIndexes[ref.Chart.Name]
+		if !ok {
+			repository.Charts = append(repository.Charts, ref.Chart)
+			index = len(repository.Charts) - 1
+			chartIndexes[ref.Chart.Name] = index
 		}
+		repository.Charts[index].Versions = append(repository.Charts[index].Versions, ref.Version)
 	}
-	if len(catalog.Charts) > 0 {
-		baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv(ociCatalogBaseURLEnv)), "/")
-		if baseURL == "" {
-			return OCIChartCatalog{}, fmt.Errorf("%s is required when top-level OCI charts are configured", ociCatalogBaseURLEnv)
-		}
-		repositoryName := strings.TrimSpace(os.Getenv(ociCatalogRepositoryNameEnv))
-		if repositoryName == "" {
-			repositoryName = defaultOCIRepositoryName
-		}
-		catalog.Repositories = append(catalog.Repositories, OCIChartRepository{
-			Name:   repositoryName,
-			URL:    baseURL,
-			Charts: catalog.Charts,
-		})
-		catalog.Charts = nil
-	}
-
-	if err := normalizeOCIChartCatalog(&catalog); err != nil {
-		return OCIChartCatalog{}, err
-	}
-	for i := range catalog.Repositories {
-		catalog.Repositories[i].Registry = registryOptions
-	}
-	return catalog, nil
+	return OCIChartCatalog{Repositories: []OCIChartRepository{repository}}, nil
 }
 
 func ListOCIChartVersions() ([]OCIChartVersionRef, error) {
-	catalog, err := LoadOCIChartCatalog()
+	config, err := loadOCIRegistryDiscoveryConfig()
 	if err != nil {
 		return nil, err
 	}
-	refs := []OCIChartVersionRef{}
-	for _, repository := range catalog.Repositories {
-		for _, chart := range repository.Charts {
-			for _, version := range ociChartVersions(chart) {
-				refs = append(refs, newOCIChartVersionRef(repository, chart, version))
-			}
-		}
+	if !config.Enabled {
+		return nil, nil
 	}
+
+	cacheKey := ociDiscoveryCacheKey(config)
+	now := time.Now()
+	ociDiscoveryCacheMu.Lock()
+	if ociDiscoveryCache.loaded && ociDiscoveryCache.key == cacheKey && now.Before(ociDiscoveryCache.expiresAt) {
+		refs := cloneOCIChartVersionRefs(ociDiscoveryCache.refs)
+		ociDiscoveryCacheMu.Unlock()
+		return refs, nil
+	}
+	ociDiscoveryCacheMu.Unlock()
+
+	refs, err := discoverOCIChartVersions(config)
+	if err != nil {
+		ociDiscoveryCacheMu.Lock()
+		if ociDiscoveryCache.loaded && ociDiscoveryCache.key == cacheKey {
+			refs := cloneOCIChartVersionRefs(ociDiscoveryCache.refs)
+			ociDiscoveryCacheMu.Unlock()
+			return refs, nil
+		}
+		ociDiscoveryCacheMu.Unlock()
+		return nil, err
+	}
+
+	ociDiscoveryCacheMu.Lock()
+	ociDiscoveryCache = cachedOCIDiscovery{
+		key:       cacheKey,
+		refs:      cloneOCIChartVersionRefs(refs),
+		expiresAt: now.Add(ociDiscoveryCacheTTL),
+		loaded:    true,
+	}
+	ociDiscoveryCacheMu.Unlock()
+
 	return refs, nil
+}
+
+func ClearOCIChartDiscoveryCache() {
+	ociDiscoveryCacheMu.Lock()
+	ociDiscoveryCache = cachedOCIDiscovery{}
+	ociDiscoveryCacheMu.Unlock()
 }
 
 func LatestOCIChartVersion(repositoryName, chartName string) (OCIChartVersionRef, error) {
@@ -202,28 +274,21 @@ func OCIChartUpdatedAt(value string) *time.Time {
 }
 
 func OCIRegistryOptionsForChartURL(chartURL string) (OCIRegistryOptions, bool, error) {
-	catalog, err := LoadOCIChartCatalog()
+	config, err := loadOCIRegistryDiscoveryConfig()
 	if err != nil {
 		return OCIRegistryOptions{}, false, err
+	}
+	if !config.Enabled {
+		return OCIRegistryOptions{}, false, nil
 	}
 	chartURL = strings.TrimRight(strings.TrimSpace(chartURL), "/")
 	if chartURL == "" {
 		return OCIRegistryOptions{}, false, nil
 	}
 	chartURLWithoutReference := ociURLWithoutReference(chartURL)
-	for _, repository := range catalog.Repositories {
-		for _, chart := range repository.Charts {
-			for _, version := range ociChartVersions(chart) {
-				ref := newOCIChartVersionRef(repository, chart, version)
-				if ref.ChartURL == chartURL || ociURLWithoutReference(ref.ChartURL) == chartURLWithoutReference {
-					return ref.Registry, true, nil
-				}
-			}
-		}
-		repositoryURL := strings.TrimRight(repository.URL, "/")
-		if chartURLWithoutReference == repositoryURL || strings.HasPrefix(chartURLWithoutReference, repositoryURL+"/") {
-			return repository.Registry, true, nil
-		}
+	baseURL := strings.TrimRight(config.BaseURL, "/")
+	if chartURLWithoutReference == baseURL || strings.HasPrefix(chartURLWithoutReference, baseURL+"/") {
+		return config.RegistryOptions, true, nil
 	}
 	return OCIRegistryOptions{}, false, nil
 }
@@ -250,78 +315,60 @@ func matchingOCIChartVersions(repositoryName, chartName string) ([]OCIChartVersi
 	return matches, nil
 }
 
-func normalizeOCIChartCatalog(catalog *OCIChartCatalog) error {
-	for i := range catalog.Repositories {
-		repository := &catalog.Repositories[i]
-		repository.Name = strings.TrimSpace(repository.Name)
-		if repository.Name == "" {
-			return fmt.Errorf("OCI repository name is required")
-		}
-		repository.URL = strings.TrimRight(strings.TrimSpace(repository.URL), "/")
-		if err := validateOCIChartURL(repository.URL); err != nil {
-			return fmt.Errorf("invalid OCI repository %s: %w", repository.Name, err)
-		}
-		for j := range repository.Charts {
-			chart := &repository.Charts[j]
-			chart.Name = strings.TrimSpace(chart.Name)
-			if chart.Name == "" {
-				return fmt.Errorf("OCI chart name is required")
-			}
-			chart.Version = strings.TrimSpace(chart.Version)
-			chart.ChartURL = strings.TrimRight(strings.TrimSpace(chart.ChartURL), "/")
-			if chart.ChartURL == "" {
-				chart.ChartURL = repository.URL + "/" + chart.Name
-			}
-			if err := validateOCIChartURL(chart.ChartURL); err != nil {
-				return fmt.Errorf("invalid OCI chart %s/%s: %w", repository.Name, chart.Name, err)
-			}
-			for k := range chart.Versions {
-				version := &chart.Versions[k]
-				version.Version = strings.TrimSpace(version.Version)
-				if version.Version == "" {
-					return fmt.Errorf("OCI chart %s/%s version is required", repository.Name, chart.Name)
-				}
-				version.ChartURL = strings.TrimRight(strings.TrimSpace(version.ChartURL), "/")
-				if version.ChartURL != "" {
-					if err := validateOCIChartURL(version.ChartURL); err != nil {
-						return fmt.Errorf("invalid OCI chart %s/%s version %s: %w", repository.Name, chart.Name, version.Version, err)
-					}
-					if err := validateOCIChartVersionURL(version.ChartURL, version.Version); err != nil {
-						return fmt.Errorf("invalid OCI chart %s/%s version %s: %w", repository.Name, chart.Name, version.Version, err)
-					}
-				}
-			}
-			if ociURLHasReference(chart.ChartURL) {
-				versions := ociChartVersions(*chart)
-				if len(versions) != 1 {
-					return fmt.Errorf("OCI chart %s/%s chartUrl with tag or digest requires exactly one version", repository.Name, chart.Name)
-				}
-				if err := validateOCIChartVersionURL(chart.ChartURL, versions[0].Version); err != nil {
-					return fmt.Errorf("invalid OCI chart %s/%s: %w", repository.Name, chart.Name, err)
-				}
-			}
-		}
+func discoverOCIChartVersions(config OCIRegistryDiscoveryConfig) ([]OCIChartVersionRef, error) {
+	client, err := newOCIDiscoveryClient(config)
+	if err != nil {
+		return nil, err
 	}
-	return nil
-}
+	repositories, err := client.listRepositories()
+	if err != nil {
+		return nil, err
+	}
 
-func ociChartVersions(chart OCIChart) []OCIChartVersion {
-	if len(chart.Versions) > 0 {
-		return chart.Versions
+	repository := OCIChartRepository{
+		Name:     config.RepositoryName,
+		URL:      config.BaseURL,
+		Registry: config.RegistryOptions,
 	}
-	if strings.TrimSpace(chart.Version) == "" {
-		return nil
+	refs := []OCIChartVersionRef{}
+	for _, repositoryPath := range repositories {
+		chartName, ok := chartNameFromRepositoryPath(config.RepositoryPrefix, repositoryPath)
+		if !ok {
+			continue
+		}
+		tags, err := client.listTags(repositoryPath)
+		if err != nil {
+			return nil, err
+		}
+		chartURL := "oci://" + config.RegistryHost + "/" + strings.Trim(repositoryPath, "/")
+		chart := OCIChart{
+			Name:     chartName,
+			ChartURL: chartURL,
+		}
+		for _, tag := range tags {
+			isHelmChart, err := client.isHelmChartTag(repositoryPath, tag)
+			if err != nil {
+				return nil, err
+			}
+			if !isHelmChart {
+				continue
+			}
+			version := OCIChartVersion{
+				Version: chartVersionFromOCITag(tag),
+			}
+			refs = append(refs, newOCIChartVersionRef(repository, chart, version))
+		}
 	}
-	return []OCIChartVersion{{
-		Version:     chart.Version,
-		AppVersion:  chart.AppVersion,
-		KubeVersion: chart.KubeVersion,
-		Description: chart.Description,
-		Icon:        chart.Icon,
-		Home:        chart.Home,
-		ChartURL:    chart.ChartURL,
-		UpdatedAt:   chart.UpdatedAt,
-	}}
+	sort.SliceStable(refs, func(i, j int) bool {
+		if refs[i].RepositoryName != refs[j].RepositoryName {
+			return refs[i].RepositoryName < refs[j].RepositoryName
+		}
+		if refs[i].Chart.Name != refs[j].Chart.Name {
+			return refs[i].Chart.Name < refs[j].Chart.Name
+		}
+		return CompareChartVersions(refs[i].Version.Version, refs[j].Version.Version) > 0
+	})
+	return refs, nil
 }
 
 func newOCIChartVersionRef(repository OCIChartRepository, chart OCIChart, version OCIChartVersion) OCIChartVersionRef {
@@ -337,6 +384,58 @@ func newOCIChartVersionRef(repository OCIChartRepository, chart OCIChart, versio
 		Version:        version,
 		ChartURL:       OCIChartVersionURL(chartURL, version.Version),
 	}
+}
+
+func loadOCIRegistryDiscoveryConfig() (OCIRegistryDiscoveryConfig, error) {
+	registryOptions, err := loadOCIRegistryOptions()
+	if err != nil {
+		return OCIRegistryDiscoveryConfig{}, err
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv(ociRegistryBaseEnv)), "/")
+	if baseURL == "" {
+		return OCIRegistryDiscoveryConfig{RegistryOptions: registryOptions}, nil
+	}
+	if err := validateOCIChartURL(baseURL); err != nil {
+		return OCIRegistryDiscoveryConfig{}, fmt.Errorf("invalid %s: %w", ociRegistryBaseEnv, err)
+	}
+	if ociURLHasReference(baseURL) {
+		return OCIRegistryDiscoveryConfig{}, fmt.Errorf("%s must not include a tag or digest", ociRegistryBaseEnv)
+	}
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return OCIRegistryDiscoveryConfig{}, err
+	}
+	repositoryPrefix := strings.Trim(parsed.Path, "/")
+	if repositoryPrefix == "" {
+		return OCIRegistryDiscoveryConfig{}, fmt.Errorf("%s must include a repository prefix", ociRegistryBaseEnv)
+	}
+	repositoryName := strings.TrimSpace(os.Getenv(ociRepositoryNameEnv))
+	if repositoryName == "" {
+		repositoryName = defaultOCIRepositoryName
+	}
+	pageSize, err := parsePositiveIntEnv(ociDiscoveryPageSizeEnv, defaultOCIDiscoveryPageSize)
+	if err != nil {
+		return OCIRegistryDiscoveryConfig{}, err
+	}
+	maxRepositories, err := parsePositiveIntEnv(ociDiscoveryMaxRepositoriesEnv, defaultOCIDiscoveryMaxRepositories)
+	if err != nil {
+		return OCIRegistryDiscoveryConfig{}, err
+	}
+	maxTagsPerRepository, err := parsePositiveIntEnv(ociDiscoveryMaxTagsPerRepositoryEnv, defaultOCIDiscoveryMaxTagsPerRepository)
+	if err != nil {
+		return OCIRegistryDiscoveryConfig{}, err
+	}
+	return OCIRegistryDiscoveryConfig{
+		Enabled:              true,
+		BaseURL:              baseURL,
+		RepositoryName:       repositoryName,
+		RepositoryPrefix:     repositoryPrefix,
+		RegistryHost:         parsed.Host,
+		RegistryOptions:      registryOptions,
+		PageSize:             pageSize,
+		MaxRepositories:      maxRepositories,
+		MaxTagsPerRepository: maxTagsPerRepository,
+	}, nil
 }
 
 func loadOCIRegistryOptions() (OCIRegistryOptions, error) {
@@ -367,6 +466,197 @@ func parseOptionalBoolEnv(name string) (bool, error) {
 		return false, fmt.Errorf("invalid %s: %w", name, err)
 	}
 	return parsed, nil
+}
+
+func parsePositiveIntEnv(name string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid %s: must be a positive integer", name)
+	}
+	return parsed, nil
+}
+
+func newOCIDiscoveryClient(config OCIRegistryDiscoveryConfig) (*ociDiscoveryClient, error) {
+	httpClient := http.DefaultClient
+	if !config.RegistryOptions.PlainHTTP && (config.RegistryOptions.InsecureSkipTLSVerify || strings.TrimSpace(config.RegistryOptions.CAFile) != "") {
+		tlsConfig, err := newOCITLSConfig(config.RegistryOptions)
+		if err != nil {
+			return nil, err
+		}
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+				Proxy:           http.ProxyFromEnvironment,
+			},
+		}
+	}
+	return &ociDiscoveryClient{
+		config: config,
+		client: httpClient,
+	}, nil
+}
+
+func (c *ociDiscoveryClient) listRepositories() ([]string, error) {
+	repositories := []string{}
+	last := ""
+	scannedRepositories := 0
+	for scannedRepositories < c.config.MaxRepositories {
+		var response registryCatalogResponse
+		query := url.Values{}
+		query.Set("n", strconv.Itoa(c.config.PageSize))
+		if last != "" {
+			query.Set("last", last)
+		}
+		if err := c.getJSON([]string{"_catalog"}, query, &response); err != nil {
+			return nil, err
+		}
+		if len(response.Repositories) == 0 {
+			break
+		}
+		for _, repository := range response.Repositories {
+			scannedRepositories++
+			repository = strings.Trim(repository, "/")
+			if _, ok := chartNameFromRepositoryPath(c.config.RepositoryPrefix, repository); !ok {
+				if scannedRepositories >= c.config.MaxRepositories {
+					break
+				}
+				continue
+			}
+			repositories = append(repositories, repository)
+			if scannedRepositories >= c.config.MaxRepositories {
+				break
+			}
+		}
+		nextLast := response.Repositories[len(response.Repositories)-1]
+		if len(response.Repositories) < c.config.PageSize || nextLast == last {
+			break
+		}
+		last = nextLast
+	}
+	return repositories, nil
+}
+
+func (c *ociDiscoveryClient) listTags(repositoryPath string) ([]string, error) {
+	tags := []string{}
+	last := ""
+	for len(tags) < c.config.MaxTagsPerRepository {
+		var response registryTagsResponse
+		query := url.Values{}
+		query.Set("n", strconv.Itoa(c.config.PageSize))
+		if last != "" {
+			query.Set("last", last)
+		}
+		if err := c.getJSON([]string{repositoryPath, "tags", "list"}, query, &response); err != nil {
+			return nil, err
+		}
+		if len(response.Tags) == 0 {
+			break
+		}
+		for _, tag := range response.Tags {
+			tag = strings.TrimSpace(tag)
+			if tag == "" {
+				continue
+			}
+			tags = append(tags, tag)
+			if len(tags) >= c.config.MaxTagsPerRepository {
+				break
+			}
+		}
+		nextLast := response.Tags[len(response.Tags)-1]
+		if len(response.Tags) < c.config.PageSize || nextLast == last {
+			break
+		}
+		last = nextLast
+	}
+	return tags, nil
+}
+
+func (c *ociDiscoveryClient) isHelmChartTag(repositoryPath, tag string) (bool, error) {
+	var manifest ociManifest
+	statusCode, err := c.getJSONWithStatus([]string{repositoryPath, "manifests", tag}, nil, &manifest, strings.Join([]string{
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v2+json",
+	}, ", "))
+	if statusCode == http.StatusNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if manifest.Config.MediaType == helmOCIConfigMediaType {
+		return true, nil
+	}
+	for _, layer := range manifest.Layers {
+		if layer.MediaType == helmOCIChartLayerType {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *ociDiscoveryClient) getJSON(parts []string, query url.Values, target any) error {
+	_, err := c.getJSONWithStatus(parts, query, target, "application/json")
+	return err
+}
+
+func (c *ociDiscoveryClient) getJSONWithStatus(parts []string, query url.Values, target any, accept string) (int, error) {
+	req, err := http.NewRequest(http.MethodGet, c.registryAPIURL(parts, query), nil)
+	if err != nil {
+		return 0, err
+	}
+	if c.config.RegistryOptions.Username != "" {
+		req.SetBasicAuth(c.config.RegistryOptions.Username, c.config.RegistryOptions.Password)
+	}
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return resp.StatusCode, fmt.Errorf("OCI registry request failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return resp.StatusCode, err
+	}
+	return resp.StatusCode, nil
+}
+
+func (c *ociDiscoveryClient) registryAPIURL(parts []string, query url.Values) string {
+	scheme := "https"
+	if c.config.RegistryOptions.PlainHTTP {
+		scheme = "http"
+	}
+	u := url.URL{
+		Scheme: scheme,
+		Host:   c.config.RegistryHost,
+		Path:   path.Join(append([]string{"/v2"}, parts...)...),
+	}
+	if query != nil {
+		u.RawQuery = query.Encode()
+	}
+	return u.String()
+}
+
+func chartNameFromRepositoryPath(repositoryPrefix, repositoryPath string) (string, bool) {
+	repositoryPrefix = strings.Trim(repositoryPrefix, "/")
+	repositoryPath = strings.Trim(repositoryPath, "/")
+	if repositoryPrefix == "" || !strings.HasPrefix(repositoryPath, repositoryPrefix+"/") {
+		return "", false
+	}
+	chartName := strings.TrimPrefix(repositoryPath, repositoryPrefix+"/")
+	if chartName == "" || strings.Contains(chartName, "/") {
+		return "", false
+	}
+	return chartName, true
 }
 
 func validateOCIChartURL(rawURL string) error {
@@ -455,4 +745,29 @@ func ociURLWithoutReference(rawURL string) string {
 
 func ociTagFromChartVersion(version string) string {
 	return strings.ReplaceAll(version, "+", "_")
+}
+
+func chartVersionFromOCITag(tag string) string {
+	return strings.ReplaceAll(tag, "_", "+")
+}
+
+func cloneOCIChartVersionRefs(refs []OCIChartVersionRef) []OCIChartVersionRef {
+	return append([]OCIChartVersionRef(nil), refs...)
+}
+
+func ociDiscoveryCacheKey(config OCIRegistryDiscoveryConfig) string {
+	return strings.Join([]string{
+		config.BaseURL,
+		config.RepositoryName,
+		config.RepositoryPrefix,
+		config.RegistryHost,
+		strconv.FormatBool(config.RegistryOptions.PlainHTTP),
+		strconv.FormatBool(config.RegistryOptions.InsecureSkipTLSVerify),
+		config.RegistryOptions.CAFile,
+		config.RegistryOptions.Username,
+		config.RegistryOptions.Password,
+		strconv.Itoa(config.PageSize),
+		strconv.Itoa(config.MaxRepositories),
+		strconv.Itoa(config.MaxTagsPerRepository),
+	}, "\x00")
 }

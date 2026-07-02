@@ -66,59 +66,119 @@ When `db.autoCreate` is enabled, the configured database user must have permissi
 
 ## Helm Chart Catalog
 
-| Parameter                                | Description                                                                  | Default   |
-| ---------------------------------------- | ---------------------------------------------------------------------------- | --------- |
-| `helmCatalog.artifactHub.enabled`        | Enable Artifact Hub chart search/detail proxy APIs                           | `true`    |
-| `helmCatalog.oci.catalog`                | Inline YAML/JSON OCI chart catalog                                           | `""`      |
-| `helmCatalog.oci.catalogFile`            | Mounted catalog file path. Takes precedence over `helmCatalog.oci.catalog`   | `""`      |
-| `helmCatalog.oci.base`                   | Base `oci://` registry repository used by top-level catalog `charts` entries | `""`      |
-| `helmCatalog.oci.repositoryName`         | Repository name shown in Kite for top-level catalog `charts` entries         | `offline` |
-| `helmCatalog.oci.plainHTTP`              | Use plain HTTP for OCI registry manifest pulls                               | `false`   |
-| `helmCatalog.oci.insecureSkipTLSVerify`  | Skip TLS verification for private registry and token endpoints               | `false`   |
-| `helmCatalog.oci.caFile`                 | CA bundle path mounted inside the Kite container for private registry TLS    | `""`      |
-| `helmCatalog.oci.username`               | Username used by Kite when pulling OCI chart packages                        | `""`      |
-| `helmCatalog.oci.password`               | Password stored in the Kite Secret and used when pulling OCI chart packages  | `""`      |
+| Parameter                                      | Description                                                             | Default   |
+| ---------------------------------------------- | ----------------------------------------------------------------------- | --------- |
+| `helmCatalog.artifactHub.enabled`              | Enable Artifact Hub chart search/detail proxy APIs                      | `true`    |
+| `helmCatalog.oci.base`                         | `oci://` registry repository prefix scanned for offline Helm OCI charts | `""`      |
+| `helmCatalog.oci.repositoryName`               | Repository name shown in Kite for discovered OCI charts                 | `offline` |
+| `helmCatalog.oci.discoveryPageSize`            | Registry API page size used when listing repositories and tags          | `100`     |
+| `helmCatalog.oci.discoveryMaxRepositories`     | Maximum registry repositories checked while searching the configured prefix | `1000` |
+| `helmCatalog.oci.discoveryMaxTagsPerRepository` | Maximum tags scanned per repository                                    | `200`     |
+| `helmCatalog.oci.uploadMaxBytes`               | Maximum Helm chart package size accepted by the admin upload API        | `512MiB`  |
+| `helmCatalog.oci.plainHTTP`                    | Use plain HTTP for OCI registry API and chart pulls                     | `false`   |
+| `helmCatalog.oci.insecureSkipTLSVerify`        | Skip TLS verification for private registry and token endpoints          | `false`   |
+| `helmCatalog.oci.caFile`                       | CA bundle path mounted inside the Kite container for private registry TLS | `""`    |
+| `helmCatalog.oci.username`                     | Username used by Kite when listing and pulling OCI chart packages       | `""`      |
+| `helmCatalog.oci.password`                     | Password stored in the Kite Secret and used for OCI registry access; prefer `passwordSecretName` for production installs | `""` |
+| `helmCatalog.oci.passwordSecretName`           | Existing Secret containing the OCI registry password                    | `""`      |
+| `helmCatalog.oci.passwordSecretKey`            | Key inside `passwordSecretName` used as `KITE_HELM_OCI_REGISTRY_PASSWORD` | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
+| `helmCatalog.imageUploads.registry`            | Registry host for uploaded container image archives; empty reuses `helmCatalog.offlineImages.registry` when set | `""` |
+| `helmCatalog.imageUploads.repositoryPrefix`    | Repository prefix prepended to uploaded container image archives        | `kite-images` |
+| `helmCatalog.imageUploads.maxBytes`            | Maximum container image archive or offline application bundle size accepted by the admin upload/import APIs | `4GiB` |
+| `helmCatalog.imageUploads.plainHTTP`           | Use plain HTTP for container image archive uploads                      | `false`   |
+| `helmCatalog.imageUploads.insecureSkipTLSVerify` | Skip TLS verification for the container image upload registry and token endpoints | `false` |
+| `helmCatalog.imageUploads.caFile`              | CA bundle path mounted inside the Kite container for container image upload registry TLS | `""` |
+| `helmCatalog.imageUploads.username`            | Username used by Kite when pushing uploaded container image archives    | `""`      |
+| `helmCatalog.imageUploads.password`            | Password stored in the Kite Secret for container image archive uploads; prefer `passwordSecretName` for production installs | `""` |
+| `helmCatalog.imageUploads.passwordSecretName`  | Existing Secret containing the container image upload registry password | `""`      |
+| `helmCatalog.imageUploads.passwordSecretKey`   | Key inside `passwordSecretName` used as `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` | `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` |
+| `helmCatalog.offlineImages.enabled`            | Inject offline container image defaults for OCI catalog installs/upgrades | `false` |
+| `helmCatalog.offlineImages.registry`           | Registry host expected in rendered workload images from offline OCI charts | `""` |
+| `helmCatalog.offlineImages.enforce`            | Block OCI chart installs/upgrades when rendered workload images still point outside the offline registry | `true` |
 
 Offline deployments can disable Artifact Hub and expose a local OCI-backed
-chart catalog without a Helm `index.yaml`:
+chart catalog without a Helm `index.yaml`. Kite scans only the configured
+repository prefix:
 
 ```yaml
 helmCatalog:
   artifactHub:
     enabled: false
   oci:
-    base: oci://registry.internal/charts
+    base: oci://registry.internal/kite-helm
     repositoryName: offline
     plainHTTP: true
     insecureSkipTLSVerify: true
     username: admin
-    password: change-me
-    catalog: |
-      charts:
-        - name: demo-chart
-          versions:
-            - version: 0.1.0
-            - version: 0.2.0
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
+  offlineImages:
+    enabled: true
+    registry: registry.internal
+    enforce: true
 ```
 
-Kite resolves those entries as `oci://registry.internal/charts/demo-chart:0.2.0`
-for browsing, install, upgrade, and auto-upgrade. For larger catalogs, mount a
-file and set `helmCatalog.oci.catalogFile` instead of storing the catalog in an
-environment variable.
+If the registry contains `kite-helm/demo-chart` tags `0.1.0` and `0.2.0`, Kite
+resolves those entries as `oci://registry.internal/kite-helm/demo-chart:0.2.0`
+for browsing, install, upgrade, and auto-upgrade.
 
-Catalog URLs are returned by authenticated chart read APIs, so do not put
-credentials, tokens, query parameters, or fragments in `url` or `chartUrl`.
-Use `helmCatalog.oci.username` and `helmCatalog.oci.password` for private
-registries instead; the password is injected through the chart Secret and is not
-part of catalog API responses. For self-signed registries, either mount a CA
+The configured `base` must be an `oci://` URL with a repository prefix and must
+not include credentials, tokens, query parameters, fragments, tags, or digests.
+Use `helmCatalog.oci.username` plus `helmCatalog.oci.passwordSecretName` for
+private registries in production; `helmCatalog.oci.password` remains available
+for simple installs and is copied into the chart-managed Secret. Credentials are
+not part of catalog API responses. For self-signed registries, either mount a CA
 bundle and set `helmCatalog.oci.caFile`, or set
 `helmCatalog.oci.insecureSkipTLSVerify` in trusted offline environments. Some
 private registries expose chart manifests over HTTP but advertise an HTTPS token
 realm, so `plainHTTP` and `insecureSkipTLSVerify` may need to be enabled
-together. When `chartUrl` includes an explicit tag, the tag must match the chart
-version using Helm OCI encoding (`+` in SemVer build metadata becomes `_` in
-the registry tag). Digest-only `chartUrl` references are rejected in this
-catalog mode because Kite uses the declared version for update detection.
+together. Helm OCI tag encoding is preserved (`+` in SemVer build metadata
+becomes `_` in the registry tag).
+
+Kite's admin UI transfers offline apps as `.kiteapp.tar.gz` bundles. A bundle
+binds Helm chart archives to the rendered workload image archives required for
+offline install, can include multiple apps, and can be exported from one
+configured Kite cluster and imported into another. Import validates the bundle,
+pushes required images first, and pushes the chart last so the OCI catalog does
+not expose a chart whose images are missing. The UI starts imports as
+background jobs after the bundle upload is accepted; job status is in-memory and
+may be lost if the Kite pod restarts.
+
+Kite still keeps the lower-level backend flows separate. Helm chart packages
+(`.tgz`) are pushed through the chart upload API into the configured
+`helmCatalog.oci.base` prefix and then appear in the OCI chart catalog.
+Container image archives are pushed through a separate image upload API into
+`helmCatalog.imageUploads.registry` plus
+`helmCatalog.imageUploads.repositoryPrefix`; they do not become chart catalog
+entries. If `helmCatalog.imageUploads.registry` is empty, Kite falls back to
+`helmCatalog.offlineImages.registry` when that offline image registry is set.
+Use a separate Secret key for `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` when the
+chart and image registry credentials differ. Bundle uploads are bounded by the
+image upload size limit because they may contain container image archives.
+
+`helmCatalog.offlineImages` is separate from OCI chart discovery. Keep Helm OCI
+chart artifacts under the configured chart prefix such as
+`oci://registry.internal/kite-helm/nginx:25.0.12`, and mirror container images
+into the same registry host using their normal repository paths such as
+`registry.internal/bitnami/nginx:latest`. For OCI catalog charts, Kite injects
+`global.imageRegistry=<registry>` and
+`global.security.allowInsecureImages=true` when those values are absent, renders
+the release, and blocks the write if rendered workload images still reference an
+external registry. Kite records the chart source on installed releases, so
+current-chart upgrades of releases installed from the OCI catalog keep the same
+offline image policy even when the client omits `source`. Kite does not copy
+container images during install; prepare them with offline bundle import,
+`scripts/mirror-helm-chart-images.sh`, or an equivalent registry sync process.
 
 ## Sealos App Configuration
 
@@ -181,6 +241,7 @@ rbac:
 | Parameter             | Description                | Default           |
 | --------------------- | -------------------------- | ----------------- |
 | `ingress.enabled`     | Whether to enable Ingress  | `true`            |
+| `ingress.proxyBodySize` | NGINX body size limit for repository uploads; keep at least as large as the largest upload limit | `4g` |
 
 Ingress behavior is fixed in templates:
 - host: `kite.<cloudDomain>`
@@ -190,6 +251,7 @@ Ingress behavior is fixed in templates:
 - annotations:
   - `nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'`
   - `nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'`
+  - `nginx.ingress.kubernetes.io/proxy-body-size: <ingress.proxyBodySize>`
 
 ### Ingress Example
 

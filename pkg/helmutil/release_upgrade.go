@@ -12,6 +12,7 @@ import (
 
 type UpgradeReleaseOptions struct {
 	Namespace            string
+	ChartProvenance      ChartProvenance
 	Timeout              time.Duration
 	ReuseValues          bool
 	ResetThenReuseValues bool
@@ -23,6 +24,7 @@ type UpgradeReleaseOptions struct {
 }
 
 func UpgradeRelease(ctx context.Context, cfg *action.Configuration, name string, chartToUpgrade *chart.Chart, values map[string]interface{}, opts UpgradeReleaseOptions) (*release.Release, error) {
+	AnnotateChartSource(chartToUpgrade, opts.ChartProvenance)
 	upgrade := action.NewUpgrade(cfg)
 	upgrade.Namespace = opts.Namespace
 	upgrade.Timeout = opts.Timeout

@@ -61,7 +61,8 @@ type HelmReleaseDryRunResource struct {
 }
 
 type HelmReleaseDryRunResponse struct {
-	Resources []HelmReleaseDryRunResource `json:"resources"`
+	Resources  []HelmReleaseDryRunResource `json:"resources"`
+	ImageCheck ImageCheckResult            `json:"imageCheck,omitempty"`
 }
 
 type HelmReleaseHistoryItem struct {

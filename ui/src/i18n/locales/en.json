@@ -1629,11 +1629,17 @@
     "actions": {
       "addRepository": "Add Repository",
       "deleteRepository": "Delete Repository",
-      "install": "Install"
+      "copyReference": "Copy reference",
+      "install": "Install",
+      "upload": "Upload",
+      "transferOfflineBundle": "Offline app bundle",
+      "importOfflineBundle": "Import offline app bundle",
+      "exportOfflineBundle": "Export offline app bundle"
     },
     "fields": {
       "repository": "Repository",
       "deprecated": "Deprecated",
+      "offlineBundle": "Offline app bundle",
       "sources": "Sources",
       "keywords": "Keywords",
       "versions": "Versions",
@@ -1644,7 +1650,7 @@
     "filters": {
       "allRepositories": "All repositories",
       "artifactHub": "Artifact Hub",
-      "oci": "Offline OCI",
+      "oci": "Offline apps",
       "repositories": "Repositories",
       "verifiedPublisher": "Verified publisher"
     },
@@ -1661,6 +1667,20 @@
       "noChartUrl": "Chart package URL is missing.",
       "invalidValues": "Values must be a YAML object.",
       "artifactHubTrafficNotice": "Security notice: Kite contacts <artifactHub>Artifact Hub</artifactHub> when searching or viewing chart information from this source. Kite only displays third-party data and is not responsible for its content.",
+      "uploadDescription": "Upload an offline app bundle to the configured registry.",
+      "offlineBundleDescription": "An offline app bundle binds Helm charts to the container images required by their rendered manifests. Import one bundle for multiple apps, or export selected offline apps for another cluster.",
+      "offlineBundleTarget": "Chart target: {{chartTarget}}. Image target: {{imageTarget}}. Bundle limit: {{limit}}.",
+      "offlineBundleNotConfigured": "Helm OCI chart registry and offline image registry are not fully configured.",
+      "selectOfflineBundle": "Select an offline app bundle.",
+      "offlineBundleUploadStarted": "Offline app bundle upload started. You can continue using Kite while the import is prepared.",
+      "offlineBundleImportStarted": "Offline app bundle import started. Kite will push images and charts in the background.",
+      "offlineBundleImportCompleted": "Offline app bundle import completed",
+      "offlineBundleImportSuccess": "Imported {{count}} offline apps",
+      "offlineBundleImportPartial": "{{count}} offline apps failed to import",
+      "offlineBundleImportFailed": "Offline app bundle import failed: {{error}}",
+      "offlineBundleImportSummary": "Import result: {{success}} succeeded, {{failed}} failed.",
+      "offlineBundleExportRequiresSelection": "Select offline apps to export first.",
+      "offlineBundleExportSuccess": "Exported {{count}} offline apps",
       "installed": "Helm release installed"
     },
     "placeholders": {
@@ -1760,6 +1780,14 @@
       "loadingVersions": "Loading versions...",
       "loadingChartPackage": "Loading chart package...",
       "loadingValues": "Loading values...",
+      "offlineImagesReady": "Offline images",
+      "externalImages_one": "{{count}} external image",
+      "externalImages_other": "{{count}} external images",
+      "offlineImageRegistry": "Registry: {{registry}}",
+      "offlineImageRegistryEnabled": "Offline image registry enabled",
+      "renderedImages_one": "{{count}} rendered image",
+      "renderedImages_other": "{{count}} rendered images",
+      "imageRegistryInjected": "Offline image defaults injected",
       "autoUpgradeSaved": "Auto upgrade saved",
       "autoUpgradeDescription": "Upgrade when a newer chart version is available.",
       "autoUpgradeChartDescription": "Chart source for version checks.",

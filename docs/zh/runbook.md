@@ -150,24 +150,72 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 
 - Chart catalog 只读 API 面向认证用户开放在 `/api/v1/charts`。仓库创建/删除和 catalog 管理 API 仍在 `/api/v1/admin/charts`，只允许管理员使用；响应里不能暴露已存储的仓库凭据。
 - 离线环境可以通过 `KITE_HELM_ARTIFACT_HUB_ENABLED=false` 或 `helmCatalog.artifactHub.enabled=false` 关闭 Artifact Hub。关闭后，后端 Artifact Hub 代理接口和前端 fallback 都不会再使用线上 Artifact Hub。
-- Kite 可以通过 `KITE_HELM_OCI_CATALOG` 或 `KITE_HELM_OCI_CATALOG_FILE` 消费静态 OCI Chart catalog。这个 catalog 指向已经同步到离线 OCI registry 的 Chart；Kite 不会扫描 registry 来自动发现所有内容。
-- OCI catalog 的 `url` 和 `chartUrl` 不能包含凭据、查询参数或 fragment，因为 Chart 只读 API 会把这些 URL 返回给已认证用户。如果 `chartUrl` 显式带 tag，tag 必须按 Helm OCI 规则匹配声明版本（SemVer build metadata 里的 `+` 在 registry tag 中写成 `_`）；当前 catalog 更新检测不支持 digest-only 引用。
-- 最小 inline OCI catalog 示例：
+- Kite 通过 `helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE` 扫描受控 OCI registry 前缀来发现离线 Helm Chart；只会暴露该前缀下的内容，不做无边界的全 registry 展示。
+- registry 凭据和 TLS 配置只在服务端使用。Chart 只读 API 返回干净的 `oci://host/prefix/chart:version` URL，不包含凭据、查询参数或 fragment。Helm OCI tag 会把 SemVer build metadata 中的 `+` 编码为 `_`。
+- 离线 Chart artifact 和容器镜像可以共用同一个 registry host，但使用不同 repository 路径。Chart 放在专用前缀下，例如 `oci://registry.internal/kite-helm/<chart>:<version>`；容器镜像放在原始仓库路径下，例如 `registry.internal/bitnami/nginx:<tag>`。
+- 管理员 UI 以 `.kiteapp.tar.gz` 离线应用包作为传递单位，不再把 Chart 和镜像拆成两个上传入口。一个包包含 `kite-bundle.json`、一个或多个 Helm chart 归档，以及这些 Chart 按离线镜像 values 渲染后需要的容器镜像归档。导入时会先校验包内容，推送所有必需镜像，再最后推送 Chart，避免 catalog 中出现缺镜像的 Chart。UI 会在离线包上传被服务端接受后启动后台导入任务，在弹窗外轮询任务状态，让用户可以继续操作；任务状态保存在内存里，Kite Pod 重启后可能丢失。导出会把选中的 OCI catalog Chart 和渲染出的 workload 镜像打包，方便导入到另一个已配置好的 Kite 集群。
+- 底层后端上传能力仍保持分离，用于兼容和内部复用。Helm chart 包走 `POST /api/v1/admin/charts/oci/upload`，推送到 `helmCatalog.oci.base` 下；容器镜像归档走 `POST /api/v1/admin/images/upload`，推送到 `helmCatalog.imageUploads.registry` 加 `helmCatalog.imageUploads.repositoryPrefix` 下。离线应用包后台导入使用 `POST /api/v1/admin/charts/offline-bundles/import-jobs` 和 `GET /api/v1/admin/charts/offline-bundles/import-jobs/:id`，兼容保留同步导入接口 `POST /api/v1/admin/charts/offline-bundles/import`，导出接口是 `POST /api/v1/admin/charts/offline-bundles/export`。
+- 最小 OCI discovery 示例：
 
 ```yaml
 helmCatalog:
   artifactHub:
     enabled: false
   oci:
-    base: oci://registry.internal/charts
+    base: oci://registry.internal/kite-helm
     repositoryName: offline
-    catalog: |
-      charts:
-        - name: demo-chart
-          versions:
-            - version: 0.1.0
-            - version: 0.2.0
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
+  offlineImages:
+    enabled: true
+    registry: registry.internal
+    enforce: true
 ```
+
+如果 `helmCatalog.imageUploads.registry` 为空，Kite 会在已配置
+`helmCatalog.offlineImages.registry` 时复用它作为镜像上传 registry。Chart OCI
+registry 和镜像上传 registry 凭据不同时，请使用不同 Secret key。上传大小限制会
+渲染为 `KITE_HELM_OCI_UPLOAD_MAX_BYTES` 和 `KITE_IMAGE_UPLOAD_MAX_BYTES`；
+ingress 或网关 body-size limit 至少要高于服务端限制。离线应用包上传同样受镜像归档大小限制约束。
+
+- 如果不通过 Kite 的离线应用包导出准备 Chart，安装离线 OCI Chart 前需先同步它渲染出的 workload 容器镜像：
+
+```bash
+scripts/mirror-helm-chart-images.sh \
+  --chart oci://registry.internal/kite-helm/nginx \
+  --version 25.0.12 \
+  --registry registry.internal
+```
+
+先加 `--dry-run` 查看复制计划。脚本会渲染原始 Chart 和注入离线 registry 后
+的目标 Chart，按 Kubernetes 资源和容器身份映射 source image 到 target image，
+去重后用 `crane copy` 复制。目标渲染时也会注入
+`global.security.allowInsecureImages=true`，避免
+Bitnami 这类 Chart 因离线 registry 替换触发镜像校验失败。
+
+- 当 `helmCatalog.offlineImages.enabled=true` 时，Kite 会对 OCI catalog 的
+安装、升级、AI Helm 工具和定时自动升级应用同一套离线镜像默认值。仅在用户
+未显式设置时注入 `global.imageRegistry` 和
+`global.security.allowInsecureImages`，然后 dry-run release 并检查 Pod、
+Deployment、StatefulSet、DaemonSet、ReplicaSet、ReplicationController、
+Job、CronJob 中的容器镜像。若 `helmCatalog.offlineImages.enforce=true`，
+任何仍指向 `helmCatalog.offlineImages.registry` 之外的 workload 镜像都会在
+写入集群前阻止安装/升级。Kite 会在安装或显式切换 Chart 时把 Chart 来源写入
+Helm chart metadata，所以后续沿用当前 Chart 的升级仍会继续应用 OCI 离线镜像
+策略。
 
 - Helm Release API 使用规范资源路径 `helmreleases`。旧的 `helmrelease` 路由仅保留兼容。
 - Helm install、upgrade、rollback、uninstall 和 auto-upgrade 在写入前都会先渲染目标清单。新增资源需要 `create`，保留资源需要 `update`，被移除资源需要 `delete`。

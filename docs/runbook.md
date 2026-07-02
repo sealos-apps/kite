@@ -222,24 +222,78 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 
 - Chart catalog read APIs live under `/api/v1/charts` for authenticated users. Repository create/delete and catalog management APIs remain admin-only under `/api/v1/admin/charts`; stored repository credentials must not be exposed in responses.
 - Offline environments can disable Artifact Hub with `KITE_HELM_ARTIFACT_HUB_ENABLED=false` or `helmCatalog.artifactHub.enabled=false`. This disables the backend Artifact Hub proxy endpoints and the frontend fallback.
-- Kite can consume a static OCI chart catalog through `KITE_HELM_OCI_CATALOG` or `KITE_HELM_OCI_CATALOG_FILE`. This catalog points to charts already mirrored into an offline OCI registry; Kite does not discover registry contents by scanning the registry.
-- OCI catalog `url` and `chartUrl` values must not include credentials, query parameters, or fragments because chart read APIs return those URLs to authenticated users. If a `chartUrl` includes a tag, the tag must match the declared version using Helm OCI encoding (`+` becomes `_`); digest-only references are not supported for catalog update detection.
-- Minimal inline OCI catalog example:
+- Kite discovers offline Helm OCI charts by scanning only the configured registry repository prefix (`helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE`). It does not expose arbitrary registry contents outside that prefix.
+- Registry credentials and TLS options are server-side only. Chart read APIs return clean `oci://host/prefix/chart:version` URLs without credentials, query parameters, or fragments. Helm OCI tags encode SemVer build metadata by replacing `+` with `_`.
+- Offline chart artifacts and container images can share one registry host, but they use different repository paths. Keep charts under a dedicated prefix such as `oci://registry.internal/kite-helm/<chart>:<version>` and container images under their normal repositories such as `registry.internal/bitnami/nginx:<tag>`.
+- The admin UI transfers offline apps as `.kiteapp.tar.gz` bundles, not as separate chart and image uploads. A bundle contains `kite-bundle.json`, one or more Helm chart archives, and the container image archives required by those charts after offline image values are rendered. Import validates the bundle, pushes all required images first, and pushes the chart last so a chart is not exposed in the catalog without its images. The UI starts import as a background job after the bundle upload is accepted, polls job status outside the dialog, and lets users keep working while registry pushes continue. Import job status is in-memory and may be lost if the Kite pod restarts. Export packages selected OCI catalog charts with their rendered workload images so the result can be imported into another configured Kite cluster.
+- The lower-level backend upload primitives remain separate for compatibility and internal use. Helm chart packages use `POST /api/v1/admin/charts/oci/upload` and are pushed under `helmCatalog.oci.base`; container image archives use `POST /api/v1/admin/images/upload` and are pushed under `helmCatalog.imageUploads.registry` plus `helmCatalog.imageUploads.repositoryPrefix`. Bundle import/export is exposed under `POST /api/v1/admin/charts/offline-bundles/import-jobs` plus `GET /api/v1/admin/charts/offline-bundles/import-jobs/:id` for the background import flow, the legacy synchronous `POST /api/v1/admin/charts/offline-bundles/import` route for compatibility, and `POST /api/v1/admin/charts/offline-bundles/export` for export.
+- Minimal OCI discovery example:
 
 ```yaml
 helmCatalog:
   artifactHub:
     enabled: false
   oci:
-    base: oci://registry.internal/charts
+    base: oci://registry.internal/kite-helm
     repositoryName: offline
-    catalog: |
-      charts:
-        - name: demo-chart
-          versions:
-            - version: 0.1.0
-            - version: 0.2.0
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_HELM_OCI_REGISTRY_PASSWORD
+    uploadMaxBytes: 512MiB
+  imageUploads:
+    registry: registry.internal
+    repositoryPrefix: kite-images
+    maxBytes: 4GiB
+    plainHTTP: true
+    insecureSkipTLSVerify: true
+    username: admin
+    passwordSecretName: registry-credentials
+    passwordSecretKey: KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD
+  offlineImages:
+    enabled: true
+    registry: registry.internal
+    enforce: true
 ```
+
+If `helmCatalog.imageUploads.registry` is empty, Kite reuses
+`helmCatalog.offlineImages.registry` as the image upload registry when that
+offline image registry is configured. Use separate Secret keys when the chart
+OCI registry and image upload registry credentials differ. The upload limits are
+rendered as `KITE_HELM_OCI_UPLOAD_MAX_BYTES` and
+`KITE_IMAGE_UPLOAD_MAX_BYTES`; keep any ingress or gateway body-size limit at
+least as high as the server-side limit. The same image archive limit bounds
+offline bundle uploads.
+
+- If you are preparing charts without Kite bundle export, mirror their rendered
+workload images before installing an offline OCI chart:
+
+```bash
+scripts/mirror-helm-chart-images.sh \
+  --chart oci://registry.internal/kite-helm/nginx \
+  --version 25.0.12 \
+  --registry registry.internal
+```
+
+Use `--dry-run` first to inspect the copy plan. The script renders the chart
+twice, maps each original image to the image rendered with the offline registry
+by Kubernetes resource and container identity, deduplicates the copy plan, and
+uses `crane copy` for the actual transfer. It
+also injects `global.security.allowInsecureImages=true` for target rendering so
+Bitnami-style image verification does not block offline registry substitution.
+
+- When `helmCatalog.offlineImages.enabled=true`, Kite applies the same offline
+image defaults to OCI catalog installs, upgrades, AI Helm tools, and scheduled
+auto-upgrades. It injects `global.imageRegistry` and
+`global.security.allowInsecureImages` only when the user did not explicitly set
+them, then dry-runs the release and checks rendered Pod, Deployment,
+StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, and CronJob
+container images. If `helmCatalog.offlineImages.enforce=true`, any rendered
+image outside `helmCatalog.offlineImages.registry` blocks the write before
+cluster state changes. Kite persists the chart source in Helm chart metadata on
+install or explicit chart upgrades, so later current-chart upgrades continue to
+apply the OCI offline image policy.
 
 - Helm release APIs use the canonical `helmreleases` resource path. The legacy `helmrelease` route remains for compatibility.
 - Helm install, upgrade, rollback, uninstall, and auto-upgrade render target manifests before writing. Added resources require `create`, retained resources require `update`, and removed resources require `delete` on the rendered Kubernetes resource.

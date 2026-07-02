@@ -162,6 +162,79 @@ export interface HelmRepository {
   updatedAt: string
 }
 
+export interface RepositoryUploadTargetConfig {
+  configured: boolean
+  maxBytes: number
+}
+
+export interface OCIChartUploadConfig extends RepositoryUploadTargetConfig {
+  registryBase?: string
+  repositoryName?: string
+}
+
+export interface ContainerImageUploadConfig extends RepositoryUploadTargetConfig {
+  registry?: string
+  repositoryPrefix?: string
+}
+
+export interface RepositoryUploadConfig {
+  chart: OCIChartUploadConfig
+  image: ContainerImageUploadConfig
+}
+
+export interface OCIChartUploadResult {
+  repositoryName: string
+  chartName: string
+  version: string
+  chartUrl: string
+  pushedRef: string
+  digest?: string
+  size: number
+}
+
+export interface ContainerImageUploadResult {
+  imageRef: string
+  digest?: string
+  size: number
+}
+
+export interface OfflineBundleExportApplication {
+  repositoryName: string
+  chartName: string
+  version: string
+  values?: Record<string, unknown>
+}
+
+export interface OfflineBundleImportResult {
+  apps: OfflineBundleImportAppResult[]
+}
+
+export type OfflineBundleImportJobStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+
+export interface OfflineBundleImportJob {
+  id: string
+  status: OfflineBundleImportJobStatus
+  createdAt: string
+  updatedAt: string
+  completedAt?: string
+  result?: OfflineBundleImportResult
+  error?: string
+}
+
+export interface OfflineBundleImportAppResult {
+  name: string
+  version: string
+  chartUrl?: string
+  images?: ContainerImageUploadResult[]
+  chart?: OCIChartUploadResult
+  skipped?: boolean
+  error?: string
+}
+
 export type HelmChartSource = 'repository' | 'artifacthub' | 'oci'
 
 export interface HelmChart {
@@ -285,8 +358,17 @@ export interface HelmReleaseDryRunResource {
   namespace?: string
 }
 
+export interface HelmReleaseImageCheck {
+  enabled: boolean
+  registry?: string
+  allImages?: string[]
+  externalImages?: string[]
+  injectedValues?: boolean
+}
+
 export interface HelmReleaseDryRunResponse {
   resources: HelmReleaseDryRunResource[]
+  imageCheck?: HelmReleaseImageCheck
 }
 
 // Resource type definitions

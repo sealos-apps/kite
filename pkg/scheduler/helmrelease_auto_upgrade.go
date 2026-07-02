@@ -62,11 +62,11 @@ func (e *helmReleaseAutoUpgradeExecutor) Run(ctx context.Context, task model.Sch
 	if !rbac.CanAccess(*creator, string(common.HelmReleases), string(common.VerbUpdate), cs.Name, payload.Namespace) {
 		return fmt.Errorf("%s", rbac.NoAccess(creator.Key(), string(common.VerbUpdate), string(common.HelmReleases), payload.Namespace, cs.Name))
 	}
-	cfg, err := helmutil.NewActionConfig(cs.K8sClient.Configuration, helmutil.StorageNamespace(payload.Namespace))
+	currentCfg, err := helmutil.NewActionConfig(cs.K8sClient.Configuration, helmutil.StorageNamespace(payload.Namespace))
 	if err != nil {
 		return err
 	}
-	current, err := helmutil.GetRelease(cfg, releaseName)
+	current, err := helmutil.GetRelease(currentCfg, releaseName)
 	if err != nil {
 		return err
 	}
@@ -89,13 +89,22 @@ func (e *helmReleaseAutoUpgradeExecutor) Run(ctx context.Context, task model.Sch
 	}
 	opts := helmutil.UpgradeReleaseOptions{
 		Namespace:            payload.Namespace,
+		ChartProvenance:      helmutil.ChartProvenance{Source: payload.Source, RepositoryName: payload.RepositoryName, ChartName: payload.ChartName, Version: nextChart.Version, URL: nextChart.URL},
 		Timeout:              time.Duration(payload.TimeoutMinutes) * time.Minute,
 		ResetThenReuseValues: true,
 		Description:          "Auto upgrade requested from Kite",
 		RollbackOnFailure:    payload.RollbackOnFailure,
 	}
-	preview, err := helmutil.DryRunUpgradeRelease(ctx, cfg, releaseName, loadedChart, map[string]interface{}{}, opts)
+	values, imagePolicy, injectedValues := helmutil.PrepareReleaseValues(map[string]interface{}{}, payload.Source)
+	previewCfg, err := helmutil.NewActionConfig(cs.K8sClient.Configuration, helmutil.StorageNamespace(payload.Namespace))
 	if err != nil {
+		return err
+	}
+	preview, err := helmutil.DryRunUpgradeRelease(ctx, previewCfg, releaseName, loadedChart, values, opts)
+	if err != nil {
+		return err
+	}
+	if _, err := helmutil.CheckReleaseImages(preview, imagePolicy, injectedValues); err != nil {
 		return err
 	}
 	if err := helmguard.AuthorizeReleaseChange(ctx, *creator, cs, current, preview); err != nil {
@@ -120,7 +129,12 @@ func (e *helmReleaseAutoUpgradeExecutor) Run(ctx context.Context, task model.Sch
 		)
 	}()
 
-	next, err = helmutil.UpgradeRelease(ctx, cfg, releaseName, loadedChart, map[string]interface{}{}, opts)
+	runCfg, err := helmutil.NewActionConfig(cs.K8sClient.Configuration, helmutil.StorageNamespace(payload.Namespace))
+	if err != nil {
+		runErr = err
+		return err
+	}
+	next, err = helmutil.UpgradeRelease(ctx, runCfg, releaseName, loadedChart, values, opts)
 	if err != nil {
 		runErr = err
 		return err

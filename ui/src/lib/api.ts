@@ -9,6 +9,7 @@ import {
   AuditLogResponse,
   Cluster,
   clusterScopeResources,
+  ContainerImageUploadResult,
   FetchUserListResponse,
   GeneralSetting,
   GeneralSettingUpdateRequest,
@@ -27,9 +28,14 @@ import {
   HelmRepository,
   ImageTagInfo,
   OAuthProvider,
+  OCIChartUploadResult,
+  OfflineBundleExportApplication,
+  OfflineBundleImportJob,
+  OfflineBundleImportResult,
   OverviewData,
   PodMetrics,
   RelatedResources,
+  RepositoryUploadConfig,
   ResourceHistoryResponse,
   ResourcesTypeMap,
   ResourceTemplate,
@@ -350,6 +356,83 @@ export const deleteHelmRepository = (
   return apiClient.delete<{ message: string }>(
     `/admin/charts/repositories/${id}`
   )
+}
+
+export const fetchRepositoryUploadConfig =
+  (): Promise<RepositoryUploadConfig> => {
+    return apiClient.get<RepositoryUploadConfig>('/admin/charts/uploads/config')
+  }
+
+export const fetchOfflineBundleConfig = (): Promise<RepositoryUploadConfig> => {
+  return apiClient.get<RepositoryUploadConfig>(
+    '/admin/charts/offline-bundles/config'
+  )
+}
+
+export const uploadOCIHelmChart = (
+  file: File
+): Promise<OCIChartUploadResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post<OCIChartUploadResult>(
+    '/admin/charts/oci/upload',
+    formData
+  )
+}
+
+export const uploadContainerImageArchive = ({
+  file,
+  repository,
+  tag,
+}: {
+  file: File
+  repository: string
+  tag: string
+}): Promise<ContainerImageUploadResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('repository', repository)
+  formData.append('tag', tag)
+  return apiClient.post<ContainerImageUploadResult>(
+    '/admin/images/upload',
+    formData
+  )
+}
+
+export const importOfflineApplicationBundle = (
+  file: File
+): Promise<OfflineBundleImportResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post<OfflineBundleImportResult>(
+    '/admin/charts/offline-bundles/import',
+    formData
+  )
+}
+
+export const startOfflineApplicationBundleImportJob = (
+  file: File
+): Promise<OfflineBundleImportJob> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post<OfflineBundleImportJob>(
+    '/admin/charts/offline-bundles/import-jobs',
+    formData
+  )
+}
+
+export const fetchOfflineApplicationBundleImportJob = (
+  id: string
+): Promise<OfflineBundleImportJob> => {
+  return apiClient.get<OfflineBundleImportJob>(
+    `/admin/charts/offline-bundles/import-jobs/${encodeURIComponent(id)}`
+  )
+}
+
+export const exportOfflineApplicationBundle = async (
+  apps: OfflineBundleExportApplication[]
+): Promise<{ blob: Blob; filename?: string }> => {
+  return apiClient.postBlob('/admin/charts/offline-bundles/export', { apps })
 }
 
 export const fetchHelmCharts = (options?: {

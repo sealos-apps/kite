@@ -7,16 +7,20 @@ import (
 )
 
 type HelmChartHandler struct {
-	indexCacheMu   sync.Mutex
-	indexCache     map[string]cachedRepositoryIndex
-	contentCacheMu sync.Mutex
-	contentCache   map[string]cachedChartContent
+	indexCacheMu      sync.Mutex
+	indexCache        map[string]cachedRepositoryIndex
+	contentCacheMu    sync.Mutex
+	contentCache      map[string]cachedChartContent
+	offlineBundleJobs *offlineBundleImportJobStore
 }
 
 func NewHelmChartHandler() *HelmChartHandler {
 	return &HelmChartHandler{
 		indexCache:   map[string]cachedRepositoryIndex{},
 		contentCache: map[string]cachedChartContent{},
+		offlineBundleJobs: newOfflineBundleImportJobStore(
+			helmutilImportOfflineBundle,
+		),
 	}
 }
 
@@ -36,10 +40,20 @@ func (h *HelmChartHandler) RegisterAdminRoutes(group *gin.RouterGroup) {
 	g.GET("/repositories", h.ListRepositories)
 	g.GET("/artifacthub", h.ListArtifactHubCharts)
 	g.GET("", h.ListCharts)
+	g.GET("/uploads/config", h.GetRepositoryUploadConfig)
+	g.GET("/offline-bundles/config", h.GetOfflineBundleConfig)
+	g.POST("/offline-bundles/import", h.ImportOfflineBundle)
+	g.POST("/offline-bundles/import-jobs", h.StartOfflineBundleImportJob)
+	g.GET("/offline-bundles/import-jobs/:id", h.GetOfflineBundleImportJob)
+	g.POST("/offline-bundles/export", h.ExportOfflineBundle)
+	g.POST("/repositories", h.CreateRepository)
+	g.POST("/oci/upload", h.UploadOCIChart)
+	g.DELETE("/repositories/:id", h.DeleteRepository)
 	g.GET("/artifacthub/:repository/:name/content/:content", h.GetArtifactHubChartContent)
 	g.GET("/artifacthub/:repository/:name", h.GetArtifactHubChart)
 	g.GET("/:repository/:name/content/:content", h.GetChartContent)
 	g.GET("/:repository/:name", h.GetChart)
-	g.POST("/repositories", h.CreateRepository)
-	g.DELETE("/repositories/:id", h.DeleteRepository)
+
+	images := group.Group("/images")
+	images.POST("/upload", h.UploadContainerImage)
 }
