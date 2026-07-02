@@ -84,7 +84,7 @@
 | `helmCatalog.oci.passwordSecretKey`            | `passwordSecretName` 中作为 `KITE_HELM_OCI_REGISTRY_PASSWORD` 使用的 key | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
 | `helmCatalog.imageUploads.registry`            | 上传容器镜像归档使用的 registry host；留空时复用已配置的 `helmCatalog.offlineImages.registry` | `""` |
 | `helmCatalog.imageUploads.repositoryPrefix`    | 上传容器镜像归档时追加的 repository 前缀      | `kite-images` |
-| `helmCatalog.imageUploads.maxBytes`            | 管理员上传容器镜像归档 API 接受的最大归档大小 | `4GiB` |
+| `helmCatalog.imageUploads.maxBytes`            | 管理员上传容器镜像归档或导入离线应用包 API 接受的最大归档大小 | `4GiB` |
 | `helmCatalog.imageUploads.plainHTTP`           | 容器镜像归档上传是否使用 HTTP                 | `false` |
 | `helmCatalog.imageUploads.insecureSkipTLSVerify` | 是否跳过容器镜像上传 registry/token endpoint 的 TLS 校验 | `false` |
 | `helmCatalog.imageUploads.caFile`              | 挂载到 Kite 容器内的容器镜像上传 registry CA bundle 路径 | `""` |
@@ -135,15 +135,21 @@ tag，Kite 会解析为
 `helmCatalog.oci.username` 加 `helmCatalog.oci.passwordSecretName`；简易安装
 仍可使用 `helmCatalog.oci.password`，它会写入 chart 管理的 Secret。
 
-Kite 在 UI 上提供一个管理员“上传到仓库”入口，但后端流程仍然分开。Helm
-chart 包（`.tgz`）通过 Chart 上传 API 推送到 `helmCatalog.oci.base` 配置的
-前缀下，并进入 OCI Chart catalog；容器镜像归档通过独立的镜像上传 API 推送到
-`helmCatalog.imageUploads.registry` 加
+Kite 管理员 UI 以 `.kiteapp.tar.gz` 离线应用包作为传递单位。一个包会把 Helm
+chart 归档和按离线镜像 values 渲染后需要的 workload 镜像归档绑定在一起，
+可以包含多个应用，也可以从一个已配置好的 Kite 集群导出后导入到另一个集群。
+导入会先校验包内容，先推送必需镜像，最后才推送 Chart，避免 OCI catalog
+里出现缺镜像的 Chart。
+
+Kite 底层后端流程仍然分开。Helm chart 包（`.tgz`）通过 Chart 上传 API 推送到
+`helmCatalog.oci.base` 配置的前缀下，并进入 OCI Chart catalog；容器镜像归档
+通过独立的镜像上传 API 推送到 `helmCatalog.imageUploads.registry` 加
 `helmCatalog.imageUploads.repositoryPrefix`，不会变成 Chart catalog 条目。
 如果 `helmCatalog.imageUploads.registry` 为空，Kite 会在已配置
 `helmCatalog.offlineImages.registry` 时复用该离线镜像 registry。Chart registry
 和镜像 registry 凭据不同时，请使用单独的 Secret key 注入
-`KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD`。
+`KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD`。离线应用包可能包含容器镜像归档，因此同样
+受镜像上传大小限制约束。
 
 `helmCatalog.offlineImages` 与 OCI Chart 发现是两件事。Helm OCI Chart
 artifact 放在配置的 Chart 前缀下，例如
@@ -155,8 +161,8 @@ registry host 的原始仓库路径下，例如
 仍指向外部 registry 时阻止写入。Kite 会把 Chart 来源记录在已安装 release
 中，所以从 OCI catalog 安装的 release 后续即使客户端沿用当前 Chart、没有
 再次传 `source`，升级时也会继续应用离线镜像策略。Kite 安装时不会复制容器
-镜像；需要提前使用 `scripts/mirror-helm-chart-images.sh` 或等价 registry
-同步流程完成镜像同步。
+镜像；需要提前通过离线应用包导入、`scripts/mirror-helm-chart-images.sh` 或
+等价 registry 同步流程完成镜像同步。
 
 ## Sealos App 配置
 

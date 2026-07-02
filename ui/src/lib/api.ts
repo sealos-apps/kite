@@ -29,6 +29,8 @@ import {
   ImageTagInfo,
   OAuthProvider,
   OCIChartUploadResult,
+  OfflineBundleExportApplication,
+  OfflineBundleImportResult,
   OverviewData,
   PodMetrics,
   RelatedResources,
@@ -360,6 +362,12 @@ export const fetchRepositoryUploadConfig =
     return apiClient.get<RepositoryUploadConfig>('/admin/charts/uploads/config')
   }
 
+export const fetchOfflineBundleConfig = (): Promise<RepositoryUploadConfig> => {
+  return apiClient.get<RepositoryUploadConfig>(
+    '/admin/charts/offline-bundles/config'
+  )
+}
+
 export const uploadOCIHelmChart = (
   file: File
 ): Promise<OCIChartUploadResult> => {
@@ -388,6 +396,23 @@ export const uploadContainerImageArchive = ({
     '/admin/images/upload',
     formData
   )
+}
+
+export const importOfflineApplicationBundle = (
+  file: File
+): Promise<OfflineBundleImportResult> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post<OfflineBundleImportResult>(
+    '/admin/charts/offline-bundles/import',
+    formData
+  )
+}
+
+export const exportOfflineApplicationBundle = async (
+  apps: OfflineBundleExportApplication[]
+): Promise<{ blob: Blob; filename?: string }> => {
+  return apiClient.postBlob('/admin/charts/offline-bundles/export', { apps })
 }
 
 export const fetchHelmCharts = (options?: {

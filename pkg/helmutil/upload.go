@@ -84,6 +84,13 @@ type ContainerImageUploadResult struct {
 	Size     int64  `json:"size"`
 }
 
+type ExactContainerImageUploadRequest struct {
+	ArchivePath string
+	ImageRef    string
+	Size        int64
+	MaxBytes    int64
+}
+
 type ContainerImageUploadRequest struct {
 	ArchivePath string
 	Repository  string
@@ -107,6 +114,26 @@ func LoadRepositoryUploadConfig() (RepositoryUploadConfig, error) {
 		return RepositoryUploadConfig{}, err
 	}
 	return RepositoryUploadConfig{Chart: chartConfig, Image: imageConfig}, nil
+}
+
+func LoadOfflineBundleTransferConfig() (RepositoryUploadConfig, error) {
+	chartConfig, err := LoadOCIChartUploadConfig()
+	if err != nil {
+		return RepositoryUploadConfig{}, err
+	}
+	maxBytes, err := ContainerImageUploadMaxBytes()
+	if err != nil {
+		return RepositoryUploadConfig{}, err
+	}
+	registry := cleanRegistryHost(common.HelmOfflineImagesRegistry)
+	return RepositoryUploadConfig{
+		Chart: chartConfig,
+		Image: ContainerImageUploadConfig{
+			Configured: registry != "",
+			Registry:   registry,
+			MaxBytes:   maxBytes,
+		},
+	}, nil
 }
 
 func LoadOCIChartUploadConfig() (OCIChartUploadConfig, error) {
@@ -199,6 +226,48 @@ func PushContainerImageArchive(ctx context.Context, req ContainerImageUploadRequ
 		return ContainerImageUploadResult{}, fmt.Errorf("%w: %s or %s is required", ErrUploadNotConfigured, imageUploadRegistryEnv, "KITE_HELM_OFFLINE_IMAGE_REGISTRY")
 	}
 	ref, err := buildImageUploadReference(config, req.Repository, req.Tag)
+	if err != nil {
+		return ContainerImageUploadResult{}, err
+	}
+	remoteOptions, err := imageRemoteOptions(config.Options, ctx)
+	if err != nil {
+		return ContainerImageUploadResult{}, err
+	}
+
+	img, err := tarball.Image(imageArchiveOpener(req.ArchivePath), nil)
+	if err == nil {
+		digest, err := pushContainerImage(ctx, ref, img, remoteOptions)
+		if err != nil {
+			return ContainerImageUploadResult{}, err
+		}
+		return ContainerImageUploadResult{ImageRef: ref.Name(), Digest: digest, Size: req.Size}, nil
+	}
+	dockerArchiveErr := err
+
+	maxExtractBytes := req.MaxBytes
+	if maxExtractBytes <= 0 {
+		maxExtractBytes = req.Size
+	}
+	index, err := imageIndexFromOCIArchive(req.ArchivePath, maxExtractBytes)
+	if err != nil {
+		return ContainerImageUploadResult{}, fmt.Errorf("%w: failed to load image archive as docker save tarball (%v) or OCI layout archive (%v)", ErrUploadValidation, dockerArchiveErr, err)
+	}
+	digest, err := pushImageIndex(ctx, ref, index, remoteOptions)
+	if err != nil {
+		return ContainerImageUploadResult{}, err
+	}
+	return ContainerImageUploadResult{ImageRef: ref.Name(), Digest: digest, Size: req.Size}, nil
+}
+
+func PushContainerImageArchiveToRef(ctx context.Context, req ExactContainerImageUploadRequest) (ContainerImageUploadResult, error) {
+	config, err := loadExactImageUploadConfig()
+	if err != nil {
+		return ContainerImageUploadResult{}, err
+	}
+	if !config.Configured {
+		return ContainerImageUploadResult{}, fmt.Errorf("%w: %s or %s is required", ErrUploadNotConfigured, imageUploadRegistryEnv, "KITE_HELM_OFFLINE_IMAGE_REGISTRY")
+	}
+	ref, err := parseExactImageUploadReference(config, req.ImageRef)
 	if err != nil {
 		return ContainerImageUploadResult{}, err
 	}
@@ -329,6 +398,50 @@ func buildImageUploadReference(config imageUploadConfig, repository, tag string)
 		return nil, fmt.Errorf("%w: invalid image reference: %v", ErrUploadValidation, err)
 	}
 	return parsed, nil
+}
+
+func parseExactImageUploadReference(config imageUploadConfig, imageRef string) (name.Reference, error) {
+	imageRef = strings.TrimSpace(imageRef)
+	if imageRef == "" {
+		return nil, fmt.Errorf("%w: image reference is required", ErrUploadValidation)
+	}
+	if strings.Contains(imageRef, "://") {
+		return nil, fmt.Errorf("%w: image reference must not include a URL scheme", ErrUploadValidation)
+	}
+	if strings.Contains(imageRef, "..") {
+		return nil, fmt.Errorf("%w: image reference cannot contain ..", ErrUploadValidation)
+	}
+	expectedPrefix := config.Registry + "/"
+	if !strings.HasPrefix(imageRef, expectedPrefix) {
+		return nil, fmt.Errorf("%w: image reference must use configured registry %s", ErrUploadValidation, config.Registry)
+	}
+	ref := strings.TrimPrefix(imageRef, expectedPrefix)
+	if strings.Trim(ref, "/") == "" {
+		return nil, fmt.Errorf("%w: image reference must include a repository path", ErrUploadValidation)
+	}
+	nameOptions := []name.Option{name.StrictValidation}
+	if config.Options.PlainHTTP {
+		nameOptions = append(nameOptions, name.Insecure)
+	}
+	parsed, err := name.ParseReference(imageRef, nameOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid image reference: %v", ErrUploadValidation, err)
+	}
+	return parsed, nil
+}
+
+func loadExactImageUploadConfig() (imageUploadConfig, error) {
+	config, err := loadImageUploadConfig()
+	if err != nil {
+		return imageUploadConfig{}, err
+	}
+	registry := cleanRegistryHost(common.HelmOfflineImagesRegistry)
+	if registry != "" {
+		config.Registry = registry
+		config.Configured = true
+		config.RepositoryPrefix = ""
+	}
+	return config, nil
 }
 
 func imageRemoteOptions(options OCIRegistryOptions, ctx context.Context) ([]remote.Option, error) {

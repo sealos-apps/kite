@@ -84,7 +84,7 @@ When `db.autoCreate` is enabled, the configured database user must have permissi
 | `helmCatalog.oci.passwordSecretKey`            | Key inside `passwordSecretName` used as `KITE_HELM_OCI_REGISTRY_PASSWORD` | `KITE_HELM_OCI_REGISTRY_PASSWORD` |
 | `helmCatalog.imageUploads.registry`            | Registry host for uploaded container image archives; empty reuses `helmCatalog.offlineImages.registry` when set | `""` |
 | `helmCatalog.imageUploads.repositoryPrefix`    | Repository prefix prepended to uploaded container image archives        | `kite-images` |
-| `helmCatalog.imageUploads.maxBytes`            | Maximum container image archive size accepted by the admin upload API   | `4GiB`    |
+| `helmCatalog.imageUploads.maxBytes`            | Maximum container image archive or offline application bundle size accepted by the admin upload/import APIs | `4GiB` |
 | `helmCatalog.imageUploads.plainHTTP`           | Use plain HTTP for container image archive uploads                      | `false`   |
 | `helmCatalog.imageUploads.insecureSkipTLSVerify` | Skip TLS verification for the container image upload registry and token endpoints | `false` |
 | `helmCatalog.imageUploads.caFile`              | CA bundle path mounted inside the Kite container for container image upload registry TLS | `""` |
@@ -145,16 +145,24 @@ realm, so `plainHTTP` and `insecureSkipTLSVerify` may need to be enabled
 together. Helm OCI tag encoding is preserved (`+` in SemVer build metadata
 becomes `_` in the registry tag).
 
-Kite exposes one admin upload entry in the UI, but it keeps the backend flows
-separate. Helm chart packages (`.tgz`) are pushed through the chart upload API
-into the configured `helmCatalog.oci.base` prefix and then appear in the OCI
-chart catalog. Container image archives are pushed through a separate image
-upload API into `helmCatalog.imageUploads.registry` plus
+Kite's admin UI transfers offline apps as `.kiteapp.tar.gz` bundles. A bundle
+binds Helm chart archives to the rendered workload image archives required for
+offline install, can include multiple apps, and can be exported from one
+configured Kite cluster and imported into another. Import validates the bundle,
+pushes required images first, and pushes the chart last so the OCI catalog does
+not expose a chart whose images are missing.
+
+Kite still keeps the lower-level backend flows separate. Helm chart packages
+(`.tgz`) are pushed through the chart upload API into the configured
+`helmCatalog.oci.base` prefix and then appear in the OCI chart catalog.
+Container image archives are pushed through a separate image upload API into
+`helmCatalog.imageUploads.registry` plus
 `helmCatalog.imageUploads.repositoryPrefix`; they do not become chart catalog
 entries. If `helmCatalog.imageUploads.registry` is empty, Kite falls back to
 `helmCatalog.offlineImages.registry` when that offline image registry is set.
 Use a separate Secret key for `KITE_IMAGE_UPLOAD_REGISTRY_PASSWORD` when the
-chart and image registry credentials differ.
+chart and image registry credentials differ. Bundle uploads are bounded by the
+image upload size limit because they may contain container image archives.
 
 `helmCatalog.offlineImages` is separate from OCI chart discovery. Keep Helm OCI
 chart artifacts under the configured chart prefix such as
@@ -167,8 +175,8 @@ the release, and blocks the write if rendered workload images still reference an
 external registry. Kite records the chart source on installed releases, so
 current-chart upgrades of releases installed from the OCI catalog keep the same
 offline image policy even when the client omits `source`. Kite does not copy
-container images during install; mirror them ahead of time with
-`scripts/mirror-helm-chart-images.sh` or an equivalent registry sync process.
+container images during install; prepare them with offline bundle import,
+`scripts/mirror-helm-chart-images.sh`, or an equivalent registry sync process.
 
 ## Sealos App Configuration
 

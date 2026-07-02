@@ -7,6 +7,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   PaginationState,
+  RowSelectionState,
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table'
@@ -14,8 +15,7 @@ import {
   Box,
   Copy,
   Database,
-  FileArchive,
-  Image as ImageIcon,
+  Download,
   Loader2,
   Plus,
   RefreshCw,
@@ -30,18 +30,17 @@ import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
-  ContainerImageUploadResult,
   HelmChart,
   HelmRepository,
-  OCIChartUploadResult,
+  OfflineBundleImportResult,
   RepositoryUploadConfig,
 } from '@/types/api'
 import {
   createHelmRepository,
   deleteHelmRepository,
-  fetchRepositoryUploadConfig,
-  uploadContainerImageArchive,
-  uploadOCIHelmChart,
+  exportOfflineApplicationBundle,
+  fetchOfflineBundleConfig,
+  importOfflineApplicationBundle,
   useArtifactHubCharts,
   useHelmCharts,
   useHelmRepositories,
@@ -49,6 +48,7 @@ import {
 import { formatDate, translateError } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -75,7 +75,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DeleteConfirmationDialog } from '@/components/delete-confirmation-dialog'
 import { ErrorMessage } from '@/components/error-message'
@@ -86,14 +85,11 @@ const allRepositories = 'all'
 const artifactHubSource = 'artifacthub'
 const repositoriesSource = 'repositories'
 const ociSource = 'oci'
-const uploadTypeChart = 'chart'
-const uploadTypeImage = 'image'
 const columnHelper = createColumnHelper<HelmChart>()
 type ChartSource =
   | typeof artifactHubSource
   | typeof repositoriesSource
   | typeof ociSource
-type UploadType = typeof uploadTypeChart | typeof uploadTypeImage
 type HelmChartListSessionState = {
   verifiedPublisherOnly?: boolean
   searchQuery?: string
@@ -307,29 +303,31 @@ function AddRepositoryDialog({
   )
 }
 
-function UploadRepositoryDialog({
+function OfflineBundleTransferDialog({
   open,
   onOpenChange,
-  onChartUploaded,
+  onImported,
+  onExport,
+  isExporting,
+  selectedCharts,
+  onSelectionConsumed,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onChartUploaded: () => Promise<unknown>
+  onImported: () => Promise<unknown>
+  onExport: () => Promise<void>
+  isExporting: boolean
+  selectedCharts: HelmChart[]
+  onSelectionConsumed: () => void
 }) {
   const { t } = useTranslation()
-  const [uploadType, setUploadType] = useState<UploadType>(uploadTypeChart)
   const [config, setConfig] = useState<RepositoryUploadConfig | null>(null)
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
-  const [chartFile, setChartFile] = useState<File | null>(null)
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imageRepository, setImageRepository] = useState('')
-  const [imageTag, setImageTag] = useState('')
+  const [bundleFile, setBundleFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [lastChartResult, setLastChartResult] =
-    useState<OCIChartUploadResult | null>(null)
-  const [lastImageResult, setLastImageResult] =
-    useState<ContainerImageUploadResult | null>(null)
+  const [lastImportResult, setLastImportResult] =
+    useState<OfflineBundleImportResult | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -337,23 +335,20 @@ function UploadRepositoryDialog({
     }
     setIsLoadingConfig(true)
     setError('')
-    void fetchRepositoryUploadConfig()
+    void fetchOfflineBundleConfig()
       .then(setConfig)
       .catch((err) => setError(translateError(err, t)))
       .finally(() => setIsLoadingConfig(false))
   }, [open, t])
 
   const resetForm = () => {
-    setChartFile(null)
-    setImageFile(null)
-    setImageRepository('')
-    setImageTag('')
-    setLastChartResult(null)
-    setLastImageResult(null)
+    setBundleFile(null)
+    setLastImportResult(null)
+    setError('')
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && !isSubmitting) {
+    if (!nextOpen && !isSubmitting && !isExporting) {
       resetForm()
     }
     onOpenChange(nextOpen)
@@ -363,37 +358,28 @@ function UploadRepositoryDialog({
     event.preventDefault()
     setError('')
     setIsSubmitting(true)
-    setLastChartResult(null)
-    setLastImageResult(null)
+    setLastImportResult(null)
     try {
-      if (uploadType === uploadTypeChart) {
-        if (!chartFile) {
-          throw new Error(t('helmCharts.messages.selectChartPackage'))
-        }
-        const result = await uploadOCIHelmChart(chartFile)
-        setLastChartResult(result)
-        toast.success(
-          t('helmCharts.messages.chartUploadSuccess', {
-            name: `${result.chartName}:${result.version}`,
+      if (!bundleFile) {
+        throw new Error(t('helmCharts.messages.selectOfflineBundle'))
+      }
+      const result = await importOfflineApplicationBundle(bundleFile)
+      setLastImportResult(result)
+      const failed = result.apps.filter((app) => app.error).length
+      if (failed > 0) {
+        toast.error(
+          t('helmCharts.messages.offlineBundleImportPartial', {
+            count: failed,
           })
         )
-        await onChartUploaded()
       } else {
-        if (!imageFile) {
-          throw new Error(t('helmCharts.messages.selectImageArchive'))
-        }
-        const result = await uploadContainerImageArchive({
-          file: imageFile,
-          repository: imageRepository,
-          tag: imageTag,
-        })
-        setLastImageResult(result)
         toast.success(
-          t('helmCharts.messages.imageUploadSuccess', {
-            name: result.imageRef,
+          t('helmCharts.messages.offlineBundleImportSuccess', {
+            count: result.apps.length,
           })
         )
       }
+      await onImported()
     } catch (err) {
       setError(translateError(err, t))
     } finally {
@@ -401,145 +387,68 @@ function UploadRepositoryDialog({
     }
   }
 
-  const activeConfig =
-    uploadType === uploadTypeChart ? config?.chart : config?.image
-  const isConfigured = activeConfig?.configured ?? false
+  const handleExport = async () => {
+    setError('')
+    try {
+      await onExport()
+      onSelectionConsumed()
+    } catch (err) {
+      setError(translateError(err, t))
+    }
+  }
+
+  const isConfigured =
+    Boolean(config?.chart.configured) && Boolean(config?.image.configured)
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[620px]">
         <form onSubmit={handleSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>{t('helmCharts.actions.upload')}</DialogTitle>
+            <DialogTitle>
+              {t('helmCharts.actions.transferOfflineBundle')}
+            </DialogTitle>
             <DialogDescription>
-              {t('helmCharts.messages.uploadDescription')}
+              {t('helmCharts.messages.offlineBundleDescription')}
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs
-            value={uploadType}
-            onValueChange={(value) => {
-              setUploadType(value as UploadType)
-              setError('')
-            }}
-            className="gap-4"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value={uploadTypeChart}>
-                <FileArchive className="size-4" />
-                {t('helmCharts.fields.chartPackage')}
-              </TabsTrigger>
-              <TabsTrigger value={uploadTypeImage}>
-                <ImageIcon className="size-4" />
-                {t('helmCharts.fields.containerImage')}
-              </TabsTrigger>
-            </TabsList>
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            {isLoadingConfig ? (
+              <span>{t('common.loading')}</span>
+            ) : (
+              <span>
+                {t('helmCharts.messages.offlineBundleTarget', {
+                  chartTarget: config?.chart.registryBase || '-',
+                  imageTarget: config?.image.registry || '-',
+                  limit: formatUploadLimit(config?.image.maxBytes),
+                })}
+              </span>
+            )}
+          </div>
 
-            <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              {isLoadingConfig ? (
-                <span>{t('common.loading')}</span>
-              ) : uploadType === uploadTypeChart ? (
-                <span>
-                  {t('helmCharts.messages.chartUploadTarget', {
-                    target: config?.chart.registryBase || '-',
-                    limit: formatUploadLimit(config?.chart.maxBytes),
-                  })}
-                </span>
-              ) : (
-                <span>
-                  {t('helmCharts.messages.imageUploadTarget', {
-                    target: config?.image.registry
-                      ? `${config.image.registry}/${config.image.repositoryPrefix || ''}`.replace(
-                          /\/$/,
-                          ''
-                        )
-                      : '-',
-                    limit: formatUploadLimit(config?.image.maxBytes),
-                  })}
-                </span>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="offline-bundle-file">
+              {t('helmCharts.fields.offlineBundle')}
+            </Label>
+            <Input
+              id="offline-bundle-file"
+              type="file"
+              accept=".kiteapp.tar.gz,.tar.gz,.tgz,application/gzip,application/x-gzip"
+              onChange={(event) =>
+                setBundleFile(event.target.files?.[0] ?? null)
+              }
+              disabled={isSubmitting || isExporting}
+            />
+          </div>
 
-            <TabsContent value={uploadTypeChart} className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {t('helmCharts.messages.chartUploadDescription')}
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="helm-chart-upload-file">
-                  {t('helmCharts.fields.chartPackage')}
-                </Label>
-                <Input
-                  id="helm-chart-upload-file"
-                  type="file"
-                  accept=".tgz,application/gzip,application/x-gzip"
-                  onChange={(event) =>
-                    setChartFile(event.target.files?.[0] ?? null)
-                  }
-                  disabled={isSubmitting}
-                />
-              </div>
-              {lastChartResult ? (
-                <UploadResult value={lastChartResult.chartUrl} />
-              ) : null}
-            </TabsContent>
-
-            <TabsContent value={uploadTypeImage} className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {t('helmCharts.messages.imageUploadDescription')}
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="image-upload-file">
-                  {t('helmCharts.fields.imageArchive')}
-                </Label>
-                <Input
-                  id="image-upload-file"
-                  type="file"
-                  accept=".tar,.oci,application/x-tar,application/gzip,application/x-gzip"
-                  onChange={(event) =>
-                    setImageFile(event.target.files?.[0] ?? null)
-                  }
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-                <div className="space-y-2">
-                  <Label htmlFor="image-upload-repository">
-                    {t('helmCharts.fields.imageRepository')}
-                  </Label>
-                  <Input
-                    id="image-upload-repository"
-                    value={imageRepository}
-                    onChange={(event) => setImageRepository(event.target.value)}
-                    placeholder={t('helmCharts.placeholders.imageRepository')}
-                    disabled={isSubmitting}
-                    required={uploadType === uploadTypeImage}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="image-upload-tag">
-                    {t('helmCharts.fields.imageTag')}
-                  </Label>
-                  <Input
-                    id="image-upload-tag"
-                    value={imageTag}
-                    onChange={(event) => setImageTag(event.target.value)}
-                    placeholder={t('helmCharts.placeholders.imageTag')}
-                    disabled={isSubmitting}
-                    required={uploadType === uploadTypeImage}
-                  />
-                </div>
-              </div>
-              {lastImageResult ? (
-                <UploadResult value={lastImageResult.imageRef} />
-              ) : null}
-            </TabsContent>
-          </Tabs>
+          {lastImportResult ? (
+            <OfflineBundleImportResultView result={lastImportResult} />
+          ) : null}
 
           {!isConfigured && !isLoadingConfig ? (
             <p className="text-sm text-destructive">
-              {uploadType === uploadTypeChart
-                ? t('helmCharts.messages.chartUploadNotConfigured')
-                : t('helmCharts.messages.imageUploadNotConfigured')}
+              {t('helmCharts.messages.offlineBundleNotConfigured')}
             </p>
           ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -549,20 +458,41 @@ function UploadRepositoryDialog({
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isExporting}
             >
               {t('common.cancel')}
             </Button>
             <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleExport()}
+              disabled={
+                isSubmitting ||
+                isExporting ||
+                isLoadingConfig ||
+                !isConfigured ||
+                selectedCharts.length === 0
+              }
+            >
+              {isExporting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Download className="size-4" />
+              )}
+              {t('helmCharts.actions.exportOfflineBundle')}
+            </Button>
+            <Button
               type="submit"
-              disabled={isSubmitting || isLoadingConfig || !isConfigured}
+              disabled={
+                isSubmitting || isExporting || isLoadingConfig || !isConfigured
+              }
             >
               {isSubmitting ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Upload className="size-4" />
               )}
-              {t('helmCharts.actions.upload')}
+              {t('helmCharts.actions.importOfflineBundle')}
             </Button>
           </DialogFooter>
         </form>
@@ -571,28 +501,72 @@ function UploadRepositoryDialog({
   )
 }
 
-function UploadResult({ value }: { value: string }) {
+function OfflineBundleImportResultView({
+  result,
+}: {
+  result: OfflineBundleImportResult
+}) {
   const { t } = useTranslation()
-  const copyValue = async () => {
+  const successfulApps = result.apps.filter((app) => !app.error)
+  const failedApps = result.apps.filter((app) => app.error)
+  const copyValue = async (value: string) => {
     await navigator.clipboard.writeText(value)
     toast.success(t('common.copied'))
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-md border bg-muted/20 p-2">
-      <code className="min-w-0 flex-1 truncate text-xs">{value}</code>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="size-8 shrink-0"
-        onClick={() => void copyValue()}
-        aria-label={t('helmCharts.actions.copyReference')}
-      >
-        <Copy className="size-4" />
-      </Button>
+    <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
+      <div className="text-muted-foreground">
+        {t('helmCharts.messages.offlineBundleImportSummary', {
+          success: successfulApps.length,
+          failed: failedApps.length,
+        })}
+      </div>
+      {result.apps.map((app) => (
+        <div key={`${app.name}:${app.version}`} className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">
+              {app.name}:{app.version}
+            </span>
+            {app.chartUrl ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => void copyValue(app.chartUrl || '')}
+                aria-label={t('helmCharts.actions.copyReference')}
+              >
+                <Copy className="size-4" />
+              </Button>
+            ) : null}
+          </div>
+          {app.error ? (
+            <p className="text-xs text-destructive">{app.error}</p>
+          ) : app.chartUrl ? (
+            <code className="block truncate text-xs text-muted-foreground">
+              {app.chartUrl}
+            </code>
+          ) : null}
+        </div>
+      ))}
     </div>
   )
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = sanitizeDownloadFilename(filename)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function sanitizeDownloadFilename(filename: string) {
+  return filename.replace(/[\\/:*?"<>|]+/g, '-')
 }
 
 export function HelmChartListPage() {
@@ -614,8 +588,10 @@ export function HelmChartListPage() {
   const [repositoryToDelete, setRepositoryToDelete] =
     useState<HelmRepository | null>(null)
   const [isDeletingRepository, setIsDeletingRepository] = useState(false)
+  const [isExportingBundle, setIsExportingBundle] = useState(false)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [pagination, setPagination] = useState<PaginationState>(
     initialSessionState.pagination ?? defaultPagination
   )
@@ -624,6 +600,7 @@ export function HelmChartListPage() {
   const isArtifactHubSource = chartSource === artifactHubSource
   const isOCISource = chartSource === ociSource
   const canManageRepositories = user?.isAdmin() ?? false
+  const canTransferOfflineBundles = isOCISource && canManageRepositories
 
   usePageTitle(t('nav.helmCharts'))
 
@@ -644,6 +621,10 @@ export function HelmChartListPage() {
       })
     )
   }, [verifiedPublisherOnly, searchQuery, repositoryFilter, pagination])
+
+  useEffect(() => {
+    setRowSelection({})
+  }, [chartSource])
 
   const { data: repositories = [], refetch: refetchRepositories } =
     useHelmRepositories()
@@ -679,8 +660,8 @@ export function HelmChartListPage() {
     ? (data?.total ?? charts.length)
     : charts.length
 
-  const columns = useMemo(
-    () => [
+  const columns = useMemo(() => {
+    const baseColumns = [
       columnHelper.accessor('name', {
         header: t('helm.fields.chart'),
         enableHiding: false,
@@ -728,9 +709,40 @@ export function HelmChartListPage() {
           </span>
         ),
       }),
-    ],
-    [t]
-  )
+    ]
+
+    if (!canTransferOfflineBundles) {
+      return baseColumns
+    }
+
+    return [
+      columnHelper.display({
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && 'indeterminate')
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label={t('resourceTable.selectAllAria')}
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t('resourceTable.selectRowAria')}
+          />
+        ),
+        enableHiding: false,
+        enableSorting: false,
+      }),
+      ...baseColumns,
+    ]
+  }, [canTransferOfflineBundles, t])
 
   const table = useReactTable({
     data: charts,
@@ -740,20 +752,23 @@ export function HelmChartListPage() {
     getPaginationRowModel: getPaginationRowModel(),
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
+    enableRowSelection: canTransferOfflineBundles,
     enableSorting: false,
     manualPagination: isArtifactHubSource,
     pageCount: isArtifactHubSource
       ? Math.ceil(totalRowCount / pagination.pageSize) || 0
       : undefined,
     getRowId: (chart) =>
-      `${chart.source || repositoriesSource}/${chart.repositoryUrl}/${chart.name}`,
+      `${chart.source || repositoriesSource}/${chart.repositoryUrl}/${chart.name}/${chart.version}`,
     globalFilterFn: (row, _columnId, value) =>
       chartMatchesSearch(row.original, String(value)),
     state: {
       columnFilters,
       globalFilter: isArtifactHubSource ? '' : searchQuery,
       columnVisibility,
+      rowSelection,
       pagination,
     },
     autoResetPageIndex: false,
@@ -765,7 +780,43 @@ export function HelmChartListPage() {
 
   const handleChartUploaded = async () => {
     setChartSource(ociSource)
+    setRowSelection({})
     await localChartsQuery.refetch()
+  }
+
+  const selectedOCICharts = canTransferOfflineBundles
+    ? table.getSelectedRowModel().rows.map((row) => row.original)
+    : []
+
+  const handleExportSelectedCharts = async () => {
+    if (selectedOCICharts.length === 0) {
+      throw new Error(
+        t('helmCharts.messages.offlineBundleExportRequiresSelection')
+      )
+    }
+    setIsExportingBundle(true)
+    try {
+      const { blob, filename } = await exportOfflineApplicationBundle(
+        selectedOCICharts.map((chart) => ({
+          repositoryName: chart.repositoryName,
+          chartName: chart.name,
+          version: chart.version,
+        }))
+      )
+      downloadBlob(
+        blob,
+        filename ||
+          `kite-offline-apps-${new Date().toISOString()}.kiteapp.tar.gz`
+      )
+      toast.success(
+        t('helmCharts.messages.offlineBundleExportSuccess', {
+          count: selectedOCICharts.length,
+        })
+      )
+      setRowSelection({})
+    } finally {
+      setIsExportingBundle(false)
+    }
   }
 
   const handleDeleteRepository = async () => {
@@ -855,7 +906,7 @@ export function HelmChartListPage() {
               onClick={() => setUploadDialogOpen(true)}
             >
               <Upload className="size-4" />
-              {t('helmCharts.actions.upload')}
+              {t('helmCharts.actions.importOfflineBundle')}
             </Button>
           ) : null}
           {!isArtifactHubSource && !isOCISource && canManageRepositories ? (
@@ -993,13 +1044,31 @@ export function HelmChartListPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              {canManageRepositories ? (
+              {canTransferOfflineBundles ? (
                 <Button
-                  variant={isOCISource ? 'default' : 'outline'}
+                  variant="default"
                   onClick={() => setUploadDialogOpen(true)}
                 >
                   <Upload className="size-4" />
-                  {t('helmCharts.actions.upload')}
+                  {t('helmCharts.actions.transferOfflineBundle')}
+                </Button>
+              ) : null}
+              {canTransferOfflineBundles ? (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void handleExportSelectedCharts().catch((err) =>
+                      toast.error(translateError(err, t))
+                    )
+                  }
+                  disabled={selectedOCICharts.length === 0 || isExportingBundle}
+                >
+                  {isExportingBundle ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  {t('helmCharts.actions.exportOfflineBundle')}
                 </Button>
               ) : null}
               {!isArtifactHubSource && !isOCISource && canManageRepositories ? (
@@ -1092,10 +1161,14 @@ export function HelmChartListPage() {
         onOpenChange={setDialogOpen}
         onCreated={handleCreated}
       />
-      <UploadRepositoryDialog
+      <OfflineBundleTransferDialog
         open={uploadDialogOpen}
         onOpenChange={setUploadDialogOpen}
-        onChartUploaded={handleChartUploaded}
+        onImported={handleChartUploaded}
+        onExport={handleExportSelectedCharts}
+        isExporting={isExportingBundle}
+        selectedCharts={selectedOCICharts}
+        onSelectionConsumed={() => setRowSelection({})}
       />
       <DeleteConfirmationDialog
         open={Boolean(repositoryToDelete)}

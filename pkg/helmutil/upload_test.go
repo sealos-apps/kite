@@ -36,6 +36,24 @@ func TestLoadRepositoryUploadConfigUsesOCIAndOfflineImageConfig(t *testing.T) {
 	require.Equal(t, int64(8*1024*1024*1024), config.Image.MaxBytes)
 }
 
+func TestLoadOfflineBundleTransferConfigUsesOfflineImageRegistry(t *testing.T) {
+	t.Setenv(ociRegistryBaseEnv, "oci://registry.local/kite-helm")
+	t.Setenv(imageUploadRegistryEnv, "manual-upload.local")
+	t.Setenv(imageUploadRepositoryPrefixEnv, "manual-prefix")
+	originalRegistry := common.HelmOfflineImagesRegistry
+	common.HelmOfflineImagesRegistry = "https://offline-images.local"
+	t.Cleanup(func() {
+		common.HelmOfflineImagesRegistry = originalRegistry
+	})
+
+	config, err := LoadOfflineBundleTransferConfig()
+	require.NoError(t, err)
+	require.True(t, config.Chart.Configured)
+	require.True(t, config.Image.Configured)
+	require.Equal(t, "offline-images.local", config.Image.Registry)
+	require.Empty(t, config.Image.RepositoryPrefix)
+}
+
 func TestBuildImageUploadReferenceRejectsAbsoluteInput(t *testing.T) {
 	config := imageUploadConfig{
 		ContainerImageUploadConfig: ContainerImageUploadConfig{
@@ -84,6 +102,37 @@ func TestBuildImageUploadReferenceAllowsEmptyPrefix(t *testing.T) {
 	ref, err := buildImageUploadReference(config, "apps/demo", "1.0.0")
 	require.NoError(t, err)
 	require.Equal(t, "registry.local:5000/apps/demo:1.0.0", ref.Name())
+}
+
+func TestParseExactImageUploadReferenceRequiresConfiguredRegistry(t *testing.T) {
+	config := imageUploadConfig{
+		ContainerImageUploadConfig: ContainerImageUploadConfig{
+			Registry: "registry.local:5000",
+		},
+		Options: OCIRegistryOptions{PlainHTTP: true},
+	}
+
+	ref, err := parseExactImageUploadReference(config, "registry.local:5000/apps/demo:1.0.0")
+	require.NoError(t, err)
+	require.Equal(t, "registry.local:5000/apps/demo:1.0.0", ref.Name())
+
+	_, err = parseExactImageUploadReference(config, "docker.io/apps/demo:1.0.0")
+	require.ErrorIs(t, err, ErrUploadValidation)
+}
+
+func TestLoadExactImageUploadConfigPrefersOfflineImageRegistry(t *testing.T) {
+	t.Setenv(imageUploadRegistryEnv, "manual-upload.local")
+	originalRegistry := common.HelmOfflineImagesRegistry
+	common.HelmOfflineImagesRegistry = "offline-images.local"
+	t.Cleanup(func() {
+		common.HelmOfflineImagesRegistry = originalRegistry
+	})
+
+	config, err := loadExactImageUploadConfig()
+	require.NoError(t, err)
+	require.True(t, config.Configured)
+	require.Equal(t, "offline-images.local", config.Registry)
+	require.Empty(t, config.RepositoryPrefix)
 }
 
 func TestParseByteSize(t *testing.T) {

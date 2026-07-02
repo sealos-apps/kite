@@ -153,7 +153,8 @@ SQLite hostPath 问题见 `docs/zh/faq.md`。生产持久化建议优先使用 M
 - Kite 通过 `helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE` 扫描受控 OCI registry 前缀来发现离线 Helm Chart；只会暴露该前缀下的内容，不做无边界的全 registry 展示。
 - registry 凭据和 TLS 配置只在服务端使用。Chart 只读 API 返回干净的 `oci://host/prefix/chart:version` URL，不包含凭据、查询参数或 fragment。Helm OCI tag 会把 SemVer build metadata 中的 `+` 编码为 `_`。
 - 离线 Chart artifact 和容器镜像可以共用同一个 registry host，但使用不同 repository 路径。Chart 放在专用前缀下，例如 `oci://registry.internal/kite-helm/<chart>:<version>`；容器镜像放在原始仓库路径下，例如 `registry.internal/bitnami/nginx:<tag>`。
-- 管理员 UI 上是一个“上传到仓库”入口，但 Kite 后端流程保持分离。Helm chart 包走 `POST /api/v1/admin/charts/oci/upload`，推送到 `helmCatalog.oci.base` 下；容器镜像归档走 `POST /api/v1/admin/images/upload`，推送到 `helmCatalog.imageUploads.registry` 加 `helmCatalog.imageUploads.repositoryPrefix` 下。
+- 管理员 UI 以 `.kiteapp.tar.gz` 离线应用包作为传递单位，不再把 Chart 和镜像拆成两个上传入口。一个包包含 `kite-bundle.json`、一个或多个 Helm chart 归档，以及这些 Chart 按离线镜像 values 渲染后需要的容器镜像归档。导入时会先校验包内容，推送所有必需镜像，再最后推送 Chart，避免 catalog 中出现缺镜像的 Chart。导出会把选中的 OCI catalog Chart 和渲染出的 workload 镜像打包，方便导入到另一个已配置好的 Kite 集群。
+- 底层后端上传能力仍保持分离，用于兼容和内部复用。Helm chart 包走 `POST /api/v1/admin/charts/oci/upload`，推送到 `helmCatalog.oci.base` 下；容器镜像归档走 `POST /api/v1/admin/images/upload`，推送到 `helmCatalog.imageUploads.registry` 加 `helmCatalog.imageUploads.repositoryPrefix` 下。离线应用包导入/导出接口分别是 `POST /api/v1/admin/charts/offline-bundles/import` 和 `POST /api/v1/admin/charts/offline-bundles/export`。
 - 最小 OCI discovery 示例：
 
 ```yaml
@@ -188,9 +189,9 @@ helmCatalog:
 `helmCatalog.offlineImages.registry` 时复用它作为镜像上传 registry。Chart OCI
 registry 和镜像上传 registry 凭据不同时，请使用不同 Secret key。上传大小限制会
 渲染为 `KITE_HELM_OCI_UPLOAD_MAX_BYTES` 和 `KITE_IMAGE_UPLOAD_MAX_BYTES`；
-ingress 或网关 body-size limit 至少要高于服务端限制。
+ingress 或网关 body-size limit 至少要高于服务端限制。离线应用包上传同样受镜像归档大小限制约束。
 
-- 安装离线 OCI Chart 前，先同步它渲染出的 workload 容器镜像：
+- 如果不通过 Kite 的离线应用包导出准备 Chart，安装离线 OCI Chart 前需先同步它渲染出的 workload 容器镜像：
 
 ```bash
 scripts/mirror-helm-chart-images.sh \

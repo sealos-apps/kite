@@ -1631,16 +1631,15 @@
       "deleteRepository": "Delete Repository",
       "copyReference": "Copy reference",
       "install": "Install",
-      "upload": "Upload"
+      "upload": "Upload",
+      "transferOfflineBundle": "Offline app bundle",
+      "importOfflineBundle": "Import offline app bundle",
+      "exportOfflineBundle": "Export offline app bundle"
     },
     "fields": {
       "repository": "Repository",
-      "chartPackage": "Chart package",
-      "containerImage": "Container image",
       "deprecated": "Deprecated",
-      "imageArchive": "Image archive",
-      "imageRepository": "Image repository",
-      "imageTag": "Tag",
+      "offlineBundle": "Offline app bundle",
       "sources": "Sources",
       "keywords": "Keywords",
       "versions": "Versions",
@@ -1651,7 +1650,7 @@
     "filters": {
       "allRepositories": "All repositories",
       "artifactHub": "Artifact Hub",
-      "oci": "Offline OCI",
+      "oci": "Offline apps",
       "repositories": "Repositories",
       "verifiedPublisher": "Verified publisher"
     },
@@ -1668,22 +1667,19 @@
       "noChartUrl": "Chart package URL is missing.",
       "invalidValues": "Values must be a YAML object.",
       "artifactHubTrafficNotice": "Security notice: Kite contacts <artifactHub>Artifact Hub</artifactHub> when searching or viewing chart information from this source. Kite only displays third-party data and is not responsible for its content.",
-      "uploadDescription": "Upload a Helm chart package or a container image archive to the configured registry.",
-      "chartUploadDescription": "Upload a packaged Helm chart archive. Successful uploads appear in the Offline OCI catalog.",
-      "imageUploadDescription": "Upload a docker save tarball or OCI image archive. The image is pushed to the configured image registry and can be used in chart values.",
-      "chartUploadTarget": "Target: {{target}}. Limit: {{limit}}.",
-      "imageUploadTarget": "Target: {{target}}. Limit: {{limit}}.",
-      "chartUploadNotConfigured": "Helm OCI chart upload is not configured.",
-      "imageUploadNotConfigured": "Container image upload is not configured.",
-      "selectChartPackage": "Select a Helm chart package.",
-      "selectImageArchive": "Select a container image archive.",
-      "chartUploadSuccess": "Uploaded chart {{name}}",
-      "imageUploadSuccess": "Uploaded image {{name}}",
+      "uploadDescription": "Upload an offline app bundle to the configured registry.",
+      "offlineBundleDescription": "An offline app bundle binds Helm charts to the container images required by their rendered manifests. Import one bundle for multiple apps, or export selected offline apps for another cluster.",
+      "offlineBundleTarget": "Chart target: {{chartTarget}}. Image target: {{imageTarget}}. Bundle limit: {{limit}}.",
+      "offlineBundleNotConfigured": "Helm OCI chart registry and offline image registry are not fully configured.",
+      "selectOfflineBundle": "Select an offline app bundle.",
+      "offlineBundleImportSuccess": "Imported {{count}} offline apps",
+      "offlineBundleImportPartial": "{{count}} offline apps failed to import",
+      "offlineBundleImportSummary": "Import result: {{success}} succeeded, {{failed}} failed.",
+      "offlineBundleExportRequiresSelection": "Select offline apps to export first.",
+      "offlineBundleExportSuccess": "Exported {{count}} offline apps",
       "installed": "Helm release installed"
     },
     "placeholders": {
-      "imageRepository": "apps/demo",
-      "imageTag": "1.0.0",
       "search": "Search charts..."
     }
   },

@@ -225,7 +225,8 @@ For SQLite hostPath issues, see `docs/faq.md`. For production persistence, prefe
 - Kite discovers offline Helm OCI charts by scanning only the configured registry repository prefix (`helmCatalog.oci.base` / `KITE_HELM_OCI_REGISTRY_BASE`). It does not expose arbitrary registry contents outside that prefix.
 - Registry credentials and TLS options are server-side only. Chart read APIs return clean `oci://host/prefix/chart:version` URLs without credentials, query parameters, or fragments. Helm OCI tags encode SemVer build metadata by replacing `+` with `_`.
 - Offline chart artifacts and container images can share one registry host, but they use different repository paths. Keep charts under a dedicated prefix such as `oci://registry.internal/kite-helm/<chart>:<version>` and container images under their normal repositories such as `registry.internal/bitnami/nginx:<tag>`.
-- The admin UI shows one upload entry for repository uploads, but Kite keeps the backend flows separate. Helm chart packages use `POST /api/v1/admin/charts/oci/upload` and are pushed under `helmCatalog.oci.base`; container image archives use `POST /api/v1/admin/images/upload` and are pushed under `helmCatalog.imageUploads.registry` plus `helmCatalog.imageUploads.repositoryPrefix`.
+- The admin UI transfers offline apps as `.kiteapp.tar.gz` bundles, not as separate chart and image uploads. A bundle contains `kite-bundle.json`, one or more Helm chart archives, and the container image archives required by those charts after offline image values are rendered. Import validates the bundle, pushes all required images first, and pushes the chart last so a chart is not exposed in the catalog without its images. Export packages selected OCI catalog charts with their rendered workload images so the result can be imported into another configured Kite cluster.
+- The lower-level backend upload primitives remain separate for compatibility and internal use. Helm chart packages use `POST /api/v1/admin/charts/oci/upload` and are pushed under `helmCatalog.oci.base`; container image archives use `POST /api/v1/admin/images/upload` and are pushed under `helmCatalog.imageUploads.registry` plus `helmCatalog.imageUploads.repositoryPrefix`. Bundle import/export is exposed under `POST /api/v1/admin/charts/offline-bundles/import` and `POST /api/v1/admin/charts/offline-bundles/export`.
 - Minimal OCI discovery example:
 
 ```yaml
@@ -262,9 +263,11 @@ offline image registry is configured. Use separate Secret keys when the chart
 OCI registry and image upload registry credentials differ. The upload limits are
 rendered as `KITE_HELM_OCI_UPLOAD_MAX_BYTES` and
 `KITE_IMAGE_UPLOAD_MAX_BYTES`; keep any ingress or gateway body-size limit at
-least as high as the server-side limit.
+least as high as the server-side limit. The same image archive limit bounds
+offline bundle uploads.
 
-- Before installing an offline OCI chart, mirror its rendered workload images:
+- If you are preparing charts without Kite bundle export, mirror their rendered
+workload images before installing an offline OCI chart:
 
 ```bash
 scripts/mirror-helm-chart-images.sh \

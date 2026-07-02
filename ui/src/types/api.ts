@@ -198,6 +198,27 @@ export interface ContainerImageUploadResult {
   size: number
 }
 
+export interface OfflineBundleExportApplication {
+  repositoryName: string
+  chartName: string
+  version: string
+  values?: Record<string, unknown>
+}
+
+export interface OfflineBundleImportResult {
+  apps: OfflineBundleImportAppResult[]
+}
+
+export interface OfflineBundleImportAppResult {
+  name: string
+  version: string
+  chartUrl?: string
+  images?: ContainerImageUploadResult[]
+  chart?: OCIChartUploadResult
+  skipped?: boolean
+  error?: string
+}
+
 export type HelmChartSource = 'repository' | 'artifacthub' | 'oci'
 
 export interface HelmChart {
