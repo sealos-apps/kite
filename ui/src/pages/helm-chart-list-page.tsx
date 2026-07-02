@@ -307,18 +307,10 @@ function OfflineBundleTransferDialog({
   open,
   onOpenChange,
   onImported,
-  onExport,
-  isExporting,
-  selectedCharts,
-  onSelectionConsumed,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onImported: () => Promise<unknown>
-  onExport: () => Promise<void>
-  isExporting: boolean
-  selectedCharts: HelmChart[]
-  onSelectionConsumed: () => void
 }) {
   const { t } = useTranslation()
   const [config, setConfig] = useState<RepositoryUploadConfig | null>(null)
@@ -348,7 +340,7 @@ function OfflineBundleTransferDialog({
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && !isSubmitting && !isExporting) {
+    if (!nextOpen && !isSubmitting) {
       resetForm()
     }
     onOpenChange(nextOpen)
@@ -384,16 +376,6 @@ function OfflineBundleTransferDialog({
       setError(translateError(err, t))
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleExport = async () => {
-    setError('')
-    try {
-      await onExport()
-      onSelectionConsumed()
-    } catch (err) {
-      setError(translateError(err, t))
     }
   }
 
@@ -438,7 +420,7 @@ function OfflineBundleTransferDialog({
               onChange={(event) =>
                 setBundleFile(event.target.files?.[0] ?? null)
               }
-              disabled={isSubmitting || isExporting}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -458,34 +440,13 @@ function OfflineBundleTransferDialog({
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
-              disabled={isSubmitting || isExporting}
+              disabled={isSubmitting}
             >
               {t('common.cancel')}
             </Button>
             <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleExport()}
-              disabled={
-                isSubmitting ||
-                isExporting ||
-                isLoadingConfig ||
-                !isConfigured ||
-                selectedCharts.length === 0
-              }
-            >
-              {isExporting ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download className="size-4" />
-              )}
-              {t('helmCharts.actions.exportOfflineBundle')}
-            </Button>
-            <Button
               type="submit"
-              disabled={
-                isSubmitting || isExporting || isLoadingConfig || !isConfigured
-              }
+              disabled={isSubmitting || isLoadingConfig || !isConfigured}
             >
               {isSubmitting ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -1165,10 +1126,6 @@ export function HelmChartListPage() {
         open={uploadDialogOpen}
         onOpenChange={setUploadDialogOpen}
         onImported={handleChartUploaded}
-        onExport={handleExportSelectedCharts}
-        isExporting={isExportingBundle}
-        selectedCharts={selectedOCICharts}
-        onSelectionConsumed={() => setRowSelection({})}
       />
       <DeleteConfirmationDialog
         open={Boolean(repositoryToDelete)}
