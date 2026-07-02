@@ -209,6 +209,22 @@ export interface OfflineBundleImportResult {
   apps: OfflineBundleImportAppResult[]
 }
 
+export type OfflineBundleImportJobStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+
+export interface OfflineBundleImportJob {
+  id: string
+  status: OfflineBundleImportJobStatus
+  createdAt: string
+  updatedAt: string
+  completedAt?: string
+  result?: OfflineBundleImportResult
+  error?: string
+}
+
 export interface OfflineBundleImportAppResult {
   name: string
   version: string

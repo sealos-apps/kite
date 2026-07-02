@@ -30,6 +30,7 @@ import {
   OAuthProvider,
   OCIChartUploadResult,
   OfflineBundleExportApplication,
+  OfflineBundleImportJob,
   OfflineBundleImportResult,
   OverviewData,
   PodMetrics,
@@ -406,6 +407,25 @@ export const importOfflineApplicationBundle = (
   return apiClient.post<OfflineBundleImportResult>(
     '/admin/charts/offline-bundles/import',
     formData
+  )
+}
+
+export const startOfflineApplicationBundleImportJob = (
+  file: File
+): Promise<OfflineBundleImportJob> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post<OfflineBundleImportJob>(
+    '/admin/charts/offline-bundles/import-jobs',
+    formData
+  )
+}
+
+export const fetchOfflineApplicationBundleImportJob = (
+  id: string
+): Promise<OfflineBundleImportJob> => {
+  return apiClient.get<OfflineBundleImportJob>(
+    `/admin/charts/offline-bundles/import-jobs/${encodeURIComponent(id)}`
   )
 }
 

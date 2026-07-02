@@ -150,7 +150,9 @@ binds Helm chart archives to the rendered workload image archives required for
 offline install, can include multiple apps, and can be exported from one
 configured Kite cluster and imported into another. Import validates the bundle,
 pushes required images first, and pushes the chart last so the OCI catalog does
-not expose a chart whose images are missing.
+not expose a chart whose images are missing. The UI starts imports as
+background jobs after the bundle upload is accepted; job status is in-memory and
+may be lost if the Kite pod restarts.
 
 Kite still keeps the lower-level backend flows separate. Helm chart packages
 (`.tgz`) are pushed through the chart upload API into the configured
