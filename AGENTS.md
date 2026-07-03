@@ -47,6 +47,7 @@ Run from repo root unless noted:
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat:`, `fix:`, `chore(deps):`, `release vX.Y.Z`.
 - Keep commits scoped and descriptive; reference issues when relevant (for example `#383`).
+- For this repository, open PRs against `sealos-apps/kite:main`. Do not create PRs against `kite-org/kite`; GitHub may show it as parent metadata, but it is not this fork's upstream target unless the user explicitly overrides it.
 - PRs should include:
   - concise change summary and motivation,
   - verification steps/commands run (`make lint`, `make test`, `make build`),
