@@ -45,6 +45,7 @@ import {
   isVersionAtLeast,
   translateError,
 } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -313,13 +314,7 @@ function stripYamlMetadataChanges(content: string) {
 
   try {
     const parsed = yaml.load(content)
-    return yaml
-      .dump(stripMetadataLabelsAndAnnotations(parsed), {
-        indent: 2,
-        lineWidth: -1,
-        noRefs: true,
-      })
-      .trim()
+    return dumpKubernetesYaml(stripMetadataLabelsAndAnnotations(parsed)).trim()
   } catch {
     return content
   }
@@ -454,7 +449,7 @@ function HelmReleaseHistoryValuesDialog({
   item: HelmReleaseHistoryItem
 }) {
   const { t } = useTranslation()
-  const valuesYaml = yaml.dump(item.values || {}, { indent: 2 })
+  const valuesYaml = dumpKubernetesYaml(item.values || {})
 
   return (
     <Dialog>
@@ -984,14 +979,14 @@ function UpgradeHelmReleaseDialog({
   const [selectedRepository, setSelectedRepository] = useState('')
   const [selectedVersion, setSelectedVersion] = useState('')
   const [valuesYaml, setValuesYaml] = useState(() =>
-    yaml.dump(release.spec?.values || {}, { indent: 2 })
+    dumpKubernetesYaml(release.spec?.values || {})
   )
   const [forceConflicts, setForceConflicts] = useState(false)
   const [wait, setWait] = useState(false)
   const [rollbackOnFailure, setRollbackOnFailure] = useState(false)
   const [ignoreMetadataChanges, setIgnoreMetadataChanges] = useState(false)
   const releaseDefaultValues = useMemo(
-    () => yaml.dump(release.spec?.defaultValues || {}, { indent: 2 }),
+    () => dumpKubernetesYaml(release.spec?.defaultValues || {}),
     [release.spec?.defaultValues]
   )
   const [error, setError] = useState('')
@@ -1583,7 +1578,7 @@ export function HelmReleaseDetail(props: { namespace: string; name: string }) {
         label: t('helm.tabs.values'),
         content: data ? (
           <YamlEditor
-            value={yaml.dump(data.spec?.values || {}, { indent: 2 })}
+            value={dumpKubernetesYaml(data.spec?.values || {})}
             title={t('helm.tabs.values')}
             readOnly
             showControls={false}

@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 
 import { createResource } from '@/lib/api'
 import { translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { useCluster } from '@/hooks/use-cluster'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -419,7 +420,7 @@ export function DeploymentCreateDialog({
       },
     }
 
-    return yaml.dump(deployment, { indent: 2, noRefs: true })
+    return dumpKubernetesYaml(deployment)
   }
 
   const validateStep = (stepNum: number): boolean => {

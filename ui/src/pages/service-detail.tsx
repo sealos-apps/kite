@@ -5,7 +5,6 @@ import {
   IconRefresh,
   IconTrash,
 } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { Service } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -16,6 +15,7 @@ import { updateResource, useResource } from '@/lib/api'
 import { getOwnerInfo } from '@/lib/k8s'
 import { withSubPath } from '@/lib/subpath'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -49,7 +49,7 @@ export function ServiceDetail(props: { name: string; namespace?: string }) {
 
   useEffect(() => {
     if (data) {
-      setYamlContent(yaml.dump(data, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(data))
     }
   }, [data])
 

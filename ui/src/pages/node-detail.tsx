@@ -9,7 +9,6 @@ import {
   IconRefresh,
   IconReload,
 } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { Node } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -31,6 +30,7 @@ import {
   formatMemory,
   translateError,
 } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -98,7 +98,7 @@ export function NodeDetail(props: { name: string }) {
 
   useEffect(() => {
     if (data) {
-      setYamlContent(yaml.dump(data, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(data))
     }
   }, [data])
 

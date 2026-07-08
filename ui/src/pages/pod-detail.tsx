@@ -6,7 +6,6 @@ import {
   IconRefresh,
   IconTrash,
 } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { Container, Pod } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -16,6 +15,7 @@ import { resizePod, updateResource, useResource } from '@/lib/api'
 import { getOwnerInfo, getPodErrorMessage, getPodStatus } from '@/lib/k8s'
 import { withSubPath } from '@/lib/subpath'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { useCluster } from '@/hooks/use-cluster'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -71,7 +71,7 @@ export function PodDetail(props: { namespace: string; name: string }) {
 
   useEffect(() => {
     if (pod) {
-      setYamlContent(yaml.dump(pod, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(pod))
     }
   }, [pod])
 

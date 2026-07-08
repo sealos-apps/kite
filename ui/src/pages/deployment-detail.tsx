@@ -6,7 +6,6 @@ import {
   IconScale,
   IconTrash,
 } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { Deployment } from 'kubernetes-types/apps/v1'
 import { Container } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
@@ -20,6 +19,7 @@ import {
 } from '@/lib/api'
 import { getDeploymentStatus, toSimpleContainer } from '@/lib/k8s'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -87,7 +87,7 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
 
   useEffect(() => {
     if (deployment) {
-      setYamlContent(yaml.dump(deployment, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(deployment))
       setScaleReplicas(deployment.spec?.replicas || 1)
     }
   }, [deployment])

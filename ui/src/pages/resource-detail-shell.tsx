@@ -1,12 +1,12 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { IconLoader, IconRefresh, IconTrash } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { type ResourceType } from '@/types/api'
 import { cn, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -89,7 +89,7 @@ export function ResourceDetailShell<T>({
 
   useEffect(() => {
     if (data) {
-      setYamlContent(yaml.dump(data, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(data))
     }
   }, [data])
 

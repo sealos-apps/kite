@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 
 import { updateResource, useResource, useResourcesWatch } from '@/lib/api'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -83,7 +84,7 @@ export function StatefulSetDetail(props: { namespace: string; name: string }) {
 
   useEffect(() => {
     if (statefulset) {
-      setYamlContent(yaml.dump(statefulset, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(statefulset))
       setScaleReplicas(statefulset.spec?.replicas || 0)
     }
   }, [statefulset])

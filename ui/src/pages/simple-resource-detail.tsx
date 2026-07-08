@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { IconLoader, IconRefresh, IconTrash } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -9,6 +8,7 @@ import { ResourceType, ResourceTypeMap } from '@/types/api'
 import { updateResource, useResource } from '@/lib/api'
 import { getOwnerInfo } from '@/lib/k8s'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -55,7 +55,7 @@ export function SimpleResourceDetail<T extends ResourceType>(props: {
 
   useEffect(() => {
     if (data) {
-      setYamlContent(yaml.dump(data, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(data))
     }
   }, [data])
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import * as yaml from 'js-yaml'
 import { CustomResourceDefinition } from 'kubernetes-types/apiextensions/v1'
 import { get } from 'lodash'
 import { Eye } from 'lucide-react'
@@ -16,6 +15,7 @@ import {
   useBuiltinSidebarCRDs,
 } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { useCluster } from '@/hooks/use-cluster'
 import { Button } from '@/components/ui/button'
 import {
@@ -104,7 +104,7 @@ export function CRListPage() {
 
   const columnHelper = createColumnHelper<CustomResource>()
   const handleViewYaml = useCallback((crd: CustomResourceDefinition) => {
-    setYamlContent(yaml.dump(crd, { indent: 2 }))
+    setYamlContent(dumpKubernetesYaml(crd))
     setIsYamlDialogOpen(true)
   }, [])
   const extraToolbars = useMemo(() => {

@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 
 import { updateResource, useResource, useResourcesWatch } from '@/lib/api'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,7 +65,7 @@ export function DaemonSetDetail(props: { namespace: string; name: string }) {
 
   useEffect(() => {
     if (daemonset) {
-      setYamlContent(yaml.dump(daemonset, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(daemonset))
     }
   }, [daemonset])
 

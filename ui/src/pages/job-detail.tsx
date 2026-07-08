@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { IconLoader, IconRefresh, IconTrash } from '@tabler/icons-react'
 import { formatDistance } from 'date-fns'
-import * as yaml from 'js-yaml'
 import { Job } from 'kubernetes-types/batch/v1'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -10,6 +9,7 @@ import { toast } from 'sonner'
 import { updateResource, useResource, useResources } from '@/lib/api'
 import { getOwnerInfo } from '@/lib/k8s'
 import { formatDate, translateError } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -100,7 +100,7 @@ export function JobDetail(props: { namespace: string; name: string }) {
 
   useEffect(() => {
     if (job) {
-      setYamlContent(yaml.dump(job, { indent: 2 }))
+      setYamlContent(dumpKubernetesYaml(job))
     }
   }, [job])
 

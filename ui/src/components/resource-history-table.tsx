@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { IconAlertCircle, IconEye, IconLoader } from '@tabler/icons-react'
-import * as yaml from 'js-yaml'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ResourceHistory, ResourceType, ResourceTypeMap } from '@/types/api'
 import { applyResource, useResourceHistory } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 
 import { Column, SimpleTable } from './simple-table'
 import { Badge } from './ui/badge'
@@ -58,7 +58,7 @@ export function ResourceHistoryTable<T extends ResourceType>({
   const currentYaml = useMemo(() => {
     if (!currentResource) return ''
     try {
-      return yaml.dump(currentResource, { indent: 2, sortKeys: true })
+      return dumpKubernetesYaml(currentResource, { sortKeys: true })
     } catch (error) {
       console.error('Failed to convert current resource to YAML:', error)
       return ''

@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:yaml": "node --test --experimental-strip-types src/lib/yaml.test.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

@@ -1,6 +1,5 @@
-import * as yaml from 'js-yaml'
-
 import { getResourceSingular } from '@/lib/resource-metadata'
+import { dumpKubernetesYaml } from '@/lib/yaml'
 
 export function toSingularResource(resource: string) {
   return getResourceSingular(resource) || resource.toLowerCase()
@@ -104,13 +103,7 @@ export function buildToolYamlPreview(
           preview.metadata = metadata
         }
 
-        return yaml
-          .dump(preview, {
-            indent: 2,
-            lineWidth: -1,
-            noRefs: true,
-          })
-          .trim()
+        return dumpKubernetesYaml(preview).trim()
       } catch {
         return patch.trim()
       }

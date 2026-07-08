@@ -5,6 +5,7 @@ import * as yaml from 'js-yaml'
 import { editor as monacoEditor } from 'monaco-editor'
 import { useTranslation } from 'react-i18next'
 
+import { dumpKubernetesYaml } from '@/lib/yaml'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -101,7 +102,7 @@ export function YamlDiffViewer({
         }
 
         const cleaned = removeStatus(parsed)
-        return yaml.dump(cleaned, { indent: 2, sortKeys: true })
+        return dumpKubernetesYaml(cleaned, { sortKeys: true })
       }
     } catch (error) {
       console.error('Failed to remove status field from YAML:', error)
