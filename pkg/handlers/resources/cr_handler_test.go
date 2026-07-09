@@ -16,7 +16,9 @@ import (
 	"gorm.io/gorm"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -95,4 +97,116 @@ func TestCRHandlerListHistoryFindsPluralHistory(t *testing.T) {
 	require.Len(t, response.Data, 1)
 	require.Equal(t, "teams", response.Data[0].ResourceType)
 	require.Equal(t, "team-a", response.Data[0].ResourceName)
+}
+
+func TestCRHandlerListUsesNamespaceScopeForAllNamespaces(t *testing.T) {
+	router := newNamespaceScopedCRRouter(t, apiextensionsv1.NamespaceScoped)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/widgets.example.io/_all", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var response unstructured.UnstructuredList
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Len(t, response.Items, 1)
+	require.Equal(t, "team-a", response.Items[0].GetNamespace())
+	require.Equal(t, "widget-a", response.Items[0].GetName())
+}
+
+func TestCRHandlerRejectsOutsideNamespaceScope(t *testing.T) {
+	router := newNamespaceScopedCRRouter(t, apiextensionsv1.NamespaceScoped)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/widgets.example.io/team-b/widget-b", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "outside the current workspace scope team-a")
+}
+
+func TestCRHandlerRejectsClusterScopedCRDInNamespaceScopedCluster(t *testing.T) {
+	router := newNamespaceScopedCRRouter(t, apiextensionsv1.ClusterScoped)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/widgets.example.io/_all/widget-a", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "cluster-scoped custom resource widgets is not available")
+}
+
+func newNamespaceScopedCRRouter(t *testing.T, scope apiextensionsv1.ResourceScope) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	gvk := schema.GroupVersionKind{
+		Group:   "example.io",
+		Version: "v1",
+		Kind:    "Widget",
+	}
+	listGVK := schema.GroupVersionKind{
+		Group:   "example.io",
+		Version: "v1",
+		Kind:    "WidgetList",
+	}
+	scheme := runtime.NewScheme()
+	require.NoError(t, apiextensionsv1.AddToScheme(scheme))
+	scheme.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(listGVK, &unstructured.UnstructuredList{})
+
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "widgets.example.io",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "example.io",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Kind:     "Widget",
+				ListKind: "WidgetList",
+				Plural:   "widgets",
+			},
+			Scope: scope,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{Name: "v1", Served: true, Storage: true},
+			},
+		},
+	}
+	widgetA := newWidget("team-a", "widget-a")
+	widgetB := newWidget("team-b", "widget-b")
+	if scope == apiextensionsv1.ClusterScoped {
+		widgetA.SetNamespace("")
+		widgetB.SetNamespace("")
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("cluster", &cluster.ClientSet{
+			Name:            "test-cluster",
+			NamespaceScoped: true,
+			Namespace:       "team-a",
+			K8sClient: &kube.K8sClient{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(crd, widgetA, widgetB).
+					Build(),
+			},
+		})
+		c.Set("user", model.User{Username: "tester", Provider: "password"})
+	})
+	RegisterRoutes(router.Group("/api/v1"))
+	return router
+}
+
+func newWidget(namespace, name string) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "example.io",
+		Version: "v1",
+		Kind:    "Widget",
+	})
+	obj.SetNamespace(namespace)
+	obj.SetName(name)
+	return obj
 }

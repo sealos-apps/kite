@@ -22,8 +22,28 @@ func RBACMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid resource URL"})
 			return
 		}
-		if meta := common.LookupResource(resource); meta != nil {
+		meta := common.LookupResource(resource)
+		if meta != nil {
 			resource = string(meta.Plural)
+		}
+		if namespaceScopeLocked(cs) {
+			if meta != nil && meta.ClusterScoped {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+					"error": "cluster-scoped resource " + resource + " is not available in namespace-scoped workspaces",
+				})
+				return
+			}
+			scopedNamespace := strings.TrimSpace(cs.Namespace)
+			switch ns {
+			case "", common.AllNamespaces:
+				ns = scopedNamespace
+			case scopedNamespace:
+			default:
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+					"error": "namespace " + ns + " is outside the current workspace scope " + scopedNamespace,
+				})
+				return
+			}
 		}
 		if resource == "namespaces" && verbs == "get" {
 			// if user has roles, allow access to list namespaces resource
@@ -41,6 +61,11 @@ func RBACMiddleware() gin.HandlerFunc {
 				gin.H{"error": rbac.NoAccess(user.Key(), verbs, resource, ns, cs.Name)})
 		}
 	}
+}
+
+func namespaceScopeLocked(cs *cluster.ClientSet) bool {
+	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" &&
+		!common.IsNamespaceScopeExempt(cs.Namespace)
 }
 
 func method2verb(method string) string {

@@ -31,6 +31,30 @@ import (
 type CRHandler struct {
 }
 
+type customResourceRequestError struct {
+	status  int
+	message string
+}
+
+func (e *customResourceRequestError) Error() string {
+	return e.message
+}
+
+func writeCustomResourceRequestError(c *gin.Context, err error) {
+	if err == nil {
+		return
+	}
+	if _, ok := err.(*namespaceScopeError); ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if requestErr, ok := err.(*customResourceRequestError); ok {
+		c.JSON(requestErr.status, gin.H{"error": requestErr.Error()})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+}
+
 // NewCRHandler creates a new CRHandler
 func NewCRHandler() *CRHandler {
 	return &CRHandler{}
@@ -68,6 +92,52 @@ func (h *CRHandler) historyResourceType(crd *apiextensionsv1.CustomResourceDefin
 		return crd.Spec.Names.Plural
 	}
 	return crd.Name
+}
+
+func (h *CRHandler) resolveCustomResourceNamespace(c *gin.Context, crd *apiextensionsv1.CustomResourceDefinition, requireNamespace bool) (string, error) {
+	return h.resolveCustomResourceNamespaceValue(c, crd, c.Param("namespace"), requireNamespace)
+}
+
+func (h *CRHandler) resolveCustomResourceNamespaceValue(c *gin.Context, crd *apiextensionsv1.CustomResourceDefinition, requested string, requireNamespace bool) (string, error) {
+	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	requested = strings.TrimSpace(requested)
+	resourceName := h.historyResourceType(crd)
+
+	if crd.Spec.Scope == apiextensionsv1.ClusterScoped {
+		if isNamespaceScopeLocked(cs) {
+			return "", &customResourceRequestError{
+				status:  http.StatusForbidden,
+				message: "cluster-scoped custom resource " + resourceName + " is not available in namespace-scoped workspaces",
+			}
+		}
+		return "", nil
+	}
+
+	if isNamespaceScopeLocked(cs) {
+		scopedNamespace := strings.TrimSpace(cs.Namespace)
+		if requested == "" || requested == common.AllNamespaces {
+			return scopedNamespace, nil
+		}
+		if requested != scopedNamespace {
+			return "", &namespaceScopeError{
+				resource:  resourceName,
+				requested: requested,
+				scoped:    scopedNamespace,
+			}
+		}
+		return scopedNamespace, nil
+	}
+
+	if requested == "" || requested == common.AllNamespaces {
+		if requireNamespace {
+			return "", &customResourceRequestError{
+				status:  http.StatusBadRequest,
+				message: "namespace is required for namespaced custom resources",
+			}
+		}
+		return requested, nil
+	}
+	return requested, nil
 }
 
 func (h *CRHandler) historyResourceTypes(crd *apiextensionsv1.CustomResourceDefinition) []string {
@@ -175,11 +245,13 @@ func (h *CRHandler) List(c *gin.Context) {
 	opts := &client.ListOptions{}
 
 	// Handle namespace parameter for namespaced resources
-	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
-		namespace := c.Param("namespace")
-		if namespace != "" && namespace != common.AllNamespaces {
-			opts.Namespace = namespace
-		}
+	namespace, err := h.resolveCustomResourceNamespace(c, crd, false)
+	if err != nil {
+		writeCustomResourceRequestError(c, err)
+		return
+	}
+	if namespace != "" && namespace != common.AllNamespaces {
+		opts.Namespace = namespace
 	}
 
 	if err := cs.K8sClient.List(ctx, crList, opts); err != nil {
@@ -226,18 +298,17 @@ func (h *CRHandler) Get(c *gin.Context) {
 
 	var namespacedName types.NamespacedName
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
-		namespace := c.Param("namespace")
-		// Handle both regular namespace and _all routing
-		if namespace == common.AllNamespaces {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace/:name endpoint"})
-			return
-		}
-		if namespace == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "namespace is required for namespaced custom resources"})
+		namespace, err := h.resolveCustomResourceNamespace(c, crd, true)
+		if err != nil {
+			writeCustomResourceRequestError(c, err)
 			return
 		}
 		namespacedName = types.NamespacedName{Namespace: namespace, Name: name}
 	} else {
+		if _, err := h.resolveCustomResourceNamespace(c, crd, false); err != nil {
+			writeCustomResourceRequestError(c, err)
+			return
+		}
 		// For cluster-scoped resources, ignore namespace parameter
 		namespacedName = types.NamespacedName{Name: name}
 	}
@@ -299,16 +370,15 @@ func (h *CRHandler) Create(c *gin.Context) {
 
 	// Set namespace for namespaced resources
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
-		namespace := c.Param("namespace")
-		if namespace == common.AllNamespaces {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace endpoint"})
-			return
-		}
-		if namespace == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "namespace is required for namespaced custom resources"})
+		namespace, err := h.resolveCustomResourceNamespace(c, crd, true)
+		if err != nil {
+			writeCustomResourceRequestError(c, err)
 			return
 		}
 		cr.SetNamespace(namespace)
+	} else if _, err := h.resolveCustomResourceNamespace(c, crd, false); err != nil {
+		writeCustomResourceRequestError(c, err)
+		return
 	}
 
 	var success bool
@@ -363,17 +433,17 @@ func (h *CRHandler) Update(c *gin.Context) {
 
 	var namespacedName types.NamespacedName
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
-		namespace := c.Param("namespace")
-		if namespace == common.AllNamespaces {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace/:name endpoint"})
-			return
-		}
-		if namespace == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "namespace is required for namespaced custom resources"})
+		namespace, err := h.resolveCustomResourceNamespace(c, crd, true)
+		if err != nil {
+			writeCustomResourceRequestError(c, err)
 			return
 		}
 		namespacedName = types.NamespacedName{Namespace: namespace, Name: name}
 	} else {
+		if _, err := h.resolveCustomResourceNamespace(c, crd, false); err != nil {
+			writeCustomResourceRequestError(c, err)
+			return
+		}
 		namespacedName = types.NamespacedName{Name: name}
 	}
 
@@ -442,8 +512,9 @@ func (h *CRHandler) ListHistory(c *gin.Context) {
 		return
 	}
 
-	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped && (namespace == "" || namespace == common.AllNamespaces) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace is required for namespaced custom resources"})
+	namespace, err = h.resolveCustomResourceNamespace(c, crd, true)
+	if err != nil {
+		writeCustomResourceRequestError(c, err)
 		return
 	}
 
@@ -532,18 +603,18 @@ func (h *CRHandler) Delete(c *gin.Context) {
 
 	var namespacedName types.NamespacedName
 	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
-		namespace := c.Param("namespace")
-		if namespace == common.AllNamespaces {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "This custom resource is namespace-scoped, use /:crd/:namespace/:name endpoint"})
-			return
-		}
-		if namespace == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "namespace is required for namespaced custom resources"})
+		namespace, err := h.resolveCustomResourceNamespace(c, crd, true)
+		if err != nil {
+			writeCustomResourceRequestError(c, err)
 			return
 		}
 		namespacedName = types.NamespacedName{Namespace: namespace, Name: name}
 		cr.SetNamespace(namespace)
 	} else {
+		if _, err := h.resolveCustomResourceNamespace(c, crd, false); err != nil {
+			writeCustomResourceRequestError(c, err)
+			return
+		}
 		namespacedName = types.NamespacedName{Name: name}
 	}
 	cr.SetName(name)
@@ -643,7 +714,11 @@ func (h *CRHandler) Describe(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create describer"})
 		return
 	}
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveCustomResourceNamespace(c, crd, true)
+	if err != nil {
+		writeCustomResourceRequestError(c, err)
+		return
+	}
 	out, err := describer.Describe(namespace, name, describe.DescriberSettings{
 		ShowEvents: true,
 	})

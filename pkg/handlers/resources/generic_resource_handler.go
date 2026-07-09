@@ -108,13 +108,80 @@ func (h *GenericResourceHandler[T, V]) Searchable() bool {
 	return h.enableSearch
 }
 
+type namespaceScopeError struct {
+	resource  string
+	requested string
+	scoped    string
+}
+
+func (e *namespaceScopeError) Error() string {
+	if e.requested == "" || e.requested == common.AllNamespaces {
+		return "namespace-scoped workspace requires current workspace namespace"
+	}
+	return "namespace " + e.requested + " is outside the current workspace scope " + e.scoped
+}
+
+func isNamespaceScopeLocked(cs *cluster.ClientSet) bool {
+	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" &&
+		!common.IsNamespaceScopeExempt(cs.Namespace)
+}
+
+func (h *GenericResourceHandler[T, V]) resolveNamespace(c *gin.Context, requested string) (string, error) {
+	if h.isClusterScoped {
+		return "", nil
+	}
+
+	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	requested = strings.TrimSpace(requested)
+	if !isNamespaceScopeLocked(cs) {
+		return requested, nil
+	}
+
+	scopedNamespace := strings.TrimSpace(cs.Namespace)
+	if requested == "" || requested == common.AllNamespaces {
+		return scopedNamespace, nil
+	}
+	if requested != scopedNamespace {
+		return "", &namespaceScopeError{
+			resource:  h.name,
+			requested: requested,
+			scoped:    scopedNamespace,
+		}
+	}
+	return scopedNamespace, nil
+}
+
+func writeResourceError(c *gin.Context, err error) {
+	if _, ok := err.(*namespaceScopeError); ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.IsNotFound(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if errors.IsForbidden(err) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.IsUnauthorized(err) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+}
+
 func (h *GenericResourceHandler[T, V]) GetResource(c *gin.Context, namespace, name string) (interface{}, error) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 	object := reflect.New(h.objectType).Interface().(T)
 	namespacedName := types.NamespacedName{Name: name}
 	if !h.isClusterScoped {
-		if namespace != "" && namespace != common.AllNamespaces {
-			namespacedName.Namespace = namespace
+		resolvedNamespace, err := h.resolveNamespace(c, namespace)
+		if err != nil {
+			return nil, err
+		}
+		if resolvedNamespace != "" && resolvedNamespace != common.AllNamespaces {
+			namespacedName.Namespace = resolvedNamespace
 		}
 	}
 	if err := cs.K8sClient.Get(c.Request.Context(), namespacedName, object); err != nil {
@@ -126,11 +193,7 @@ func (h *GenericResourceHandler[T, V]) GetResource(c *gin.Context, namespace, na
 func (h *GenericResourceHandler[T, V]) Get(c *gin.Context) {
 	object, err := h.GetResource(c, c.Param("namespace"), c.Param("name"))
 	if err != nil {
-		if errors.IsNotFound(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeResourceError(c, err)
 		return
 	}
 	obj, err := meta.Accessor(object)
@@ -157,6 +220,12 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 	var listOpts []client.ListOption
 	namespace := c.Param("namespace")
 	if !h.isClusterScoped {
+		var err error
+		namespace, err = h.resolveNamespace(c, namespace)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return zero, err
+		}
 		if namespace != "" && namespace != common.AllNamespaces {
 			listOpts = append(listOpts, client.InNamespace(namespace))
 		}
@@ -275,6 +344,14 @@ func (h *GenericResourceHandler[T, V]) Create(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if !h.isClusterScoped && namespace != "" && namespace != common.AllNamespaces {
+		resource.SetNamespace(namespace)
+	}
 
 	var success bool
 	var errMsg string
@@ -304,12 +381,17 @@ func (h *GenericResourceHandler[T, V]) Update(c *gin.Context) {
 	}
 
 	oldObj := reflect.New(h.objectType).Interface().(T)
-	namespacedName := types.NamespacedName{Name: name, Namespace: c.Param("namespace")}
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	namespacedName := types.NamespacedName{Name: name, Namespace: namespace}
 	if h.isClusterScoped {
 		namespacedName = types.NamespacedName{Name: name}
 	}
 	if err := cs.K8sClient.Get(c.Request.Context(), namespacedName, oldObj); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeResourceError(c, err)
 		return
 	}
 
@@ -321,7 +403,6 @@ func (h *GenericResourceHandler[T, V]) Update(c *gin.Context) {
 
 	resource.SetName(name)
 	if !h.isClusterScoped {
-		namespace := c.Param("namespace")
 		if namespace != "" && namespace != common.AllNamespaces {
 			resource.SetNamespace(namespace)
 		}
@@ -358,18 +439,18 @@ func (h *GenericResourceHandler[T, V]) Patch(c *gin.Context) {
 	oldObj := reflect.New(h.objectType).Interface().(T)
 	namespacedName := types.NamespacedName{Name: name}
 	if !h.isClusterScoped {
-		namespace := c.Param("namespace")
+		namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		if namespace != "" && namespace != common.AllNamespaces {
 			namespacedName.Namespace = namespace
 		}
 	}
 	ctx := c.Request.Context()
 	if err := cs.K8sClient.Get(ctx, namespacedName, oldObj); err != nil {
-		if errors.IsNotFound(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeResourceError(c, err)
 		return
 	}
 
@@ -399,7 +480,11 @@ func (h *GenericResourceHandler[T, V]) Delete(c *gin.Context) {
 
 	namespacedName := types.NamespacedName{Name: name}
 	if !h.isClusterScoped {
-		namespace := c.Param("namespace")
+		namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		if namespace != "" && namespace != common.AllNamespaces {
 			namespacedName.Namespace = namespace
 		}
@@ -407,11 +492,7 @@ func (h *GenericResourceHandler[T, V]) Delete(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	if err := cs.K8sClient.Get(ctx, namespacedName, resource); err != nil {
-		if errors.IsNotFound(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeResourceError(c, err)
 		return
 	}
 
@@ -519,7 +600,11 @@ func (h *GenericResourceHandler[T, V]) registerCustomRoutes(group *gin.RouterGro
 
 func (h *GenericResourceHandler[T, V]) ListHistory(c *gin.Context) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	resourceName := c.Param("name")
 	pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	if err != nil {
@@ -574,7 +659,11 @@ func (h *GenericResourceHandler[T, V]) Describe(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no describer found for this resource"})
 		return
 	}
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	name := c.Param("name")
 	out, err := describer.Describe(namespace, name, describe.DescriberSettings{
 		ShowEvents: true,

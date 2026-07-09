@@ -107,7 +107,11 @@ func (h *PodHandler) ListMetrics(c *gin.Context) (map[string]metricsv1.PodMetric
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 	var metricsList metricsv1.PodMetricsList
 	var listOpts []client.ListOption
-	if namespace := c.Param("namespace"); namespace != "" && namespace != common.AllNamespaces {
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		return nil, err
+	}
+	if namespace != "" && namespace != common.AllNamespaces {
 		listOpts = append(listOpts, client.InNamespace(namespace))
 	}
 	if labelSelector := c.Query("labelSelector"); labelSelector != "" {
@@ -191,14 +195,18 @@ func (h *PodHandler) Resize(c *gin.Context) {
 	}
 
 	name := c.Param("name")
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	oldPod := &corev1.Pod{}
 	namespacedName := types.NamespacedName{Name: name}
 	if namespace != "" && namespace != common.AllNamespaces {
 		namespacedName.Namespace = namespace
 	}
 	if err := cs.K8sClient.Get(c.Request.Context(), namespacedName, oldPod); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeResourceError(c, err)
 		return
 	}
 
@@ -259,7 +267,12 @@ func (h *PodHandler) registerCustomRoutes(group *gin.RouterGroup) {
 	filesGroup.Use(func(c *gin.Context) {
 		user := c.MustGet("user").(model.User)
 		cs := c.MustGet("cluster").(*cluster.ClientSet)
-		namespace := c.Param("namespace")
+		namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			c.Abort()
+			return
+		}
 		if !rbac.CanAccess(user, "pods", string(common.VerbExec), cs.Name, namespace) {
 			c.JSON(http.StatusForbidden, gin.H{"error": rbac.NoAccess(user.Key(), string(common.VerbExec), "pods", namespace, cs.Name)})
 			c.Abort()
@@ -284,7 +297,11 @@ type FileInfo struct {
 }
 
 func (h *PodHandler) ListFiles(c *gin.Context) {
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	podName := c.Param("name")
 	container := c.Query("container")
 	path := c.Query("path")
@@ -359,7 +376,11 @@ func parseLsOutput(output string) []FileInfo {
 }
 
 func (h *PodHandler) PreviewFile(c *gin.Context) {
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	podName := c.Param("name")
 	container := c.Query("container")
 	path := c.Query("path")
@@ -381,7 +402,7 @@ func (h *PodHandler) PreviewFile(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filepath.Base(path)))
 
-	err := cs.K8sClient.ExecCommand(c.Request.Context(), kube.ExecOptions{
+	err = cs.K8sClient.ExecCommand(c.Request.Context(), kube.ExecOptions{
 		Namespace:     namespace,
 		PodName:       podName,
 		ContainerName: container,
@@ -397,7 +418,11 @@ func (h *PodHandler) PreviewFile(c *gin.Context) {
 }
 
 func (h *PodHandler) DownloadFile(c *gin.Context) {
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	podName := c.Param("name")
 	container := c.Query("container")
 	path := c.Query("path")
@@ -411,7 +436,7 @@ func (h *PodHandler) DownloadFile(c *gin.Context) {
 	if strings.Contains(path, "->") {
 		path = strings.TrimSpace(strings.SplitN(path, "->", 2)[0])
 	}
-	_, _, err := cs.K8sClient.ExecCommandBuffered(c.Request.Context(), namespace, podName, container, []string{"test", "-d", path})
+	_, _, err = cs.K8sClient.ExecCommandBuffered(c.Request.Context(), namespace, podName, container, []string{"test", "-d", path})
 	isDir := err == nil
 
 	var cmd []string
@@ -441,7 +466,11 @@ func (h *PodHandler) DownloadFile(c *gin.Context) {
 }
 
 func (h *PodHandler) UploadFile(c *gin.Context) {
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	podName := c.Param("name")
 	container := c.Query("container")
 	path := c.Query("path")
@@ -522,7 +551,11 @@ func (h *PodHandler) Watch(c *gin.Context) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 
 	// Parse params
-	namespace := c.Param("namespace")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	if namespace == "" {
 		namespace = common.AllNamespaces
 	}

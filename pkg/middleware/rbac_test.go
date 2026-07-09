@@ -1,7 +1,16 @@
 package middleware
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/zxh326/kite/pkg/cluster"
+	"github.com/zxh326/kite/pkg/common"
+	"github.com/zxh326/kite/pkg/model"
+	"github.com/zxh326/kite/pkg/rbac"
 )
 
 func TestUrl2NamespaceResource(t *testing.T) {
@@ -58,4 +67,76 @@ func TestUrl2NamespaceResource(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRBACMiddlewareNormalizesAllNamespaceForNamespaceScopedCluster(t *testing.T) {
+	router := newNamespaceScopedRBACRouter(t)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/configmaps/_all/app-config", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /_all returned status %d, want %d: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+}
+
+func TestRBACMiddlewareRejectsOutsideNamespaceScopedCluster(t *testing.T) {
+	router := newNamespaceScopedRBACRouter(t)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/configmaps/team-b/app-config", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("GET outside namespace returned status %d, want %d", w.Code, http.StatusForbidden)
+	}
+	if got := w.Body.String(); got == "" || !strings.Contains(got, "outside the current workspace scope team-a") {
+		t.Fatalf("unexpected response body: %s", got)
+	}
+}
+
+func newNamespaceScopedRBACRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	previousConfig := rbac.RBACConfig
+	t.Cleanup(func() {
+		rbac.RBACConfig = previousConfig
+	})
+	rbac.RBACConfig = &common.RolesConfig{
+		Roles: []common.Role{
+			{
+				Name:       "scoped",
+				Clusters:   []string{"test-cluster"},
+				Namespaces: []string{"team-a"},
+				Resources:  []string{"configmaps"},
+				Verbs:      []string{"get"},
+			},
+		},
+		RoleMapping: []common.RoleMapping{
+			{
+				Name:  "scoped",
+				Users: []string{"alice"},
+			},
+		},
+	}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user", model.User{Username: "alice"})
+		c.Set("cluster", &cluster.ClientSet{
+			Name:            "test-cluster",
+			NamespaceScoped: true,
+			Namespace:       "team-a",
+		})
+	})
+	router.Use(RBACMiddleware())
+	router.GET("/api/v1/configmaps/_all/app-config", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	router.GET("/api/v1/configmaps/team-b/app-config", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	return router
 }

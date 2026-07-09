@@ -30,6 +30,30 @@ const (
 
 type HelmReleaseHandler struct{}
 
+type helmReleaseRequestError struct {
+	status  int
+	message string
+}
+
+func (e *helmReleaseRequestError) Error() string {
+	return e.message
+}
+
+func writeHelmReleaseError(c *gin.Context, err error, fallbackStatus int) {
+	if err == nil {
+		return
+	}
+	if _, ok := err.(*namespaceScopeError); ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if requestErr, ok := err.(*helmReleaseRequestError); ok {
+		c.JSON(requestErr.status, gin.H{"error": requestErr.Error()})
+		return
+	}
+	c.JSON(fallbackStatus, gin.H{"error": err.Error()})
+}
+
 type helmReleaseRunResult struct {
 	current    *release.Release
 	release    *release.Release
@@ -54,7 +78,12 @@ func NewHelmReleaseHandler() *HelmReleaseHandler    { return &HelmReleaseHandler
 func (h *HelmReleaseHandler) IsClusterScoped() bool { return false }
 func (h *HelmReleaseHandler) Searchable() bool      { return false }
 func (h *HelmReleaseHandler) ListHistory(c *gin.Context) {
-	cfg, err := h.actionConfig(c, c.Param("namespace"))
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
+		return
+	}
+	cfg, err := h.actionConfig(c, namespace)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -88,9 +117,9 @@ func (h *HelmReleaseHandler) DryRunInstall(c *gin.Context) {
 
 func (h *HelmReleaseHandler) runInstall(c *gin.Context, dryRun bool) (result helmReleaseRunResult, status int, err error) {
 	ctx := c.Request.Context()
-	namespace := strings.TrimSpace(c.Param("namespace"))
-	if namespace == "" || namespace == common.AllNamespaces {
-		return helmReleaseRunResult{}, http.StatusBadRequest, fmt.Errorf("namespace is required")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		return helmReleaseRunResult{}, helmReleaseErrorStatus(err), err
 	}
 
 	var req helmReleaseInstallRequest
@@ -201,7 +230,7 @@ func (h *HelmReleaseHandler) Patch(c *gin.Context) {
 func (h *HelmReleaseHandler) Describe(c *gin.Context) {
 	obj, err := h.get(c, c.Param("namespace"), c.Param("name"), true)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -229,7 +258,7 @@ func (h *HelmReleaseHandler) registerCustomRoutes(group *gin.RouterGroup) {
 func (h *HelmReleaseHandler) List(c *gin.Context) {
 	list, err := h.list(c, c.Param("namespace"), false)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, list)
@@ -237,7 +266,7 @@ func (h *HelmReleaseHandler) List(c *gin.Context) {
 func (h *HelmReleaseHandler) Get(c *gin.Context) {
 	obj, err := h.get(c, c.Param("namespace"), c.Param("name"), true)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, obj)
@@ -272,12 +301,18 @@ func (h *HelmReleaseHandler) Search(c *gin.Context, q string, limit int64) ([]co
 
 func (h *HelmReleaseHandler) Delete(c *gin.Context) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
-	cfg, err := h.actionConfig(c, c.Param("namespace"))
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
+		return
+	}
+	name := c.Param("name")
+	cfg, err := h.actionConfig(c, namespace)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	current, err := helmutil.GetRelease(cfg, c.Param("name"))
+	current, err := helmutil.GetRelease(cfg, name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -285,7 +320,7 @@ func (h *HelmReleaseHandler) Delete(c *gin.Context) {
 	success := false
 	var runErr error
 	defer func() {
-		h.recordHistory(c, "delete", c.Param("name"), c.Param("namespace"), current, nil, success, runErr)
+		h.recordHistory(c, "delete", name, namespace, current, nil, success, runErr)
 	}()
 
 	user := c.MustGet("user").(model.User)
@@ -295,7 +330,7 @@ func (h *HelmReleaseHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := helmutil.UninstallRelease(cfg, c.Param("name"), helmutil.UninstallReleaseOptions{
+	if err := helmutil.UninstallRelease(cfg, name, helmutil.UninstallReleaseOptions{
 		Timeout:     helmActionTimeout,
 		Description: "Deleted from Kite",
 	}); err != nil {
@@ -344,7 +379,11 @@ func (h *HelmReleaseHandler) DryRunUpgrade(c *gin.Context) {
 
 func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result helmReleaseRunResult, status int, err error) {
 	ctx := c.Request.Context()
-	namespace, name := c.Param("namespace"), c.Param("name")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		return helmReleaseRunResult{}, helmReleaseErrorStatus(err), err
+	}
+	name := c.Param("name")
 	var req helmReleaseActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		return helmReleaseRunResult{}, http.StatusBadRequest, err
@@ -477,7 +516,12 @@ func (h *HelmReleaseHandler) runUpgrade(c *gin.Context, dryRun bool) (result hel
 }
 
 func (h *HelmReleaseHandler) Rollback(c *gin.Context) {
-	namespace, name := c.Param("namespace"), c.Param("name")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
+		return
+	}
+	name := c.Param("name")
 	var req helmReleaseActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -510,7 +554,7 @@ func (h *HelmReleaseHandler) Rollback(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no previous helm release revision found"})
 		return
 	}
-	if err := h.authorizeHelmRollback(c, current, name, targetRevision); err != nil {
+	if err := h.authorizeHelmRollback(c, current, name, targetRevision, namespace); err != nil {
 		runErr = err
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -552,8 +596,7 @@ func (h *HelmReleaseHandler) authorizeHelmUpgradePreview(c *gin.Context, current
 	return helmguard.AuthorizeReleaseChange(c.Request.Context(), user, cs, current, preview)
 }
 
-func (h *HelmReleaseHandler) authorizeHelmRollback(c *gin.Context, current *release.Release, name string, revision int) error {
-	namespace := c.Param("namespace")
+func (h *HelmReleaseHandler) authorizeHelmRollback(c *gin.Context, current *release.Release, name string, revision int, namespace string) error {
 	cfg, err := h.actionConfig(c, namespace)
 	if err != nil {
 		return err
@@ -576,6 +619,10 @@ func (h *HelmReleaseHandler) authorizeCreateNamespace(c *gin.Context, namespace 
 func (h *HelmReleaseHandler) list(c *gin.Context, namespace string, details bool) (*helmutil.HelmReleaseList, error) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 	user := c.MustGet("user").(model.User)
+	namespace, err := h.resolveNamespace(c, namespace, false)
+	if err != nil {
+		return nil, err
+	}
 	allNamespaces := namespace == "" || namespace == common.AllNamespaces
 	cfg, err := h.actionConfigForClientSet(cs, helmutil.StorageNamespace(namespace))
 	if err != nil {
@@ -598,6 +645,10 @@ func (h *HelmReleaseHandler) list(c *gin.Context, namespace string, details bool
 
 func (h *HelmReleaseHandler) get(c *gin.Context, namespace, name string, details bool) (*helmutil.HelmRelease, error) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	namespace, err := h.resolveNamespace(c, namespace, true)
+	if err != nil {
+		return nil, err
+	}
 	cfg, err := h.actionConfigForClientSet(cs, helmutil.StorageNamespace(namespace))
 	if err != nil {
 		return nil, err
@@ -617,6 +668,45 @@ func (h *HelmReleaseHandler) actionConfig(c *gin.Context, namespace string) (*ac
 
 func (h *HelmReleaseHandler) actionConfigForClientSet(cs *cluster.ClientSet, namespace string) (*action.Configuration, error) {
 	return helmutil.NewActionConfig(cs.K8sClient.Configuration, namespace)
+}
+
+func (h *HelmReleaseHandler) resolveNamespace(c *gin.Context, requested string, requireNamespace bool) (string, error) {
+	cs := c.MustGet("cluster").(*cluster.ClientSet)
+	requested = strings.TrimSpace(requested)
+	if isNamespaceScopeLocked(cs) {
+		scopedNamespace := strings.TrimSpace(cs.Namespace)
+		if requested == "" || requested == common.AllNamespaces {
+			return scopedNamespace, nil
+		}
+		if requested != scopedNamespace {
+			return "", &namespaceScopeError{
+				resource:  string(common.HelmReleases),
+				requested: requested,
+				scoped:    scopedNamespace,
+			}
+		}
+		return scopedNamespace, nil
+	}
+	if requested == "" || requested == common.AllNamespaces {
+		if requireNamespace {
+			return "", &helmReleaseRequestError{
+				status:  http.StatusBadRequest,
+				message: "namespace is required",
+			}
+		}
+		return requested, nil
+	}
+	return requested, nil
+}
+
+func helmReleaseErrorStatus(err error) int {
+	if _, ok := err.(*namespaceScopeError); ok {
+		return http.StatusForbidden
+	}
+	if requestErr, ok := err.(*helmReleaseRequestError); ok {
+		return requestErr.status
+	}
+	return http.StatusInternalServerError
 }
 
 func helmReleaseID(release helmutil.HelmRelease) string {
@@ -665,7 +755,12 @@ type helmReleaseAutoUpgradeResponse struct {
 
 func (h *HelmReleaseHandler) GetAutoUpgrade(c *gin.Context) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
-	namespace, name := c.Param("namespace"), c.Param("name")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
+		return
+	}
+	name := c.Param("name")
 	task, err := getHelmReleaseAutoUpgradeTask(cs.Name, namespace, name)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -696,7 +791,12 @@ func (h *HelmReleaseHandler) GetAutoUpgrade(c *gin.Context) {
 func (h *HelmReleaseHandler) UpdateAutoUpgrade(c *gin.Context) {
 	cs := c.MustGet("cluster").(*cluster.ClientSet)
 	user := c.MustGet("user").(model.User)
-	namespace, name := c.Param("namespace"), c.Param("name")
+	namespace, err := h.resolveNamespace(c, c.Param("namespace"), true)
+	if err != nil {
+		writeHelmReleaseError(c, err, http.StatusInternalServerError)
+		return
+	}
+	name := c.Param("name")
 	var req helmReleaseAutoUpgradeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

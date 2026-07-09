@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { clusterScopeResources, ResourceType } from '@/types/api'
@@ -36,11 +36,31 @@ function getResourceTypeName(resource: string): string {
 
 export function ResourceDetail() {
   const { resource, namespace, name } = useParams()
-  const { currentClusterInfo } = useCluster()
+  const location = useLocation()
+  const {
+    clusters,
+    currentCluster,
+    currentClusterInfo,
+    isLoading: isClusterLoading,
+  } = useCluster()
+  const isClusterContextPending =
+    isClusterLoading ||
+    (clusters.length > 0 && (!currentCluster || !currentClusterInfo))
+  const isClusterScopedResource =
+    !!resource && clusterScopeResources.includes(resource as ResourceType)
   const isClusterScopeBlocked =
-    !!resource &&
-    !!currentClusterInfo?.namespaceScoped &&
-    clusterScopeResources.includes(resource as ResourceType)
+    !!currentClusterInfo?.namespaceScoped && isClusterScopedResource
+  const scopedNamespace =
+    currentClusterInfo?.namespaceScoped && currentClusterInfo.namespace
+      ? currentClusterInfo.namespace
+      : undefined
+  const shouldUseScopedNamespace =
+    !!scopedNamespace && !!resource && !isClusterScopedResource
+  const isOutsideScopedNamespace =
+    shouldUseScopedNamespace && !!namespace && namespace !== scopedNamespace
+  const effectiveNamespace = shouldUseScopedNamespace
+    ? scopedNamespace
+    : namespace
 
   useEffect(() => {
     if (!isClusterScopeBlocked) return
@@ -52,13 +72,43 @@ export function ResourceDetail() {
     )
   }, [isClusterScopeBlocked])
 
+  useEffect(() => {
+    if (!isOutsideScopedNamespace) return
+    toast.warning(
+      'Workspace namespace changed. Showing resources from the current workspace.',
+      {
+        id: 'namespace-scope-route-guard',
+      }
+    )
+  }, [isOutsideScopedNamespace])
+
   const resourceTypeName = resource ? getResourceTypeName(resource) : ''
   const pageTitle =
     resource && name ? `${name} (${resourceTypeName})` : 'Resource'
   usePageTitle(pageTitle)
 
+  if (isClusterContextPending) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (isClusterScopeBlocked) {
     return <Navigate to="/" replace />
+  }
+
+  if (isOutsideScopedNamespace) {
+    const isCustomResourceRoute = location.pathname
+      .split('/')
+      .filter(Boolean)[0] === 'crds'
+    const listPath = isCustomResourceRoute ? `/crds/${resource}` : `/${resource}`
+    return <Navigate to={listPath} replace />
   }
 
   if (!resource || !name) {
@@ -77,28 +127,28 @@ export function ResourceDetail() {
 
   switch (resource) {
     case 'deployments':
-      return <DeploymentDetail namespace={namespace!} name={name} />
+      return <DeploymentDetail namespace={effectiveNamespace!} name={name} />
     case 'pods':
-      return <PodDetail namespace={namespace!} name={name} />
+      return <PodDetail namespace={effectiveNamespace!} name={name} />
     case 'daemonsets':
-      return <DaemonSetDetail namespace={namespace!} name={name} />
+      return <DaemonSetDetail namespace={effectiveNamespace!} name={name} />
     case 'statefulsets':
-      return <StatefulSetDetail namespace={namespace!} name={name} />
+      return <StatefulSetDetail namespace={effectiveNamespace!} name={name} />
     case 'jobs':
-      return <JobDetail namespace={namespace!} name={name} />
+      return <JobDetail namespace={effectiveNamespace!} name={name} />
     case 'cronjobs':
-      return <CronJobDetail namespace={namespace!} name={name} />
+      return <CronJobDetail namespace={effectiveNamespace!} name={name} />
     case 'secrets':
-      return <SecretDetail namespace={namespace!} name={name} />
+      return <SecretDetail namespace={effectiveNamespace!} name={name} />
     case 'nodes':
       return <NodeDetail name={name} />
     case 'services':
-      return <ServiceDetail namespace={namespace!} name={name} />
+      return <ServiceDetail namespace={effectiveNamespace!} name={name} />
     default:
       return (
         <SimpleResourceDetail
           resourceType={resource as ResourceType}
-          namespace={namespace}
+          namespace={effectiveNamespace}
           name={name}
         />
       )

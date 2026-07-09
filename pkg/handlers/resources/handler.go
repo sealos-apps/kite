@@ -189,11 +189,13 @@ func GetResource(c *gin.Context, resource, namespace, name string) (interface{},
 		})
 
 		var namespacedName types.NamespacedName
+		crHandler := NewCRHandler()
+		resolvedNamespace, err := crHandler.resolveCustomResourceNamespaceValue(c, &crd, namespace, crd.Spec.Scope == apiextensionsv1.NamespaceScoped)
+		if err != nil {
+			return nil, err
+		}
 		if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
-			if namespace == "" {
-				return nil, fmt.Errorf("namespace is required for namespaced custom resources")
-			}
-			namespacedName = types.NamespacedName{Namespace: namespace, Name: name}
+			namespacedName = types.NamespacedName{Namespace: resolvedNamespace, Name: name}
 		} else {
 			namespacedName = types.NamespacedName{Name: name}
 		}
