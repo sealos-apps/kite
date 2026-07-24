@@ -33,6 +33,7 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kubectl v0.36.1
 	k8s.io/metrics v0.36.1
+	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/gateway-api v1.5.1
 	sigs.k8s.io/yaml v1.6.0
@@ -190,7 +191,6 @@ require (
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
-	oras.land/oras-go/v2 v2.6.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect

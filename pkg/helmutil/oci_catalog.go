@@ -15,6 +15,7 @@ import (
 	"time"
 
 	chart "helm.sh/helm/v4/pkg/chart/v2"
+	"oras.land/oras-go/v2/registry/remote/auth"
 )
 
 const (
@@ -134,7 +135,9 @@ type ociManifest struct {
 
 type ociDiscoveryClient struct {
 	config OCIRegistryDiscoveryConfig
-	client *http.Client
+	client interface {
+		Do(*http.Request) (*http.Response, error)
+	}
 }
 
 var (
@@ -482,7 +485,7 @@ func parsePositiveIntEnv(name string, fallback int) (int, error) {
 
 func newOCIDiscoveryClient(config OCIRegistryDiscoveryConfig) (*ociDiscoveryClient, error) {
 	httpClient := http.DefaultClient
-	if !config.RegistryOptions.PlainHTTP && (config.RegistryOptions.InsecureSkipTLSVerify || strings.TrimSpace(config.RegistryOptions.CAFile) != "") {
+	if config.RegistryOptions.InsecureSkipTLSVerify || strings.TrimSpace(config.RegistryOptions.CAFile) != "" {
 		tlsConfig, err := newOCITLSConfig(config.RegistryOptions)
 		if err != nil {
 			return nil, err
@@ -494,9 +497,19 @@ func newOCIDiscoveryClient(config OCIRegistryDiscoveryConfig) (*ociDiscoveryClie
 			},
 		}
 	}
+	authClient := &auth.Client{
+		Client: httpClient,
+		Cache:  auth.NewCache(),
+	}
+	if config.RegistryOptions.Username != "" {
+		authClient.Credential = auth.StaticCredential(config.RegistryHost, auth.Credential{
+			Username: config.RegistryOptions.Username,
+			Password: config.RegistryOptions.Password,
+		})
+	}
 	return &ociDiscoveryClient{
 		config: config,
-		client: httpClient,
+		client: authClient,
 	}, nil
 }
 
@@ -608,8 +621,8 @@ func (c *ociDiscoveryClient) getJSONWithStatus(parts []string, query url.Values,
 	if err != nil {
 		return 0, err
 	}
-	if c.config.RegistryOptions.Username != "" {
-		req.SetBasicAuth(c.config.RegistryOptions.Username, c.config.RegistryOptions.Password)
+	if scope := ociRegistryAuthScope(parts); scope != "" {
+		req = req.WithContext(auth.WithScopesForHost(req.Context(), c.config.RegistryHost, scope))
 	}
 	if accept != "" {
 		req.Header.Set("Accept", accept)
@@ -644,6 +657,17 @@ func (c *ociDiscoveryClient) registryAPIURL(parts []string, query url.Values) st
 		u.RawQuery = query.Encode()
 	}
 	return u.String()
+}
+
+func ociRegistryAuthScope(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	if parts[0] == "_catalog" {
+		return auth.ScopeRegistryCatalog
+	}
+	repository := strings.Trim(parts[0], "/")
+	return auth.ScopeRepository(repository, auth.ActionPull)
 }
 
 func chartNameFromRepositoryPath(repositoryPrefix, repositoryPath string) (string, bool) {
