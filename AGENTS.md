@@ -44,6 +44,7 @@ Run from repo root unless noted:
 - Current CI enforces build, lint, and backend tests; no fixed coverage gate is defined.
 - Add or update tests for any changed backend logic, middleware behavior, or API handlers.
 - When syncing upstream UI, run a literal translation-key scan for the touched scopes in addition to `cd ui && pnpm run type-check` and `cd ui && pnpm run build`, so raw keys such as `common.fields.description` do not leak into the interface.
+- Web terminal liveness is owned by `pkg/wsutil` through WebSocket protocol ping/pong frames. Frontend terminal components must not send JSON `ping` messages or expect JSON `pong` responses because those messages are terminal input and can end the Kubernetes exec stream. Run `cd ui && pnpm run test:terminal-heartbeat` after terminal lifecycle changes.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat:`, `fix:`, `chore(deps):`, `release vX.Y.Z`.

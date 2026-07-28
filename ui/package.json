@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "format": "prettier --write .",
     "type-check": "tsc --noEmit",
-    "test:yaml": "node --test --experimental-strip-types src/lib/yaml.test.ts"
+    "test:yaml": "node --test --experimental-strip-types src/lib/yaml.test.ts",
+    "test:terminal-heartbeat": "node --test --experimental-strip-types src/components/terminal-heartbeat.test.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

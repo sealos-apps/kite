@@ -96,7 +96,6 @@ export function Terminal({
     lastUpdate: Date.now(),
   })
   const speedUpdateTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const pingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const { t } = useTranslation()
 
   // Initialize pod/container state on props change
@@ -336,15 +335,6 @@ export function Terminal({
         }
       }, 500)
 
-      if (pingTimerRef.current) clearInterval(pingTimerRef.current)
-      pingTimerRef.current = setInterval(() => {
-        if (websocket.readyState === WebSocket.OPEN) {
-          const pingMessage = JSON.stringify({ type: 'ping' })
-          websocket.send(pingMessage)
-          updateNetworkStats(new Blob([pingMessage]).size, true)
-        }
-      }, 30000)
-
       const terminalTypeLabel =
         type === 'pod'
           ? t('terminalPanel.type.pod')
@@ -382,9 +372,6 @@ export function Terminal({
             )
             setIsConnected(false)
             break
-          case 'pong':
-            // Ignore pong messages from server
-            break
         }
       } catch (err) {
         console.error('Failed to parse WebSocket message:', err)
@@ -403,10 +390,6 @@ export function Terminal({
       if (speedUpdateTimerRef.current) {
         clearInterval(speedUpdateTimerRef.current)
         speedUpdateTimerRef.current = null
-      }
-      if (pingTimerRef.current) {
-        clearInterval(pingTimerRef.current)
-        pingTimerRef.current = null
       }
       if (event.code !== 1000) {
         terminal.writeln(
@@ -470,7 +453,6 @@ export function Terminal({
       websocket.close()
       if (speedUpdateTimerRef.current)
         clearInterval(speedUpdateTimerRef.current)
-      if (pingTimerRef.current) clearInterval(pingTimerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
