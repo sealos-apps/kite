@@ -40,6 +40,14 @@ import (
 //go:embed static
 var static embed.FS
 
+func healthzHandler(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{
+		"service": "kite",
+		"status":  "ok",
+	})
+}
+
 func setupStatic(r *gin.Engine) {
 	base := common.Base
 	if base != "" && base != "/" {
@@ -91,11 +99,7 @@ func setupAPIRouter(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 		prometheus.DefaultGatherer,
 		ctrlmetrics.Registry,
 	}, promhttp.HandlerOpts{})))
-	r.GET("/healthz", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-		})
-	})
+	r.GET("/healthz", healthzHandler)
 	r.GET("/api/v1/init_check", handlers.InitCheck)
 	r.GET("/api/v1/version", version.GetVersion)
 	// Auth routes (no auth required)

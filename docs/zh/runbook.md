@@ -33,6 +33,7 @@ go tool pprof -top 'http://localhost:6060/debug/pprof/profile?seconds=10'
 - 后端：`http://localhost:8080`
 - Vite 开发服务：`http://localhost:5173`
 - 健康检查：`http://localhost:8080/healthz`
+  返回 `200`、`{"service":"kite","status":"ok"}`，并设置 `Cache-Control: no-store`。
 
 ## 构建与测试
 
