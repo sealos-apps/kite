@@ -34,6 +34,7 @@ Default local endpoints:
 - Backend: `http://localhost:8080`
 - Vite dev server: `http://localhost:5173`
 - Health check: `http://localhost:8080/healthz`
+  Returns `200` with `{"service":"kite","status":"ok"}` and `Cache-Control: no-store`.
 
 ## Build And Test
 
