@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"reflect"
@@ -16,7 +17,9 @@ import (
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"github.com/zxh326/kite/pkg/rbac"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -28,6 +31,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
+
+const (
+	defaultListLimit int64 = 100
+	maxListLimit     int64 = 500
+)
+
+func normalizeListLimit(raw string) (int64, bool, error) {
+	if raw == "" {
+		return defaultListLimit, true, nil
+	}
+	limit, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, false, fmt.Errorf("invalid limit parameter")
+	}
+	if limit <= 0 {
+		return defaultListLimit, true, nil
+	}
+	if limit > maxListLimit {
+		return maxListLimit, true, nil
+	}
+	return limit, true, nil
+}
 
 type GenericResourceHandler[T client.Object, V client.ObjectList] struct {
 	name            string
@@ -230,12 +255,10 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 			listOpts = append(listOpts, client.InNamespace(namespace))
 		}
 	}
-	if c.Query("limit") != "" {
-		limit, err := strconv.ParseInt(c.Query("limit"), 10, 64)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit parameter"})
-			return zero, err
-		}
+	if limit, enabled, err := normalizeListLimit(c.Query("limit")); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return zero, err
+	} else if enabled {
 		listOpts = append(listOpts, client.Limit(limit))
 	}
 
@@ -243,8 +266,6 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 		continueToken := c.Query("continue")
 		listOpts = append(listOpts, client.Continue(continueToken))
 	}
-
-	// Add label selector support
 	if c.Query("labelSelector") != "" {
 		labelSelector := c.Query("labelSelector")
 		selector, err := metav1.ParseToLabelSelector(labelSelector)
@@ -271,6 +292,23 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 	}
 
 	if err := cs.K8sClient.List(ctx, objectList, listOpts...); err != nil {
+		if h.Name() == string(common.EndpointSlices) && meta.IsNoMatchError(err) {
+			_ = meta.SetList(objectList, []runtime.Object{})
+			return objectList, nil
+		}
+		if h.Name() == string(common.Namespaces) && apierrors.IsForbidden(err) {
+			fallbackNamespace := "default"
+			if cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" {
+				fallbackNamespace = cs.Namespace
+			}
+			namespace := &corev1.Namespace{}
+			namespace.SetName(fallbackNamespace)
+			if c.Query("reduce") == "true" {
+				namespace = reduceNamespaceListItem(namespace)
+			}
+			_ = meta.SetList(objectList, []runtime.Object{namespace})
+			return objectList, nil
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return zero, err
 	}
@@ -321,12 +359,41 @@ func (h *GenericResourceHandler[T, V]) list(c *gin.Context) (V, error) {
 		}
 		filterItems = append(filterItems, items[i])
 	}
+	if c.Query("reduce") == "true" && h.Name() == string(common.Namespaces) {
+		for i := range filterItems {
+			namespace, ok := filterItems[i].(*corev1.Namespace)
+			if ok {
+				filterItems[i] = reduceNamespaceListItem(namespace)
+			}
+		}
+	}
 	_ = meta.SetList(objectList, filterItems)
 
 	return objectList, nil
 }
 
+func reduceNamespaceListItem(namespace *corev1.Namespace) *corev1.Namespace {
+	reduced := &corev1.Namespace{}
+	reduced.SetName(namespace.GetName())
+	reduced.SetUID(namespace.GetUID())
+	reduced.SetResourceVersion(namespace.GetResourceVersion())
+	reduced.SetCreationTimestamp(namespace.GetCreationTimestamp())
+	reduced.SetLabels(namespace.GetLabels())
+	return reduced
+}
+
 func (h *GenericResourceHandler[T, V]) List(c *gin.Context) {
+	if wantsSummaryList(c) {
+		if handled, err := writeCachedSummaryList(c, common.ResourceType(h.name), func(ctx *gin.Context) (*summaryListResponse, error) {
+			return h.summaryList(ctx)
+		}); handled {
+			return
+		} else if err != nil && !shouldFallbackFromSummaryError(err) {
+			writeSummaryListError(c, err)
+			return
+		}
+	}
+
 	object, err := h.list(c)
 	if err != nil {
 		return
@@ -558,6 +625,7 @@ func (h *GenericResourceHandler[T, V]) Search(c *gin.Context, q string, limit in
 		labelValue := strings.TrimSpace(q[idx+1:])
 		listOpts = append(listOpts, client.MatchingLabels{labelKey: labelValue})
 	}
+	listOpts = append(listOpts, client.Limit(maxListLimit))
 	if err := cs.K8sClient.List(ctx, objectList, listOpts...); err != nil {
 		klog.Errorf("failed to list %s: %v", h.name, err)
 		return nil, err
@@ -578,6 +646,13 @@ func (h *GenericResourceHandler[T, V]) Search(c *gin.Context, q string, limit in
 			continue
 		}
 		if !isLabelSearch && !strings.Contains(strings.ToLower(obj.GetName()), strings.ToLower(q)) {
+			continue
+		}
+		user := c.MustGet("user").(model.User)
+		if h.Name() == "namespaces" && !rbac.CanAccessNamespace(user, cs.Name, obj.GetName()) {
+			continue
+		}
+		if obj.GetNamespace() != "" && !rbac.CanAccessNamespace(user, cs.Name, obj.GetNamespace()) {
 			continue
 		}
 		result := common.SearchResult{

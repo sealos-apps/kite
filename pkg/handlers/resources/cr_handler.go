@@ -233,6 +233,16 @@ func (h *CRHandler) List(c *gin.Context) {
 
 	// Create GVR from CRD
 	gvr := h.getGVRFromCRD(crd)
+	if wantsSummaryList(c) {
+		if handled, summaryErr := writeCachedSummaryList(c, common.ResourceType(crdName), func(ctx *gin.Context) (*summaryListResponse, error) {
+			return h.summaryList(ctx, crd, gvr)
+		}); handled {
+			return
+		} else if summaryErr != nil && !shouldFallbackFromSummaryError(summaryErr) {
+			writeSummaryListError(c, summaryErr)
+			return
+		}
+	}
 
 	// Create unstructured list object
 	crList := &unstructured.UnstructuredList{}
