@@ -63,7 +63,14 @@ var (
 	nowFunc                = time.Now
 )
 
-const failedClusterBuildBackoff = 5 * time.Minute
+const (
+	failedClusterBuildBackoff = 5 * time.Minute
+	// maxConcurrentClusterBuilds caps how many clusters are built in parallel
+	// during a sync pass. Building is I/O heavy (API discovery, informer cache
+	// sync), so unbounded parallelism can overwhelm the local machine and the
+	// cluster API servers on large fleets.
+	maxConcurrentClusterBuilds = 8
+)
 
 func createClientSetInCluster(name, prometheusURL string) (*ClientSet, error) {
 	config, err := rest.InClusterConfig()
@@ -544,6 +551,46 @@ func syncClusters(cm *ClusterManager) error {
 	return syncClustersWithOptions(cm, clusterSyncOptions{})
 }
 
+// clusterBuildResult carries the outcome of a parallel cluster build.
+type clusterBuildResult struct {
+	cluster   *model.Cluster
+	clientSet *ClientSet
+	err       error
+}
+
+// runBounded runs worker over items with at most limit goroutines and
+// preserves input ordering in the returned slice.
+func runBounded[Input any, Output any](items []Input, limit int, worker func(Input) Output) []Output {
+	if len(items) == 0 {
+		return []Output{}
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > len(items) {
+		limit = len(items)
+	}
+
+	jobs := make(chan int)
+	results := make([]Output, len(items))
+	var workers sync.WaitGroup
+	workers.Add(limit)
+	for workerIndex := 0; workerIndex < limit; workerIndex++ {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				results[index] = worker(items[index])
+			}
+		}()
+	}
+	for index := range items {
+		jobs <- index
+	}
+	close(jobs)
+	workers.Wait()
+	return results
+}
+
 func syncClustersWithOptions(cm *ClusterManager, options clusterSyncOptions) error {
 	cm.syncMu.Lock()
 	defer cm.syncMu.Unlock()
@@ -556,6 +603,7 @@ func syncClustersWithOptions(cm *ClusterManager, options clusterSyncOptions) err
 	}
 	now := nowFunc()
 	dbClusterMap := make(map[string]interface{})
+	var buildQueue []*model.Cluster
 	for _, cluster := range clusters {
 		dbClusterMap[cluster.Name] = cluster
 
@@ -595,17 +643,29 @@ func syncClustersWithOptions(cm *ClusterManager, options clusterSyncOptions) err
 			continue
 		}
 
+		buildQueue = append(buildQueue, cluster)
+	}
+
+	buildResults := runBounded(buildQueue, maxConcurrentClusterBuilds, func(cluster *model.Cluster) clusterBuildResult {
 		clientSet, err := buildClientSetFunc(cluster)
-		cm.mu.Lock()
-		if err != nil {
-			klog.Errorf("Failed to build k8s client for cluster %s, in cluster: %t, err: %v", cluster.Name, cluster.InCluster, err)
-			cm.errors[cluster.Name] = err.Error()
-			cm.recordFailedBuildLocked(cluster, now)
+		return clusterBuildResult{
+			cluster:   cluster,
+			clientSet: clientSet,
+			err:       err,
+		}
+	})
+	for _, result := range buildResults {
+		if result.err != nil {
+			klog.Errorf("Failed to build k8s client for cluster %s, in cluster: %t, err: %v", result.cluster.Name, result.cluster.InCluster, result.err)
+			cm.mu.Lock()
+			cm.errors[result.cluster.Name] = result.err.Error()
+			cm.recordFailedBuildLocked(result.cluster, now)
 			cm.mu.Unlock()
 			continue
 		}
-		cm.clearBuildFailureLocked(cluster.Name)
-		cm.clusters[cluster.Name] = clientSet
+		cm.mu.Lock()
+		cm.clearBuildFailureLocked(result.cluster.Name)
+		cm.clusters[result.cluster.Name] = result.clientSet
 		cm.mu.Unlock()
 	}
 	stoppedClientSets := map[string]*ClientSet{}
