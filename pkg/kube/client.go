@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -92,6 +93,7 @@ type K8sClient struct {
 	client.Client
 	ClientSet     *kubernetes.Clientset
 	Configuration *rest.Config
+	HTTPClient    *http.Client // reusable HTTP client for REST endpoint access (e.g. Table summaries)
 	MetricsClient *metricsclient.Clientset
 	CacheEnabled  bool // true when using controller-runtime informer cache
 
@@ -108,6 +110,11 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 }
 
 func NewClientWithOptions(config *rest.Config, options ClientOptions) (*K8sClient, error) {
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return nil, err
+	}
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
@@ -176,6 +183,7 @@ func NewClientWithOptions(config *rest.Config, options ClientOptions) (*K8sClien
 		Client:        c,
 		ClientSet:     clientset,
 		Configuration: config,
+		HTTPClient:    httpClient,
 		MetricsClient: metricsClient,
 		CacheEnabled:  cacheEnabled,
 		cancel:        cancel,
