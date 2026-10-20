@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useEffect, useState } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
@@ -19,6 +20,7 @@ interface ClusterContextType {
   clusters: Cluster[]
   currentCluster: string | null
   currentClusterInfo: Cluster | null
+  canSwitchClusters: boolean
   setCurrentCluster: (clusterName: string) => void
   isLoading: boolean
   isSwitching?: boolean
@@ -32,6 +34,7 @@ export const ClusterContext = createContext<ClusterContextType | undefined>(
 export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const { user } = useAuth()
   const getScopedNamespaceKey = (clusterName: string) =>
     `${clusterName}-scoped-namespace`
   const getSelectedNamespaceKey = (clusterName: string) =>
@@ -82,6 +85,9 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const currentClusterInfo =
     clusters.find((cluster) => cluster.name === currentCluster) ?? null
+  // Sealos owns workspace selection; manual switching is for standalone use.
+  const canSwitchClusters =
+    !!user && user.provider !== 'sealos' && clusters.length > 1
 
   useEffect(() => {
     if (!currentClusterInfo || !currentClusterInfo.name) return
@@ -164,6 +170,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [clusters, currentCluster])
 
   const setCurrentCluster = (clusterName: string) => {
+    if (!canSwitchClusters) return
     if (clusterName !== currentCluster && !isSwitching) {
       if (!isAsciiClusterName(clusterName)) {
         toast.error('Cluster name must use English/ASCII characters only')
@@ -214,6 +221,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     clusters,
     currentCluster,
     currentClusterInfo,
+    canSwitchClusters,
     setCurrentCluster,
     isLoading,
     isSwitching,

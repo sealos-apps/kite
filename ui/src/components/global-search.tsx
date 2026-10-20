@@ -117,6 +117,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const {
     clusters,
     currentCluster,
+    canSwitchClusters,
     setCurrentCluster,
     isSwitching,
     isLoading: isClusterLoading,
@@ -231,7 +232,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         searchText: 'toggle theme switch mode light dark'.toLocaleLowerCase(),
         onSelect: toggleTheme,
       },
-      ...(clusters.length > 1
+      ...(canSwitchClusters
         ? clusters
             .filter((cluster) => cluster.name !== currentCluster)
             .map((cluster) => ({
@@ -254,6 +255,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     ]
   }, [
     actualTheme,
+    canSwitchClusters,
     clusters,
     currentCluster,
     isClusterLoading,

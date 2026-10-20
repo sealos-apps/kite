@@ -65,6 +65,7 @@ export function ClusterSelector() {
   const {
     clusters,
     currentCluster,
+    canSwitchClusters,
     setCurrentCluster,
     isSwitching,
     isLoading,
@@ -85,6 +86,28 @@ export function ClusterSelector() {
   }
 
   const currentClusterData = clusters.find((c) => c.name === currentCluster)
+  const displayName = getClusterDisplayName(
+    currentClusterData
+      ? {
+          ...currentClusterData,
+          username: user?.username,
+          provider: user?.provider,
+        }
+      : undefined
+  )
+
+  if (!canSwitchClusters) {
+    if (!currentClusterData) return null
+
+    return (
+      <div className="flex h-8 w-full min-w-0 items-center gap-2 px-3">
+        <IconServer className="h-4 w-4 shrink-0" />
+        <span className="truncate text-sm font-medium" title={displayName}>
+          {displayName}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <DropdownMenu>
@@ -97,17 +120,7 @@ export function ClusterSelector() {
         >
           <span className="flex items-center gap-2 min-w-0">
             <IconServer className="h-4 w-4 shrink-0" />
-            <span className="text-sm font-medium truncate">
-              {isSwitching
-                ? 'Switching...'
-                : currentClusterData
-                  ? getClusterDisplayName({
-                      ...currentClusterData,
-                      username: user?.username,
-                      provider: user?.provider,
-                    })
-                  : getClusterDisplayName()}
-            </span>
+            <span className="text-sm font-medium truncate">{displayName}</span>
           </span>
           <IconChevronDown className="h-3 w-3 opacity-50" />
         </Button>
