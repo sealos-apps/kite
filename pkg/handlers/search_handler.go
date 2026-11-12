@@ -137,7 +137,7 @@ func canViewSearchResult(user model.User, cs *cluster.ClientSet, result common.S
 			return rbac.CanAccessNamespace(user, cs.Name, result.Name)
 		}
 		if meta.ClusterScoped {
-			if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) {
+			if cs.NamespaceScopeLocked() {
 				return false
 			}
 			return rbac.CanAccess(user, resource, string(common.VerbGet), cs.Name, "")
@@ -148,7 +148,7 @@ func canViewSearchResult(user model.User, cs *cluster.ClientSet, result common.S
 	if namespace == "" {
 		namespace = common.AllNamespaces
 	}
-	if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) && namespace != cs.Namespace {
+	if cs.NamespaceScopeLocked() && namespace != cs.Namespace {
 		return false
 	}
 	return rbac.CanAccess(user, resource, string(common.VerbGet), cs.Name, namespace)

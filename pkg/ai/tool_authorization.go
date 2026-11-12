@@ -19,8 +19,7 @@ type toolPermission struct {
 }
 
 func isNamespaceScopeLocked(cs *cluster.ClientSet) bool {
-	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" &&
-		!common.IsNamespaceScopeExempt(cs.Namespace)
+	return cs.NamespaceScopeLocked()
 }
 
 func scopedNamespaceForTool(cs *cluster.ClientSet, resource resourceInfo, namespace string) (string, error) {
