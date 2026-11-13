@@ -121,7 +121,7 @@ func (h *PromHandler) loadResourceUsageHistory(ctx context.Context, cs *cluster.
 		if hasMemoryQuota {
 			options.MemoryCapacityByte = memoryCapacity
 		}
-		if !common.IsNamespaceScopeExempt(cs.Namespace) && !rbac.UserHasRole(user, model.DefaultAdminRole.Name) {
+		if !rbac.UserHasRole(user, model.DefaultAdminRole.Name) {
 			options.DisallowClusterCapacityFallback = true
 		}
 	}

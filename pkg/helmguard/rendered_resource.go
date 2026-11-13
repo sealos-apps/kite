@@ -20,7 +20,7 @@ func AuthorizeCreateNamespace(user model.User, cs *cluster.ClientSet, createName
 	if !createNamespace {
 		return nil
 	}
-	if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) {
+	if cs.NamespaceScopeLocked() {
 		return fmt.Errorf("createNamespace is not allowed on namespace-scoped clusters")
 	}
 	if !rbac.UserHasRole(user, model.DefaultAdminRole.Name) && !rbac.CanAccess(user, string(common.Namespaces), string(common.VerbCreate), cs.Name, "") {
@@ -85,12 +85,12 @@ func AuthorizeResource(ctx context.Context, user model.User, cs *cluster.ClientS
 		if namespace != releaseNamespace {
 			return fmt.Errorf("rendered %s/%s targets namespace %s, expected %s", resource.Kind, resource.Name, namespace, releaseNamespace)
 		}
-		if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) && namespace != cs.Namespace {
+		if cs.NamespaceScopeLocked() && namespace != cs.Namespace {
 			return fmt.Errorf("rendered %s/%s targets namespace %s outside cluster scope %s", resource.Kind, resource.Name, namespace, cs.Namespace)
 		}
 	} else {
 		namespace = ""
-		if cs.NamespaceScoped && cs.Namespace != "" && !common.IsNamespaceScopeExempt(cs.Namespace) {
+		if cs.NamespaceScopeLocked() {
 			return fmt.Errorf("rendered %s/%s is cluster-scoped and is not allowed on namespace-scoped clusters", resource.Kind, resource.Name)
 		}
 		if !rbac.UserHasRole(user, model.DefaultAdminRole.Name) {

@@ -147,8 +147,7 @@ func (e *namespaceScopeError) Error() string {
 }
 
 func isNamespaceScopeLocked(cs *cluster.ClientSet) bool {
-	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" &&
-		!common.IsNamespaceScopeExempt(cs.Namespace)
+	return cs.NamespaceScopeLocked()
 }
 
 func (h *GenericResourceHandler[T, V]) resolveNamespace(c *gin.Context, requested string) (string, error) {

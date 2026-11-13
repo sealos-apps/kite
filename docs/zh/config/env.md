@@ -16,7 +16,7 @@ Kite 默认支持一些环境变量，来改变一些配置项的默认值。
 - **SEALOS_AUTH_ENABLED**：是否启用 Sealos 登录接口（`/api/auth/login/sealos`），默认 `false`。
 - **SEALOS_JWT_SECRET**：用于校验 Sealos JWT 的密钥。Kite 对 Sealos token 固定使用 `HS256` 校验。
 - **SEALOS_DEFAULT_PROMETHEUS_URL**：Sealos 管理集群的默认 Prometheus 地址。配置后，Kite 会在 Sealos 集群同步时为新集群写入该值，并在启动时自动补齐历史 Sealos 集群中为空的 `prometheus_url`。
-- **KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES**：逗号分隔的命名空间白名单（例如 `ns-admin,platform-admin`）。命中后会跳过 kubeconfig `current-context.namespace` 导致的 namespace-scope 锁定，Sealos SSO 自动生成的角色会被授予该集群下 `*` 命名空间权限，并且这些 Sealos 用户会被分配 Kite 内置 `admin` 角色，可访问 AI Agent 配置等管理员专属设置。仅应配置那些实际具备全局/集群管理员权限的命名空间。
+- **KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES**：逗号分隔的命名空间白名单（例如 `ns-admin,platform-admin`）。命中后会跳过 kubeconfig `current-context.namespace` 导致的 namespace-scope 锁定，Sealos SSO 自动生成的角色会被授予该集群下 `*` 命名空间权限，并且这些 Sealos 用户会被分配 Kite 内置 `admin` 角色，可访问 AI Agent 配置等管理员专属设置。仅应配置那些实际具备全局/集群管理员权限的命名空间。构建集群客户端时，Kite 会用 kubeconfig 凭据探测集群范围内 Pods 和 PersistentVolumes 的 `list` 权限；如果 API Server 返回 Forbidden，该集群会回退到普通的 namespace-scope 锁定（以及只缓存该命名空间的 informer），并记录 warning，避免启动永远无法同步的集群级 informer 导致页面一直加载。补齐集群级 RBAC 后，需要重建集群客户端（例如重启 Kite）才会恢复豁免。
 - **KITE_HELM_ARTIFACT_HUB_ENABLED**：是否启用 Artifact Hub Chart 源 API 和前端 fallback，默认 `true`；离线部署应设为 `false`。
 - **KITE_HELM_OCI_REGISTRY_BASE**：Kite 用于发现离线 Helm OCI Chart 的 `oci://` registry 前缀，例如 `oci://registry.internal/kite-helm`。
 - **KITE_HELM_OCI_REPOSITORY_NAME**：Kite 页面中展示的 OCI Chart 仓库名称，默认 `offline`。

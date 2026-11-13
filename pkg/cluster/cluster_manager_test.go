@@ -12,9 +12,12 @@ import (
 	"github.com/zxh326/kite/pkg/kube"
 	"github.com/zxh326/kite/pkg/model"
 	"gorm.io/gorm"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func Test_applyNamespaceScope(t *testing.T) {
@@ -27,7 +30,7 @@ func Test_applyNamespaceScope(t *testing.T) {
 		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
 		cs := &ClientSet{Name: "test-cluster"}
 
-		cs.applyNamespaceScope(" default ")
+		cs.applyNamespaceScope(" default ", false)
 
 		assert.True(t, cs.NamespaceScoped)
 		assert.Equal(t, "default", cs.Namespace)
@@ -39,11 +42,69 @@ func Test_applyNamespaceScope(t *testing.T) {
 		}
 		cs := &ClientSet{Name: "test-cluster"}
 
-		cs.applyNamespaceScope("ns-admin")
+		cs.applyNamespaceScope("ns-admin", true)
 
 		assert.False(t, cs.NamespaceScoped)
 		assert.Equal(t, "ns-admin", cs.Namespace)
 	})
+}
+
+func Test_resolveNamespaceScopeExemption(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	originalProbe := clusterWideAccessProbe
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+		clusterWideAccessProbe = originalProbe
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{"ns-admin": {}}
+
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "persistentvolumes"}, "", errors.New("denied"))
+	tests := []struct {
+		name       string
+		namespace  string
+		probeErr   error
+		wantExempt bool
+		wantProbed bool
+	}{
+		{name: "non-exempt namespace skips probe", namespace: "ns-a", wantExempt: false, wantProbed: false},
+		{name: "empty namespace skips probe", namespace: "", wantExempt: false, wantProbed: false},
+		{name: "exempt namespace with cluster-wide access", namespace: "ns-admin", wantExempt: true, wantProbed: true},
+		{name: "forbidden probe falls back to namespace scope", namespace: " NS-ADMIN ", probeErr: forbidden, wantExempt: false, wantProbed: true},
+		{name: "unauthorized probe keeps exemption", namespace: "ns-admin", probeErr: apierrors.NewUnauthorized("expired"), wantExempt: true, wantProbed: true},
+		{name: "transient probe failure keeps exemption", namespace: "ns-admin", probeErr: errors.New("connection refused"), wantExempt: true, wantProbed: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			probed := false
+			clusterWideAccessProbe = func(*rest.Config) error {
+				probed = true
+				return tt.probeErr
+			}
+
+			got := resolveNamespaceScopeExemption("test-cluster", &rest.Config{}, tt.namespace)
+
+			assert.Equal(t, tt.wantExempt, got)
+			assert.Equal(t, tt.wantProbed, probed)
+		})
+	}
+}
+
+func TestClientSetNamespaceScopeLocked(t *testing.T) {
+	originalExempt := common.NamespaceScopeExemptNamespaces
+	t.Cleanup(func() {
+		common.NamespaceScopeExemptNamespaces = originalExempt
+	})
+	common.NamespaceScopeExemptNamespaces = map[string]struct{}{"ns-admin": {}}
+
+	var nilClientSet *ClientSet
+	assert.False(t, nilClientSet.NamespaceScopeLocked())
+	assert.False(t, (&ClientSet{NamespaceScoped: true, Namespace: " "}).NamespaceScopeLocked())
+	assert.False(t, (&ClientSet{Namespace: "ns-admin"}).NamespaceScopeLocked())
+
+	// An exempt namespace that fell back to namespace scope must stay locked.
+	cs := &ClientSet{Name: "test-cluster"}
+	cs.applyNamespaceScope("ns-admin", false)
+	assert.True(t, cs.NamespaceScopeLocked())
 }
 
 func Test_clientOptionsForContextNamespace(t *testing.T) {
@@ -55,7 +116,7 @@ func Test_clientOptionsForContextNamespace(t *testing.T) {
 	t.Run("regular namespace gets a namespace-scoped informer cache", func(t *testing.T) {
 		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
 
-		options := clientOptionsForContextNamespace(" ns-a ")
+		options := clientOptionsForContextNamespace(" ns-a ", false)
 
 		// The cache is no longer disabled; it is restricted to the context
 		// namespace instead.
@@ -68,16 +129,26 @@ func Test_clientOptionsForContextNamespace(t *testing.T) {
 			"ns-admin": {},
 		}
 
-		options := clientOptionsForContextNamespace(" NS-ADMIN ")
+		options := clientOptionsForContextNamespace(" NS-ADMIN ", true)
 
 		assert.False(t, options.DisableCache)
 		assert.Empty(t, options.CacheNamespaces)
 	})
 
+	t.Run("exempt namespace that failed the access probe gets a namespace-scoped cache", func(t *testing.T) {
+		common.NamespaceScopeExemptNamespaces = map[string]struct{}{
+			"ns-admin": {},
+		}
+
+		options := clientOptionsForContextNamespace("ns-admin", false)
+
+		assert.Equal(t, []string{"ns-admin"}, options.CacheNamespaces)
+	})
+
 	t.Run("empty namespace keeps default cache behavior", func(t *testing.T) {
 		common.NamespaceScopeExemptNamespaces = map[string]struct{}{}
 
-		options := clientOptionsForContextNamespace("")
+		options := clientOptionsForContextNamespace("", false)
 
 		assert.False(t, options.DisableCache)
 		assert.Empty(t, options.CacheNamespaces)

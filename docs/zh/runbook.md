@@ -80,6 +80,7 @@ make docs-build
 - `SEALOS_JWT_SECRET`：Sealos 认证校验使用的 JWT 密钥。
 - `KITE_SEALOS_STALE_TTL_DAYS`：Sealos 自动创建的用户/集群在未登录活跃多少天后被每小时执行的残留清理删除（默认 `30`，设为 `0` 关闭）。
 - `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`：逗号分隔的 Sealos 工作空间命名空间列表，表示这些工作空间使用全局/管理员凭据。命中的 Sealos 用户会获得其托管集群下的 `*` 命名空间权限，并被分配 Kite 内置 `admin` 角色。
+- 如果豁免工作空间页面一直加载，或日志出现 `failed waiting for ... Informer to sync`，请查找 warning `configured as namespace-scope exempt, but its credentials cannot read cluster-wide resources`。这表示 kubeconfig 身份（Sealos 下为 `system:serviceaccount:user-system:<user>`）只有命名空间内权限，Kite 已回退到命名空间锁定。给该身份补齐集群级 RBAC 后重启 Kite，或把该命名空间移出豁免列表。
 - `AUTH_COOKIE_SAMESITE` 和 `AUTH_COOKIE_SECURE`：普通部署和 iframe 部署下的 Cookie 策略。
 - `VITE_SEALOS_AUTO_LOGIN`：构建期前端开关，控制是否自动尝试 Sealos SDK 会话登录。
 

@@ -64,8 +64,7 @@ func RBACMiddleware() gin.HandlerFunc {
 }
 
 func namespaceScopeLocked(cs *cluster.ClientSet) bool {
-	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != "" &&
-		!common.IsNamespaceScopeExempt(cs.Namespace)
+	return cs.NamespaceScopeLocked()
 }
 
 func method2verb(method string) string {

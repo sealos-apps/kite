@@ -151,6 +151,7 @@ make docs-build
 - `SEALOS_JWT_SECRET`: JWT secret used for Sealos auth validation.
 - `KITE_SEALOS_STALE_TTL_DAYS`: inactivity TTL for Sealos auto-provisioned users/clusters before the hourly stale cleanup removes them (default `30`, `0` disables).
 - `KITE_NAMESPACE_SCOPE_EXEMPT_NAMESPACES`: comma-separated Sealos workspace namespaces that represent global/admin credentials. Matching Sealos users receive `*` namespaces on their managed cluster and Kite's built-in `admin` role. When the same Sealos user logs into a non-exempt workspace, Kite removes that user's stale built-in `admin` assignment before RBAC sync.
+- If an exempt workspace's pages hang or the logs show `failed waiting for ... Informer to sync`, check for the warning `configured as namespace-scope exempt, but its credentials cannot read cluster-wide resources`. That means the kubeconfig identity (for Sealos, `system:serviceaccount:user-system:<user>`) only has namespace RBAC; Kite has fallen back to namespace scope. Grant it cluster-wide RBAC and restart Kite, or remove the namespace from the exempt list.
 - `AUTH_COOKIE_SAMESITE` and `AUTH_COOKIE_SECURE`: cookie settings for normal and iframe deployments.
 - `VITE_SEALOS_AUTO_LOGIN`: frontend build-time flag controlling Sealos SDK session login attempts.
 

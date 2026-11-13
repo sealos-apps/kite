@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -37,6 +38,15 @@ type ClientSet struct {
 	Namespace               string
 	config                  string
 	prometheusURL           string
+}
+
+// NamespaceScopeLocked reports whether reads and writes on this cluster must
+// stay inside cs.Namespace. Namespace-scope exemption is resolved when the
+// client is built (see resolveNamespaceScopeExemption), so callers must use
+// this instead of re-checking common.IsNamespaceScopeExempt: an exempt
+// namespace whose credentials lack cluster-wide RBAC is locked here.
+func (cs *ClientSet) NamespaceScopeLocked() bool {
+	return cs != nil && cs.NamespaceScoped && strings.TrimSpace(cs.Namespace) != ""
 }
 
 type ClusterManager struct {
@@ -92,11 +102,12 @@ func createClientSetFromConfig(name, content, prometheusURL string) (*ClientSet,
 	// of a full client rebuild.
 	prepareSealosTokenInjection(name, restConfig)
 	contextNamespace := parseCurrentContextNamespace(content)
-	cs, err := newClientSet(name, restConfig, prometheusURL, clientOptionsForContextNamespace(contextNamespace))
+	exempt := resolveNamespaceScopeExemption(name, restConfig, contextNamespace)
+	cs, err := newClientSet(name, restConfig, prometheusURL, clientOptionsForContextNamespace(contextNamespace, exempt))
 	if err != nil {
 		return nil, err
 	}
-	cs.applyNamespaceScope(contextNamespace)
+	cs.applyNamespaceScope(contextNamespace, exempt)
 	cs.config = content
 
 	return cs, nil
@@ -118,9 +129,55 @@ func parseCurrentContextNamespace(content string) string {
 	return strings.TrimSpace(ctx.Namespace)
 }
 
-func clientOptionsForContextNamespace(contextNamespace string) kube.ClientOptions {
+// clusterWideAccessProbe checks whether credentials can read cluster-wide
+// resources. It is a variable so tests can replace the API round-trips.
+var clusterWideAccessProbe = probeClusterWideAccess
+
+const clusterWideAccessProbeTimeout = 3 * time.Second
+
+func probeClusterWideAccess(restConfig *rest.Config) error {
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), clusterWideAccessProbeTimeout)
+	defer cancel()
+	// Exempt clusters run cluster-wide informers for both namespaced and
+	// cluster-scoped types, so probe one of each.
+	if _, err := clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1}); err != nil {
+		return err
+	}
+	_, err = clientset.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{Limit: 1})
+	return err
+}
+
+// resolveNamespaceScopeExemption reports whether a cluster whose kubeconfig
+// context namespace is configured as exempt may really run unscoped.
+// Exemption makes Kite start cluster-wide informers; when the credentials are
+// only bound inside the context namespace those informers never sync and every
+// read blocks until the request times out. A Forbidden probe therefore falls
+// back to the regular namespace lock. Other probe failures (network,
+// Unauthorized from an expiring token) say nothing about RBAC scope, so the
+// configured exemption is kept.
+func resolveNamespaceScopeExemption(name string, restConfig *rest.Config, contextNamespace string) bool {
+	if !common.IsNamespaceScopeExempt(contextNamespace) {
+		return false
+	}
+	err := clusterWideAccessProbe(restConfig)
+	if err == nil {
+		return true
+	}
+	if apierrors.IsForbidden(err) {
+		klog.Warningf("Cluster %s context namespace %s is configured as namespace-scope exempt, but its credentials cannot read cluster-wide resources (%v); falling back to namespace scope. Grant cluster-wide RBAC to the kubeconfig identity and rebuild the cluster client (for example restart Kite) to restore the exemption", name, strings.TrimSpace(contextNamespace), err)
+		return false
+	}
+	klog.Warningf("Cluster-wide access probe failed for exempt cluster %s: %v; keeping namespace-scope exemption", name, err)
+	return true
+}
+
+func clientOptionsForContextNamespace(contextNamespace string, exempt bool) kube.ClientOptions {
 	contextNamespace = strings.TrimSpace(contextNamespace)
-	if contextNamespace == "" || common.IsNamespaceScopeExempt(contextNamespace) {
+	if contextNamespace == "" || exempt {
 		return kube.ClientOptions{}
 	}
 	// Namespace-scoped contexts (Sealos workspaces) previously disabled the
@@ -130,14 +187,14 @@ func clientOptionsForContextNamespace(contextNamespace string) kube.ClientOption
 	return kube.ClientOptions{CacheNamespaces: []string{contextNamespace}}
 }
 
-func (cs *ClientSet) applyNamespaceScope(contextNamespace string) {
+func (cs *ClientSet) applyNamespaceScope(contextNamespace string, exempt bool) {
 	contextNamespace = strings.TrimSpace(contextNamespace)
 	if contextNamespace == "" {
 		return
 	}
 	// Keep context namespace as preferred namespace even when scope lock is exempted.
 	cs.Namespace = contextNamespace
-	if common.IsNamespaceScopeExempt(contextNamespace) {
+	if exempt {
 		klog.Infof("Cluster %s context namespace %s is exempt from namespace scope lock", cs.Name, contextNamespace)
 		return
 	}
